@@ -50,6 +50,7 @@ Never commit .env or bot/API keys.
 - `/dilemma create` — create a topic
 - `/dilemma configure` — configure interval, question count and generation time
 - `/dilemma run` — generate questions immediately
+- `/dilemma random option_count:2-4` — generate one random dilemma without a saved topic or topic counter
 - `/dilemma list` — list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma rename`, `/dilemma delete`
 - `/dilemma help` or `/help` — show help
@@ -73,3 +74,8 @@ Never commit .env or bot/API keys.
 ## License
 
 MIT
+
+## Legal
+
+- [Terms of Service](TERMS_OF_SERVICE.md)
+- [Privacy Policy](PRIVACY_POLICY.md)
