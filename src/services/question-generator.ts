@@ -10,7 +10,7 @@ const client = apiKey
       apiKey,
       baseURL: isOpenRouter ? "https://openrouter.ai/api/v1" : undefined,
       defaultHeaders: isOpenRouter
-        ? { "HTTP-Referer": "https://github.com/mwazqa/Dylematic", "X-Title": "Dilemma" }
+        ? { "HTTP-Referer": "https://github.com/mwazqa/Dilemma", "X-Title": "Dilemma" }
         : undefined
     })
   : null;
@@ -37,7 +37,13 @@ async function withAiRateLimit<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function generateQuestion(topic: string, language = "en", allowedOptions: string[] = [], optionCount = 4): Promise<Question> {
+export async function generateQuestion(
+  topic: string,
+  language = "en",
+  allowedOptions: string[] = [],
+  optionCount = 4,
+  avoidQuestions: string[] = []
+): Promise<Question> {
   if (!client) throw new Error(isOpenRouter
     ? "OPENROUTER_API_KEY is not configured"
     : "OPENAI_API_KEY is not configured");
@@ -52,7 +58,8 @@ export async function generateQuestion(topic: string, language = "en", allowedOp
             ? "Use exactly these answer options: " + allowedOptions.join(", ") + "."
             : "Create exactly " + optionCount + " suitable answer options.") +
           " The explanation must be one short, interesting fact only about the correct answer. " +
-          "Return JSON with language, topic, question, options, topicEmoji, optionEmojis, correctOption and explanation."
+          "Return JSON with language, topic, question, options, topicEmoji, optionEmojis, correctOption and explanation. " +
+          (avoidQuestions.length ? "Do not repeat these previous questions: " + avoidQuestions.join(" | ") + "." : "")
       }));
       return questionSchema.parse(normalizeQuestion(parseJson(response.output_text)));
     } catch (error) {
@@ -67,9 +74,12 @@ export async function generateQuestion(topic: string, language = "en", allowedOp
 function isRetryableAiError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const apiError = error as { status?: number; code?: string; name?: string };
+  const message = error instanceof Error ? error.message : "";
   return apiError.status === 408 || apiError.status === 409 || apiError.status === 429 ||
     (typeof apiError.status === "number" && apiError.status >= 500) ||
-    apiError.code === "ECONNRESET" || apiError.code === "ETIMEDOUT" || apiError.name === "FetchError";
+    apiError.code === "ECONNRESET" || apiError.code === "ETIMEDOUT" || apiError.name === "FetchError" ||
+    apiError.name === "ZodError" || message.includes("AI response does not contain a JSON object") ||
+    message.includes("Unexpected end of JSON input");
 }
 
 function parseJson(value: string): unknown {
@@ -83,7 +93,7 @@ function parseJson(value: string): unknown {
 function normalizeQuestion(value: unknown): unknown {
   if (!value || typeof value !== "object") return value;
   const question = value as Record<string, unknown>;
-  const options = Array.isArray(question.options) ? question.options.map(String) : [];
+  const options = Array.isArray(question.options) ? question.options.map((option) => removeLeadingEmoji(String(option))) : [];
   const rawCorrect = question.correctOption;
   const optionEmojis = Array.isArray(question.optionEmojis) && question.optionEmojis.length === options.length
     ? question.optionEmojis.map(String)
@@ -99,4 +109,8 @@ function normalizeQuestion(value: unknown): unknown {
   const textIndex = options.findIndex((option) => option.toLowerCase() === normalized.toLowerCase());
   const correctOption = letterIndex >= 0 ? letterIndex : numericIndex >= 0 ? numericIndex : textIndex;
   return { ...question, topicEmoji, optionEmojis, correctOption };
+}
+
+function removeLeadingEmoji(value: string): string {
+  return value.replace(/^(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\uFE0F|\u200D)+\s*/u, "").trim();
 }

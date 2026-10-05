@@ -54,3 +54,23 @@ CREATE TABLE "GeneratedPoll" (
 
 -- CreateIndex
 CREATE INDEX "GeneratedPoll_guildId_createdAt_idx" ON "GeneratedPoll"("guildId", "createdAt");
+
+-- CreateTable
+CREATE TABLE "RandomPoll" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "guildId" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "messageId" TEXT NOT NULL,
+    "channelId" TEXT NOT NULL,
+    "question" TEXT NOT NULL,
+    "options" TEXT NOT NULL,
+    "correctOption" INTEGER NOT NULL,
+    "explanation" TEXT NOT NULL,
+    "optionEmojis" TEXT NOT NULL DEFAULT '',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "endedAt" DATETIME,
+    CONSTRAINT "RandomPoll_messageId_key" UNIQUE ("messageId")
+);
+
+-- CreateIndex
+CREATE INDEX "RandomPoll_guildId_createdAt_idx" ON "RandomPoll"("guildId", "createdAt");

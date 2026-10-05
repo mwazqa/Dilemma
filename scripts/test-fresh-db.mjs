@@ -8,7 +8,7 @@ try {
   const database = new DatabaseSync(databasePath);
   database.exec(readFileSync(migrationPath, "utf8"));
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
-  for (const table of ["Topic", "GuildSettings", "GeneratedPoll"]) {
+  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   database.close();

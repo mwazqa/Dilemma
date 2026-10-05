@@ -12,6 +12,7 @@ export function getHelpContent(): string {
     "`/dilemma configure` — set interval, question count and generation time",
     "`/dilemma enable` / `/dilemma disable` — control automatic generation",
     "`/dilemma run` — generate questions now",
+    "`/dilemma random` — generate one random dilemma with 2–4 AI-created options",
     "`/dilemma list` — show configured topics",
     "`/dilemma rename` / `/dilemma delete` — manage topics",
     "`/settings` — set server language and defaults",

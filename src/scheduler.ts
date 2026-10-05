@@ -6,21 +6,22 @@ const schedulerIntervalMs = 60_000;
 
 export function startScheduler(client: Client) {
   void runDueTopics(client);
-  return setInterval(() => void runDueTopics(client), schedulerIntervalMs);
+  const now = new Date();
+  const millisecondsToNextMinute = schedulerIntervalMs - (now.getSeconds() * 1_000 + now.getMilliseconds());
+  return setTimeout(() => {
+    void runDueTopics(client);
+    setInterval(() => void runDueTopics(client), schedulerIntervalMs);
+  }, millisecondsToNextMinute);
 }
 
 async function runDueTopics(client: Client) {
   const now = new Date();
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   const topics = await db.topic.findMany({
-    where: { enabled: true, generationTime: currentTime, channelId: { not: null } }
+    where: { enabled: true, generationTime: { not: null }, channelId: { not: null } }
   });
 
   for (const topic of topics) {
-    if (topic.lastGeneratedAt) {
-      const elapsedDays = (now.getTime() - topic.lastGeneratedAt.getTime()) / 86_400_000;
-      if (elapsedDays < topic.intervalDays) continue;
-    }
+    if (!isTopicDue(topic, now)) continue;
 
     try {
       const channel = await client.channels.fetch(topic.channelId!);
@@ -31,4 +32,15 @@ async function runDueTopics(client: Client) {
       console.error(`Scheduled generation failed for ${topic.name}`, error);
     }
   }
+}
+
+function isTopicDue(topic: { generationTime: string | null; lastGeneratedAt: Date | null; intervalDays: number }, now: Date): boolean {
+  if (!topic.generationTime) return false;
+  const [hours, minutes] = topic.generationTime.split(":").map(Number);
+  const scheduledToday = new Date(now);
+  scheduledToday.setHours(hours, minutes, 0, 0);
+  if (now < scheduledToday) return false;
+  if (!topic.lastGeneratedAt) return true;
+  const nextAllowedAt = topic.lastGeneratedAt.getTime() + topic.intervalDays * 86_400_000;
+  return now.getTime() >= nextAllowedAt;
 }

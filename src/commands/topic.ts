@@ -1,6 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
-import { publishTopicQuestions } from "../services/poll-publisher.js";
+import { publishRandomQuestion, publishTopicQuestions } from "../services/poll-publisher.js";
 import { getHelpContent } from "./help.js";
 
 export const dilemmaCommand = new SlashCommandBuilder()
@@ -43,6 +43,15 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setName("help")
     .setDescription("Show Dilemma commands."))
   .addSubcommand((subcommand) => subcommand
+    .setName("random")
+    .setDescription("Generate one random dilemma now.")
+    .addIntegerOption((option) => option
+      .setName("option_count")
+      .setDescription("Number of AI-generated answers.")
+      .setRequired(true)
+      .setMinValue(2)
+      .setMaxValue(4)))
+  .addSubcommand((subcommand) => subcommand
     .setName("run")
     .setDescription("Generate questions now with AI.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)));
@@ -68,6 +77,32 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       `• **${topic.name}** — ${topic.enabled ? "on" : "off"}, every ${topic.intervalDays} day(s), ${topic.questionsPerRun} question(s), at ${topic.generationTime ?? "server default"}, ${topic.options || `AI chooses ${topic.optionCount}`}`
     );
     await interaction.reply({ content: lines.length ? lines.join("\n") : "No topics configured yet.", ephemeral: true });
+    return;
+  }
+
+  if (subcommand === "random") {
+    const channel = interaction.channel;
+    if (!channel?.isSendable()) {
+      await interaction.reply({ content: "This channel cannot receive questions.", ephemeral: true });
+      return;
+    }
+    const settings = await db.guildSettings.upsert({
+      where: { guildId: interaction.guildId },
+      create: { guildId: interaction.guildId },
+      update: {}
+    });
+    const optionCount = interaction.options.getInteger("option_count", true);
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const generatedTopic = await publishRandomQuestion(interaction.guildId, settings.language, optionCount, channel);
+      await interaction.editReply(`Random dilemma generated: **${generatedTopic}** with ${optionCount} option(s).`);
+    } catch (error) {
+      if (isOpenAIQuotaError(error)) {
+        await interaction.editReply("AI is unavailable: OpenRouter credits or limits were exhausted. Try again later.");
+        return;
+      }
+      throw error;
+    }
     return;
   }
 
@@ -182,6 +217,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         ...(intervalDays === null ? {} : { intervalDays }),
         ...(questionsPerRun === null ? {} : { questionsPerRun }),
         ...(generationTime === null ? {} : { generationTime }),
+        ...(generationTime !== null && generationTime !== topic.generationTime ? { lastGeneratedAt: null } : {}),
         enabled: true
       }
     });

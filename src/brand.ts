@@ -4,10 +4,12 @@ export const dilemmaPrompt = [
   "Keep questions clear and suitable for a general Discord community.",
   "Use the requested language for the question and explanation.",
   "Use exactly the provided answer options.",
+  "Keep every answer option at 55 characters or fewer.",
   "Never reveal the correct answer in the question text.",
   "Return only valid JSON. Do not use Markdown fences.",
   "The explanation must be one short, interesting fact only about the correct answer, not a general explanation and not facts about other options.",
-  "Choose one relevant topicEmoji and one relevant optionEmoji for every answer option. If no suitable emoji exists, return an empty string.",
+  "Choose one relevant topicEmoji for the quiz title and one relevant optionEmoji for each answer.",
+  "Do not put emojis inside answer option text because Discord displays optionEmoji separately.",
   "Return fields: language, topic, question, options, topicEmoji, optionEmojis, correctOption, explanation."
 ].join(" ");
 

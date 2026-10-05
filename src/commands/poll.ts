@@ -38,18 +38,26 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
       return;
     }
     const generatedPoll = await db.generatedPoll.findUnique({ where: { messageId } });
+    const randomPoll = generatedPoll ? null : await db.randomPoll.findUnique({ where: { messageId } });
     await message.poll.end();
-    if (!generatedPoll) {
+    if (!generatedPoll && !randomPoll) {
       await interaction.reply({ content: "Poll ended. Final results are now visible.", ephemeral: true });
       return;
     }
 
-    const options = generatedPoll.options.split("||");
-    const correctAnswer = options[generatedPoll.correctOption] ?? "Unknown";
-    const resultEmojis = generatedPoll.optionEmojis.split("||");
-    await db.generatedPoll.update({ where: { messageId }, data: { endedAt: new Date() } });
-    const topic = await db.topic.findUnique({ where: { id: generatedPoll.topicId } });
-    await channel.send(getResultMessage(topic?.language ?? "en", correctAnswer, generatedPoll.explanation, resultEmojis[generatedPoll.correctOption] ?? ""));
+    const poll = generatedPoll ?? randomPoll!;
+    const options = poll.options.split("||");
+    const correctAnswer = options[poll.correctOption] ?? "Unknown";
+    const resultEmojis = poll.optionEmojis.split("||");
+    if (generatedPoll) {
+      await db.generatedPoll.update({ where: { messageId }, data: { endedAt: new Date() } });
+    } else {
+      await db.randomPoll.update({ where: { messageId }, data: { endedAt: new Date() } });
+    }
+    const language = generatedPoll
+      ? (await db.topic.findUnique({ where: { id: generatedPoll.topicId } }))?.language ?? "en"
+      : randomPoll!.language;
+    await channel.send(getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""));
     await interaction.reply({ content: "Poll ended and results published.", ephemeral: true });
   } catch {
     await interaction.reply({ content: "Poll not found in this channel or it is already closed.", ephemeral: true });

@@ -55,3 +55,20 @@ model GeneratedPoll {
 
   @@index([guildId, createdAt])
 }
+
+model RandomPoll {
+  id            String    @id @default(cuid())
+  guildId       String
+  language      String
+  messageId     String    @unique
+  channelId     String
+  question      String
+  options       String
+  correctOption Int
+  explanation   String
+  optionEmojis  String    @default("")
+  createdAt     DateTime  @default(now())
+  endedAt       DateTime?
+
+  @@index([guildId, createdAt])
+}

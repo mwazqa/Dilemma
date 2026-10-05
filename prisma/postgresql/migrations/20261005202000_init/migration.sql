@@ -49,3 +49,22 @@ CREATE UNIQUE INDEX "Topic_guildId_name_key" ON "Topic"("guildId", "name");
 CREATE INDEX "Topic_guildId_idx" ON "Topic"("guildId");
 CREATE UNIQUE INDEX "GeneratedPoll_messageId_key" ON "GeneratedPoll"("messageId");
 CREATE INDEX "GeneratedPoll_guildId_createdAt_idx" ON "GeneratedPoll"("guildId", "createdAt");
+
+CREATE TABLE "RandomPoll" (
+    "id" TEXT NOT NULL,
+    "guildId" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "messageId" TEXT NOT NULL,
+    "channelId" TEXT NOT NULL,
+    "question" TEXT NOT NULL,
+    "options" TEXT NOT NULL,
+    "correctOption" INTEGER NOT NULL,
+    "explanation" TEXT NOT NULL,
+    "optionEmojis" TEXT NOT NULL DEFAULT '',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "endedAt" TIMESTAMP(3),
+    CONSTRAINT "RandomPoll_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "RandomPoll_messageId_key" ON "RandomPoll"("messageId");
+CREATE INDEX "RandomPoll_guildId_createdAt_idx" ON "RandomPoll"("guildId", "createdAt");
