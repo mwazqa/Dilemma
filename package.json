@@ -17,10 +17,12 @@
     "db:migrate:postgres": "prisma migrate deploy --schema prisma/postgresql/schema.prisma"
   },
   "dependencies": {
+    "@neon/config": "^1.8.4",
+    "@neon/env": "^1.5.1",
+    "@prisma/client": "^6.16.2",
     "discord.js": "^14.19.3",
     "dotenv": "^16.4.7",
     "openai": "^5.12.2",
-    "@prisma/client": "^6.16.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
