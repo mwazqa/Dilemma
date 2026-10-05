@@ -74,7 +74,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   if (subcommand === "list") {
     const topics = await db.topic.findMany({ where: { guildId: interaction.guildId }, orderBy: { name: "asc" } });
     const lines = topics.map((topic) =>
-      `• **${topic.name}** — ${topic.enabled ? "on" : "off"}, every ${topic.intervalDays} day(s), ${topic.questionsPerRun} question(s), at ${topic.generationTime ?? "server default"}, ${topic.options || `AI chooses ${topic.optionCount}`}`
+      `• **${topic.name}** - ${topic.enabled ? "on" : "off"}, every ${topic.intervalDays} day(s), ${topic.questionsPerRun} question(s), at ${topic.generationTime ?? "server default"}, ${topic.options || `AI chooses ${topic.optionCount}`}`
     );
     await interaction.reply({ content: lines.length ? lines.join("\n") : "No topics configured yet.", ephemeral: true });
     return;

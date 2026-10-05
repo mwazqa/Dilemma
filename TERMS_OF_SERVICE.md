@@ -1,4 +1,4 @@
-# Dilemma — Terms of Service
+# Dilemma - Terms of Service
 
 Last updated: October 5, 2026
 

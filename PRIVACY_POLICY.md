@@ -1,4 +1,4 @@
-# Dilemma — Privacy Policy
+# Dilemma - Privacy Policy
 
 Last updated: October 5, 2026
 

@@ -47,15 +47,15 @@ Never commit .env or bot/API keys.
 
 ## Commands
 
-- `/dilemma create` — create a topic
-- `/dilemma configure` — configure interval, question count and generation time
-- `/dilemma run` — generate questions immediately
-- `/dilemma random option_count:2-4` — generate one random dilemma without a saved topic or topic counter
-- `/dilemma list` — list topics
+- `/dilemma create` - create a topic
+- `/dilemma configure` - configure interval, question count and generation time
+- `/dilemma run` - generate questions immediately
+- `/dilemma random option_count:2-4` - generate one random dilemma without a saved topic or topic counter
+- `/dilemma list` - list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma rename`, `/dilemma delete`
-- `/dilemma help` or `/help` — show help
-- `/settings` — set server language and defaults
-- `/poll end` — end a poll and publish its result
+- `/dilemma help` or `/help` - show help
+- `/settings` - set server language and defaults
+- `/poll end` - end a poll and publish its result
 
 ## Production notes
 
