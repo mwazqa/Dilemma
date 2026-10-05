@@ -62,6 +62,8 @@ Never commit .env or bot/API keys.
 - Run the bot continuously. Automatic generation works only while the process is online.
 - Use a persistent PostgreSQL database for production. SQLite is intended for local development.
 - For PostgreSQL: set `DATABASE_URL`, run `npm run db:generate:postgres`, then `npm run db:migrate:postgres`.
+- Recommended free hosting: Oracle Cloud Always Free VM for the bot and Neon Free for PostgreSQL. See [DEPLOYMENT.md](DEPLOYMENT.md).
+- Vercel is suitable for a future web dashboard, not for the always-on Discord bot process.
 - Global Discord commands can take up to one hour to appear. Guild commands update faster during development.
 - Never commit `.env`, Discord tokens or AI API keys.
 
