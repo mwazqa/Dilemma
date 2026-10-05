@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Topic {
+  id             String   @id @default(cuid())
+  guildId        String
+  name           String
+  language       String   @default("en")
+  intervalDays   Int      @default(1)
+  questionsPerRun Int     @default(3)
+  options        String
+  optionCount    Int      @default(4)
+  questionsGenerated Int   @default(0)
+  channelId      String?
+  enabled        Boolean  @default(true)
+  nextGenerationAt DateTime?
+  generationTime String?
+  lastGeneratedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([guildId, name])
+  @@index([guildId])
+}
+
+model GuildSettings {
+  guildId   String   @id
+  language          String   @default("en")
+  defaultIntervalDays Int    @default(1)
+  defaultQuestionsPerRun Int @default(3)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model GeneratedPoll {
+  id            String    @id @default(cuid())
+  guildId       String
+  topicId       String
+  messageId     String    @unique
+  channelId     String
+  question     String
+  options      String
+  correctOption Int
+  explanation  String
+  topicEmoji   String    @default("✨")
+  optionEmojis String    @default("")
+  createdAt    DateTime  @default(now())
+  endedAt      DateTime?
+
+  @@index([guildId, createdAt])
+}

@@ -1,5 +1,5 @@
 {
-  "name": "dylematic",
+  "name": "dilemma",
   "version": "0.1.0",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
@@ -9,16 +9,23 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "register": "tsx src/register-commands.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:db:fresh": "node scripts/test-fresh-db.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:generate:postgres": "prisma generate --schema prisma/postgresql/schema.prisma",
+    "db:migrate:postgres": "prisma migrate deploy --schema prisma/postgresql/schema.prisma"
   },
   "dependencies": {
     "discord.js": "^14.19.3",
     "dotenv": "^16.4.7",
     "openai": "^5.12.2",
+    "@prisma/client": "^6.16.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "prisma": "^6.16.2",
     "tsx": "^4.19.4",
     "typescript": "^5.9.2"
   },
