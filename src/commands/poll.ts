@@ -16,7 +16,7 @@ export const pollCommand = new SlashCommandBuilder()
       .setRequired(true)));
 
 export async function handlePoll(interaction: ChatInputCommandInteraction) {
-  const { text, reply } = await openFeedback(interaction);
+  const { language, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
     await reply(text("serverOnly"));
     return;
@@ -56,9 +56,6 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
     } else {
       await db.randomPoll.update({ where: { messageId }, data: { endedAt: new Date() } });
     }
-    const language = generatedPoll
-      ? (await db.topic.findUnique({ where: { id: generatedPoll.topicId } }))?.language ?? "en"
-      : randomPoll!.language;
     await channel.send({ content: getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""), allowedMentions: { parse: [] } });
     await reply(text("pollDone"));
   } catch {

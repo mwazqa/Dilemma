@@ -98,6 +98,22 @@ assert.equal(topic.difficulty, "easy", "Server defaults do not overwrite existin
 await handleSettings(interaction("defaults", { interval_days: 4, questions_per_run: 1 }));
 assert.equal(settings.defaultDifficulty, "medium");
 await handleSettings(interaction("language", { value: "ja" }));
+topic.language = "en";
+const savedCount = topic.questionsPerRun;
+const savedDifficulty = topic.difficulty;
+await handleTopic(interaction("run", { name: "Test" }));
+assert.match(lastPrompt, / in ja\./, "Run uses global language, not stale topic language");
+assert.match(sent.content, new RegExp(message("ja", "difficulty", { difficulty: message("ja", savedDifficulty) })));
+await publishTopicQuestions(topic, channel);
+assert.match(lastPrompt, / in ja\./, "Scheduled publisher uses global language");
+assert.equal(topic.questionsPerRun, savedCount);
+assert.equal(topic.difficulty, savedDifficulty);
+await handleTopic(interaction("random", { option_count: 4 }));
+assert.match(lastPrompt, / in ja\./, "Random uses global language");
+await handleSettings(interaction("language", { value: "pl" }));
+await publishTopicQuestions(topic, channel);
+assert.match(lastPrompt, / in pl\./, "Changing global language takes effect without recreating topic");
+await handleSettings(interaction("language", { value: "ja" }));
 const ping = interaction("ping");
 await handlePing(ping);
 assert.match(ping.replies[0], /ここにいる/);
@@ -109,4 +125,4 @@ for (const command of [dilemmaCommand.toJSON(), settingsCommand.toJSON()]) {
   }
 }
 await db.$disconnect();
-console.log("PASS: six locales, feedback, choices, all difficulty paths, preserved settings, permissions and validation");
+console.log("PASS: six locales, feedback, difficulty, global language, preserved settings, permissions and validation");

@@ -23,10 +23,10 @@ export const settingsCommand = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.toString())
   .addSubcommand((subcommand) => subcommand
     .setName("language")
-    .setDescription("Set the default language for new questions.")
+    .setDescription("Set the server language for all topics, questions and commands.")
     .addStringOption((option) => option
       .setName("value")
-      .setDescription("Default question language.")
+      .setDescription("Global server language.")
       .setRequired(true)
       .addChoices(...supportedLanguages)))
   .addSubcommand((subcommand) => subcommand

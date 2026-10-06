@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.1.1-alpha`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.1.2-alpha`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with `/dilemma`, `/help`, `/settings`, `/poll` and `/ping`
@@ -64,6 +64,8 @@ Never commit .env or bot/API keys.
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/settings defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
+`/settings language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. Previously published questions and explanations are not retroactively translated. Custom answer options remain exactly as provided.
+
 ## Production notes
 
 - Run the bot continuously. Automatic generation works only while the process is online.
@@ -77,7 +79,7 @@ Omitted difficulty uses the server default for random quizzes and new topics. Ex
 
 ## Roadmap
 
-### Implemented for the next release
+### Implemented in v0.1.2-alpha
 
 - Add selectable question difficulty: easy, medium and hard.
 - Apply the selected difficulty to random questions and saved topics, including scheduled generation.

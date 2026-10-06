@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.2-alpha - 2026-10-06
 
 ### Added
 
@@ -16,6 +16,13 @@
 - Acknowledge command interactions before database work.
 - Require Manage Server permission for the onboarding language selector.
 - Use direct Neon connections for migrations without changing the bot's pooled connection.
+- Treat server language as global for existing and new topics, manual runs, scheduled questions and result labels.
+- Preserve topic difficulty and question count when changing the global language.
+
+### Known limitations
+
+- Free AI provider limits still apply; questions are not guaranteed to arrive within a fixed time.
+- Dependency audit reports a high-severity advisory in the Prisma CLI dependency chain. It remains pending a separately tested dependency update.
 
 ## v0.1.1-alpha - 2026-10-06
 

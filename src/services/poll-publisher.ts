@@ -5,9 +5,11 @@ import { generateQuestion } from "./question-generator.js";
 import { getVotePrompt } from "../brand.js";
 import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
-import { message } from "../messages.js";
+import { message, normalizeLanguage } from "../messages.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
+  const settings = await db.guildSettings.findUnique({ where: { guildId: topic.guildId } });
+  const language = normalizeLanguage(settings?.language ?? "en");
   const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
   const previousQuestions = (await db.generatedPoll.findMany({
     where: { topicId: topic.id },
@@ -17,11 +19,11 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
   })).map((poll) => poll.question);
   for (let index = 0; index < topic.questionsPerRun; index += 1) {
     const difficulty = parseDifficulty(topic.difficulty);
-    const question = await generateUniqueQuestion(topic.name, topic.language, options, topic.optionCount, previousQuestions, difficulty);
+    const question = await generateUniqueQuestion(topic.name, language, options, topic.optionCount, previousQuestions, difficulty);
     previousQuestions.push(question.question);
     const questionNumber = topic.questionsGenerated + index + 1;
     const sentPoll = await channel.send({
-      content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(topic.language, "difficulty", { difficulty: message(topic.language, difficulty) })}\n\n${getVotePrompt(topic.language)}`,
+      content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [] },
       poll: {
         question: { text: question.question },
