@@ -2,6 +2,8 @@ import { PermissionFlagsBits, SlashCommandBuilder, type AutocompleteInteraction,
 import { db } from "../db.js";
 import { publishRandomQuestion, publishTopicQuestions } from "../services/poll-publisher.js";
 import { getHelpContent } from "./help.js";
+import { AiGenerationTimeoutError } from "../services/question-generator.js";
+import { env } from "../config.js";
 
 export const dilemmaCommand = new SlashCommandBuilder()
   .setName("dilemma")
@@ -86,22 +88,29 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       await interaction.reply({ content: "This channel cannot receive questions.", ephemeral: true });
       return;
     }
+    await interaction.deferReply({ ephemeral: true });
     const settings = await db.guildSettings.upsert({
       where: { guildId: interaction.guildId },
       create: { guildId: interaction.guildId },
       update: {}
     });
     const optionCount = interaction.options.getInteger("option_count", true);
-    await interaction.deferReply({ ephemeral: true });
+    const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
+    await interaction.editReply(settings.language === "pl" ? `Tworzę losowy quiz. AI ma maksymalnie ${timeoutSeconds} sekund na odpowiedź.` : `Generating a random quiz. AI has up to ${timeoutSeconds} seconds to respond.`);
     try {
       const generatedTopic = await publishRandomQuestion(interaction.guildId, settings.language, optionCount, channel);
       await interaction.editReply(`Random dilemma generated: **${generatedTopic}** with ${optionCount} option(s).`);
     } catch (error) {
+      if (error instanceof AiGenerationTimeoutError) {
+        await interaction.editReply(settings.language === "pl" ? "AI nie odpowiedziało w wyznaczonym czasie. Spróbuj ponownie za chwilę." : "AI did not respond in time. Please try again shortly.");
+        return;
+      }
       if (isOpenAIQuotaError(error)) {
         await interaction.editReply("AI is unavailable: OpenRouter credits or limits were exhausted. Try again later.");
         return;
       }
-      throw error;
+      console.error("Random dilemma failed:", error instanceof Error ? error.name : "unknown");
+      await interaction.editReply(settings.language === "pl" ? "Nie udało się utworzyć quizu. Sprawdź limity AI i uprawnienia bota do wysyłania ankiet." : "Could not create the quiz. Check AI limits and the bot's permission to send polls.");
     }
     return;
   }
@@ -189,6 +198,10 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     try {
       await publishTopicQuestions(topic, channel);
     } catch (error) {
+      if (error instanceof AiGenerationTimeoutError) {
+        await interaction.editReply("AI did not respond in time. Please try again shortly.");
+        return;
+      }
       if (isOpenAIQuotaError(error)) {
         await interaction.editReply("AI is unavailable: OpenAI API credits are exhausted. Add credits, then run this command again.");
         return;

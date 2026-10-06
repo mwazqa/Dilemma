@@ -64,7 +64,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     console.error(error);
     if (!interaction.isRepliable()) return;
     const message = "Something went wrong. Please try again later.";
-    if (interaction.replied || interaction.deferred) {
+    if (interaction.isChatInputCommand() && interaction.deferred) {
+      await interaction.editReply({ content: message });
+    } else if (interaction.replied || interaction.deferred) {
       await interaction.followUp({ content: message, ephemeral: true });
     } else {
       await interaction.reply({ content: message, ephemeral: true });
@@ -82,13 +84,14 @@ async function routeCommand(interaction: ChatInputCommandInteraction) {
 
 async function handleLanguageSelection(interaction: StringSelectMenuInteraction) {
   if (!interaction.guildId) return;
+  await interaction.deferUpdate();
   const language = interaction.values[0];
   await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, language },
     update: { language }
   });
-  await interaction.update({
+  await interaction.editReply({
     content: `Dilemma language set to **${language}**.`,
     components: []
   });

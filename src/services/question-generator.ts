@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { setTimeout as delay } from "node:timers/promises";
 import { env } from "../config.js";
 import { questionSchema, type Question } from "../types/question.js";
 import { dilemmaPrompt } from "../brand.js";
@@ -8,6 +9,8 @@ const apiKey = isOpenRouter ? env.OPENROUTER_API_KEY : env.OPENAI_API_KEY;
 const client = apiKey
   ? new OpenAI({
       apiKey,
+      maxRetries: 0,
+      timeout: env.AI_GENERATION_TIMEOUT_MS,
       baseURL: isOpenRouter ? "https://openrouter.ai/api/v1" : undefined,
       defaultHeaders: isOpenRouter
         ? { "HTTP-Referer": "https://github.com/mwazqa/Dilemma", "X-Title": "Dilemma" }
@@ -18,18 +21,23 @@ const client = apiKey
 let lastRequestStartedAt = 0;
 let requestQueue = Promise.resolve();
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export class AiGenerationTimeoutError extends Error {
+  constructor() {
+    super("AI generation timed out. Please try again later.");
+    this.name = "AiGenerationTimeoutError";
+  }
 }
 
-async function withAiRateLimit<T>(operation: () => Promise<T>): Promise<T> {
+async function withAiRateLimit<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
   const previous = requestQueue;
   let release!: () => void;
-  requestQueue = new Promise<void>((resolve) => { release = resolve; });
-  await previous;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  requestQueue = previous.then(() => gate);
   try {
+    await waitForQueue(previous, signal);
     const waitMs = Math.max(0, env.AI_MIN_INTERVAL_MS - (Date.now() - lastRequestStartedAt));
-    if (waitMs > 0) await sleep(waitMs);
+    if (waitMs > 0) await delay(waitMs, undefined, { signal });
+    signal.throwIfAborted();
     lastRequestStartedAt = Date.now();
     return await operation();
   } finally {
@@ -37,12 +45,22 @@ async function withAiRateLimit<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
+async function waitForQueue(previous: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    previous.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
+}
+
 export async function generateQuestion(
   topic: string,
   language = "en",
   allowedOptions: string[] = [],
   optionCount = 4,
-  avoidQuestions: string[] = []
+  avoidQuestions: string[] = [],
+  signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS)
 ): Promise<Question> {
   if (!client) throw new Error(isOpenRouter
     ? "OPENROUTER_API_KEY is not configured"
@@ -51,21 +69,44 @@ export async function generateQuestion(
   let lastError: unknown;
   for (let attempt = 0; attempt <= env.AI_MAX_RETRIES; attempt += 1) {
     try {
-      const response = await withAiRateLimit(() => client.responses.create({
-        model: isOpenRouter ? env.OPENROUTER_MODEL : env.OPENAI_MODEL,
-        input: dilemmaPrompt + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
+      const prompt = dilemmaPrompt + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
           " in " + language + ". " + (allowedOptions.length
             ? "Use exactly these answer options: " + allowedOptions.join(", ") + "."
             : "Create exactly " + optionCount + " suitable answer options.") +
           " The explanation must be one short, interesting fact only about the correct answer. " +
-          "Return JSON with language, topic, question, options, topicEmoji, optionEmojis, correctOption and explanation. " +
-          (avoidQuestions.length ? "Do not repeat these previous questions: " + avoidQuestions.join(" | ") + "." : "")
-      }));
-      return questionSchema.parse(normalizeQuestion(parseJson(response.output_text)));
+          "Return only JSON with language, topic, question, options, topicEmoji, optionEmojis, correctOption and explanation. " +
+          "Each answer must be at most 55 characters. correctOption is a zero-based index into options. " +
+          (avoidQuestions.length ? "Do not repeat these previous questions: " + avoidQuestions.join(" | ") + "." : "");
+      const startedAt = Date.now();
+      console.log(`AI generation started: provider=${env.AI_PROVIDER}, attempt=${attempt + 1}`);
+      const output = await withAiRateLimit(async () => {
+        if (isOpenRouter) {
+          const response = await client.chat.completions.create({
+            model: env.OPENROUTER_MODEL,
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 1500
+          }, { signal });
+          return response.choices[0]?.message.content ?? "";
+        }
+        const response = await client.responses.create({
+          model: env.OPENAI_MODEL,
+          input: prompt
+        }, { signal });
+        return response.output_text;
+      }, signal);
+      const question = questionSchema.parse(normalizeQuestion(parseJson(output)));
+      console.log(`AI generation completed in ${Date.now() - startedAt}ms`);
+      return question;
     } catch (error) {
       lastError = error;
+      if (signal.aborted || error instanceof OpenAI.APIConnectionTimeoutError) throw new AiGenerationTimeoutError();
+      console.warn(`AI generation failed: attempt=${attempt + 1}, type=${error instanceof Error ? error.name : "unknown"}`);
       if (attempt >= env.AI_MAX_RETRIES || !isRetryableAiError(error)) throw error;
-      await sleep(Math.min(8_000, 1_000 * 2 ** attempt));
+      try {
+        await delay(Math.min(8_000, 1_000 * 2 ** attempt), undefined, { signal });
+      } catch {
+        throw new AiGenerationTimeoutError();
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new Error("AI request failed");
@@ -101,14 +142,14 @@ function normalizeQuestion(value: unknown): unknown {
   const topicEmoji = typeof question.topicEmoji === "string" && question.topicEmoji.trim()
     ? question.topicEmoji.trim()
     : "";
-  if (typeof rawCorrect !== "string") return { ...question, topicEmoji, optionEmojis };
+  if (typeof rawCorrect !== "string") return { ...question, options, topicEmoji, optionEmojis };
 
   const normalized = rawCorrect.trim();
   const letterIndex = /^[A-D]$/i.test(normalized) ? normalized.toUpperCase().charCodeAt(0) - 65 : -1;
   const numericIndex = /^\d+$/.test(normalized) ? Number(normalized) : -1;
   const textIndex = options.findIndex((option) => option.toLowerCase() === normalized.toLowerCase());
   const correctOption = letterIndex >= 0 ? letterIndex : numericIndex >= 0 ? numericIndex : textIndex;
-  return { ...question, topicEmoji, optionEmojis, correctOption };
+  return { ...question, options, topicEmoji, optionEmojis, correctOption };
 }
 
 function removeLeadingEmoji(value: string): string {

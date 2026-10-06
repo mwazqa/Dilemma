@@ -42,6 +42,7 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  await interaction.deferReply({ ephemeral: true });
   if (interaction.options.getSubcommand() === "language") {
     const language = interaction.options.getString("value", true);
     await db.guildSettings.upsert({
@@ -49,7 +50,7 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
       create: { guildId: interaction.guildId, language },
       update: { language }
     });
-    await interaction.reply({ content: `Default Dilemma language set to **${language}**.`, ephemeral: true });
+    await interaction.editReply({ content: `Default Dilemma language set to **${language}**.` });
     return;
   }
 
@@ -60,5 +61,5 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
     create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun },
     update: { defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun }
   });
-  await interaction.reply({ content: `Defaults set: every ${intervalDays} day(s), ${questionsPerRun} question(s) per AI run.`, ephemeral: true });
+  await interaction.editReply({ content: `Defaults set: every ${intervalDays} day(s), ${questionsPerRun} question(s) per AI run.` });
 }

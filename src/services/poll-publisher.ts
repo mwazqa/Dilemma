@@ -3,6 +3,7 @@ import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
 import { generateQuestion } from "./question-generator.js";
 import { getVotePrompt } from "../brand.js";
+import { env } from "../config.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
   const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
@@ -106,8 +107,9 @@ async function generateUniqueQuestion(
   previousQuestions: string[]
 ) {
   const normalizedPrevious = new Set(previousQuestions.map(normalizeQuestionText));
+  const signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20));
+    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal);
     if (!normalizedPrevious.has(normalizeQuestionText(question.question))) return question;
     previousQuestions.push(question.question);
   }
