@@ -43,7 +43,7 @@ Required variables:
 - DISCORD_REGISTER_GLOBAL, set `true` for global command registration
 - `AI_PROVIDER=openrouter`
 - OPENROUTER_API_KEY
-- OPENROUTER_MODEL, default: `google/gemma-4-26b-a4b-it:free`. Gemma 4 requests use JSON mode with reasoning disabled. Free-provider rate limits still apply.
+- OPENROUTER_MODEL, default: `nvidia/nemotron-3-super-120b-a12b:free`. Nemotron 3 Super requests use JSON mode with reasoning disabled. Free-provider rate limits still apply.
 - DATABASE_URL, default: `file:./dev.db`
 
 Never commit .env or bot/API keys.

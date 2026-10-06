@@ -85,7 +85,7 @@ export async function generateQuestion(
             model: env.OPENROUTER_MODEL,
             messages: [{ role: "user", content: prompt }],
             max_tokens: 1500,
-            ...(env.OPENROUTER_MODEL.startsWith("google/gemma-4-") ? {
+            ...(env.OPENROUTER_MODEL.startsWith("google/gemma-4-") || env.OPENROUTER_MODEL === "nvidia/nemotron-3-super-120b-a12b:free" ? {
               reasoning: { enabled: false },
               response_format: { type: "json_object" as const }
             } : {})
