@@ -39,14 +39,26 @@ DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 
 ```bash
 docker build -t dilemma .
+docker run --rm \
+  --volume "$PWD:/deployment" \
+  --entrypoint node \
+  dilemma scripts/prepare-docker-env.mjs /deployment/.env /deployment/.env.docker
+sudo chown "$(id -u):$(id -g)" .env.docker
 docker run -d \
   --name dilemma \
   --restart unless-stopped \
-  --env-file .env \
+  --env TZ=Europe/Warsaw \
+  --env-file .env.docker \
+  --log-opt max-size=10m \
+  --log-opt max-file=3 \
   dilemma
 ```
 
 The container runs PostgreSQL migrations before starting the bot.
+The preparation command converts dotenv quoting to Docker's environment-file
+format and writes a separate file with owner-only permissions. Rerun it whenever
+you change `.env`. The `Europe/Warsaw` timezone keeps configured quiz hours in
+Polish local time; change it if your server uses another timezone.
 
 ## Required production variables
 
@@ -69,7 +81,7 @@ DATABASE_URL=postgresql://...
 Run registration once from the VM, using the same `.env`:
 
 ```bash
-docker run --rm --env-file .env dilemma npm run register
+docker run --rm --env-file .env.docker dilemma node dist/register-commands.js
 ```
 
 Global commands can take time to appear in Discord.
@@ -79,8 +91,10 @@ Global commands can take time to appear in Discord.
 ```bash
 git pull
 docker build -t dilemma .
+docker run --rm --volume "$PWD:/deployment" --entrypoint node dilemma scripts/prepare-docker-env.mjs /deployment/.env /deployment/.env.docker
+sudo chown "$(id -u):$(id -g)" .env.docker
 docker rm -f dilemma
-docker run -d --name dilemma --restart unless-stopped --env-file .env dilemma
+docker run -d --name dilemma --restart unless-stopped --env TZ=Europe/Warsaw --env-file .env.docker --log-opt max-size=10m --log-opt max-file=3 dilemma
 ```
 
 ## Logs
