@@ -17,8 +17,12 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate:postgres
       - name: Type-check
         run: npm run check
       - name: Build
         run: npm run build
+      - name: Test migrations and features
+        run: npm run test:db:fresh && npm run test:ai && npm run test:features

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Easy, medium and hard difficulty for random quizzes, saved topics and scheduled generation.
+- Server default difficulty; existing topics retain their own settings and migrate to medium.
+- Difficulty labels on polls and topic summaries.
+- Localized help, progress and confirmations with Dilemma-style kaomoji in six languages.
+- Clear localized validation, permission, quota and timeout errors.
+- Automated feature tests and additive migration checks on SQLite and an isolated PostgreSQL branch.
+
+### Fixed
+
+- Acknowledge command interactions before database work.
+- Require Manage Server permission for the onboarding language selector.
+- Use direct Neon connections for migrations without changing the bot's pooled connection.
+
 ## v0.1.1-alpha - 2026-10-06
 
 ### Fixed

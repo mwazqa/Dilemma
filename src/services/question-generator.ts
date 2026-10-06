@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { env } from "../config.js";
 import { questionSchema, type Question } from "../types/question.js";
 import { dilemmaPrompt } from "../brand.js";
+import { defaultDifficulty, difficultyInstructions, parseDifficulty, type Difficulty } from "../difficulty.js";
 
 const isOpenRouter = env.AI_PROVIDER === "openrouter";
 const apiKey = isOpenRouter ? env.OPENROUTER_API_KEY : env.OPENAI_API_KEY;
@@ -60,7 +61,8 @@ export async function generateQuestion(
   allowedOptions: string[] = [],
   optionCount = 4,
   avoidQuestions: string[] = [],
-  signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS)
+  signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS),
+  difficulty: Difficulty = defaultDifficulty
 ): Promise<Question> {
   if (!client) throw new Error(isOpenRouter
     ? "OPENROUTER_API_KEY is not configured"
@@ -69,7 +71,7 @@ export async function generateQuestion(
   let lastError: unknown;
   for (let attempt = 0; attempt <= env.AI_MAX_RETRIES; attempt += 1) {
     try {
-      const prompt = dilemmaPrompt + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
+      const prompt = dilemmaPrompt + ` Difficulty: ${parseDifficulty(difficulty)}. ${difficultyInstructions[difficulty]} ` + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
           " in " + language + ". " + (allowedOptions.length
             ? "Use exactly these answer options: " + allowedOptions.join(", ") + "."
             : "Create exactly " + optionCount + " suitable answer options.") +

@@ -3,6 +3,8 @@ import {
   Client,
   Events,
   GatewayIntentBits,
+  MessageFlags,
+  PermissionFlagsBits,
   StringSelectMenuBuilder,
   type ChatInputCommandInteraction,
   type StringSelectMenuInteraction
@@ -15,6 +17,8 @@ import { handleTopic, handleTopicAutocomplete } from "./commands/topic.js";
 import { handlePoll } from "./commands/poll.js";
 import { handleHelp } from "./commands/help.js";
 import { startScheduler } from "./scheduler.js";
+import { interactionLanguage, rememberLanguage } from "./feedback.js";
+import { message } from "./messages.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -44,7 +48,8 @@ client.on(Events.GuildCreate, async (guild) => {
     })));
 
   await channel.send({
-    content: "Dilemma is ready. Choose the default language for quiz questions:",
+    content: "Your little quiz companion is ready~ Choose your server's language! (≧◡≦) ♡",
+    allowedMentions: { parse: [] },
     components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)]
   });
 });
@@ -61,15 +66,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.isChatInputCommand()) await routeCommand(interaction);
   } catch (error) {
-    console.error(error);
+    console.error("Interaction failed:", error instanceof Error ? error.name : "unknown");
     if (!interaction.isRepliable()) return;
-    const message = "Something went wrong. Please try again later.";
+    const content = message(interactionLanguage(interaction), "error");
     if (interaction.isChatInputCommand() && interaction.deferred) {
-      await interaction.editReply({ content: message });
+      await interaction.editReply({ content, allowedMentions: { parse: [] } });
     } else if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: message, ephemeral: true });
+      await interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
     } else {
-      await interaction.reply({ content: message, ephemeral: true });
+      await interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
     }
   }
 });
@@ -84,15 +89,21 @@ async function routeCommand(interaction: ChatInputCommandInteraction) {
 
 async function handleLanguageSelection(interaction: StringSelectMenuInteraction) {
   if (!interaction.guildId) return;
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    await interaction.reply({ content: message(interactionLanguage(interaction), "permission"), flags: MessageFlags.Ephemeral });
+    return;
+  }
   await interaction.deferUpdate();
   const language = interaction.values[0];
+  if (!supportedLanguages.some(item => item.value === language)) throw new Error("Unsupported language selection");
+  rememberLanguage(interaction, language);
   await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, language },
     update: { language }
   });
   await interaction.editReply({
-    content: `Dilemma language set to **${language}**.`,
+    content: message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)!.name }),
     components: []
   });
 }

@@ -21,6 +21,8 @@ Latest release: `v0.1.1-alpha`. See [CHANGELOG.md](CHANGELOG.md).
 - SQLite + Prisma persistence for local development
 - PostgreSQL + Neon persistence for production
 - Server language onboarding when bot joins a guild
+- Easy, medium and hard question difficulty for random quizzes, saved topics and scheduled generation
+- Localized help and Dilemma-style command feedback in English, Polish, German, Spanish, French and Japanese
 
 ## Setup
 
@@ -50,21 +52,24 @@ Never commit .env or bot/API keys.
 
 ## Commands
 
-- `/dilemma create` - create a topic
-- `/dilemma configure` - configure interval, question count and generation time
+- `/dilemma create` - create a topic with optional `difficulty:easy|medium|hard`
+- `/dilemma configure` - configure interval, question count, generation time or difficulty
 - `/dilemma run` - generate questions immediately
-- `/dilemma random option_count:2-4` - generate one random dilemma without a saved topic or topic counter
+- `/dilemma random option_count:2-4 difficulty:easy|medium|hard` - generate one random dilemma without a saved topic or topic counter; difficulty is optional
 - `/dilemma list` - list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma rename`, `/dilemma delete`
 - `/dilemma help` or `/help` - show help
 - `/settings` - set server language and defaults
 - `/poll end` - end a poll and publish its result
 
+Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/settings defaults` can set a new default without changing existing topics. Existing data migrates to medium.
+
 ## Production notes
 
 - Run the bot continuously. Automatic generation works only while the process is online.
 - Use a persistent PostgreSQL database for production. SQLite is intended for local development.
 - For PostgreSQL: set `DATABASE_URL`, run `npm run db:generate:postgres`, then `npm run db:migrate:postgres`.
+- PostgreSQL migrations use `DATABASE_URL_UNPOOLED` when supplied, or derive the direct endpoint from a Neon pooled URL. The running bot keeps its original connection URL.
 - Recommended free hosting: Oracle Cloud Always Free VM for the bot and Neon Free for PostgreSQL. See [DEPLOYMENT.md](DEPLOYMENT.md).
 - Vercel is suitable for a future web dashboard, not for the always-on Discord bot process.
 - Global Discord commands can take up to one hour to appear. Guild commands update faster during development.
@@ -72,9 +77,9 @@ Never commit .env or bot/API keys.
 
 ## Roadmap
 
-### Next release
+### Implemented for the next release
 
-- Add selectable question difficulty. Proposed levels: easy, medium and hard.
+- Add selectable question difficulty: easy, medium and hard.
 - Apply the selected difficulty to random questions and saved topics, including scheduled generation.
 - Pass the difficulty to the AI prompt and display it with each quiz.
 - Preserve existing topic settings when introducing the new difficulty field.
@@ -85,7 +90,7 @@ Never commit .env or bot/API keys.
 ### Future releases
 
 1. User scores, streaks and leaderboards
-2. More languages and localized help text
+2. More languages beyond the six currently supported
 
 ## License
 

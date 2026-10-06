@@ -4,6 +4,9 @@ import {
   type ChatInputCommandInteraction
 } from "discord.js";
 import { db } from "../db.js";
+import { difficultyOption, parseDifficulty } from "../difficulty.js";
+import { openFeedback } from "../feedback.js";
+import { message } from "../messages.js";
 
 export const supportedLanguages = [
   { name: "English", value: "en" },
@@ -30,19 +33,20 @@ export const settingsCommand = new SlashCommandBuilder()
     .setName("defaults")
     .setDescription("Set default AI generation settings for new topics.")
     .addIntegerOption((option) => option.setName("interval_days").setDescription("Days between generations.").setRequired(true).setMinValue(1).setMaxValue(30))
-    .addIntegerOption((option) => option.setName("questions_per_run").setDescription("Questions generated each time.").setRequired(true).setMinValue(1).setMaxValue(20)));
+    .addIntegerOption((option) => option.setName("questions_per_run").setDescription("Questions generated each time.").setRequired(true).setMinValue(1).setMaxValue(20))
+    .addStringOption(difficultyOption));
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {
+  const { language: currentLanguage, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
-    await interaction.reply({ content: "This command works only inside a server.", ephemeral: true });
+    await reply(text("serverOnly"));
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    await interaction.reply({ content: "Manage Server permission required.", ephemeral: true });
+    await reply(text("permission"));
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
   if (interaction.options.getSubcommand() === "language") {
     const language = interaction.options.getString("value", true);
     await db.guildSettings.upsert({
@@ -50,16 +54,19 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
       create: { guildId: interaction.guildId, language },
       update: { language }
     });
-    await interaction.editReply({ content: `Default Dilemma language set to **${language}**.` });
+    await reply(message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)?.name ?? language }));
     return;
   }
 
   const intervalDays = interaction.options.getInteger("interval_days", true);
   const questionsPerRun = interaction.options.getInteger("questions_per_run", true);
-  await db.guildSettings.upsert({
+  const requestedDifficulty = interaction.options.getString("difficulty");
+  const settings = await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
-    create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun },
-    update: { defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun }
+    create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun,
+      defaultDifficulty: parseDifficulty(requestedDifficulty) },
+    update: { defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun,
+      ...(requestedDifficulty === null ? {} : { defaultDifficulty: parseDifficulty(requestedDifficulty) }) }
   });
-  await interaction.editReply({ content: `Defaults set: every ${intervalDays} day(s), ${questionsPerRun} question(s) per AI run.` });
+  await reply(text("defaultsSet", { days: intervalDays, count: questionsPerRun, difficulty: message(currentLanguage, parseDifficulty(settings.defaultDifficulty)) }));
 }

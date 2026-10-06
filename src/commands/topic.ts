@@ -4,6 +4,9 @@ import { publishRandomQuestion, publishTopicQuestions } from "../services/poll-p
 import { getHelpContent } from "./help.js";
 import { AiGenerationTimeoutError } from "../services/question-generator.js";
 import { env } from "../config.js";
+import { difficultyOption, parseDifficulty } from "../difficulty.js";
+import { openFeedback } from "../feedback.js";
+import { message } from "../messages.js";
 
 export const dilemmaCommand = new SlashCommandBuilder()
   .setName("dilemma")
@@ -13,14 +16,16 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setDescription("Create or update a quiz topic using server defaults.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
     .addStringOption((option) => option.setName("options").setDescription("Optional: answers separated by commas. If empty, AI creates them.").setRequired(false).setMaxLength(500))
-    .addIntegerOption((option) => option.setName("option_count").setDescription("Required only when options is empty: number of AI-created answers.").setRequired(false).setMinValue(2).setMaxValue(4)))
+    .addIntegerOption((option) => option.setName("option_count").setDescription("Required only when options is empty: number of AI-created answers.").setRequired(false).setMinValue(2).setMaxValue(4))
+    .addStringOption(difficultyOption))
   .addSubcommand((subcommand) => subcommand
     .setName("configure")
     .setDescription("Override generation settings for one topic.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
     .addIntegerOption((option) => option.setName("interval_days").setDescription("Optional: days between AI generations.").setRequired(false).setMinValue(1).setMaxValue(30))
     .addIntegerOption((option) => option.setName("questions_per_run").setDescription("Optional: questions generated each time.").setRequired(false).setMinValue(1).setMaxValue(20))
-    .addStringOption((option) => option.setName("generation_time").setDescription("Optional local time, HH:mm, for automatic generation.").setRequired(false).setMaxLength(5)))
+    .addStringOption((option) => option.setName("generation_time").setDescription("Optional local time, HH:mm, for automatic generation.").setRequired(false).setMaxLength(5))
+    .addStringOption(difficultyOption))
   .addSubcommand((subcommand) => subcommand
     .setName("enable")
     .setDescription("Enable automatic generation for a topic.")
@@ -52,65 +57,65 @@ export const dilemmaCommand = new SlashCommandBuilder()
       .setDescription("Number of AI-generated answers.")
       .setRequired(true)
       .setMinValue(2)
-      .setMaxValue(4)))
+      .setMaxValue(4))
+    .addStringOption(difficultyOption))
   .addSubcommand((subcommand) => subcommand
     .setName("run")
     .setDescription("Generate questions now with AI.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)));
 
 export async function handleTopic(interaction: ChatInputCommandInteraction) {
+  const { language, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
-    await interaction.reply({ content: "This command works only inside a server.", ephemeral: true });
+    await reply(text("serverOnly"));
     return;
   }
   const subcommand = interaction.options.getSubcommand();
   if (subcommand === "help") {
-    await interaction.reply({ content: getHelpContent(), ephemeral: true });
+    await reply(getHelpContent(language));
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    await interaction.reply({ content: "Manage Server permission required.", ephemeral: true });
+    await reply(text("permission"));
     return;
   }
 
   if (subcommand === "list") {
     const topics = await db.topic.findMany({ where: { guildId: interaction.guildId }, orderBy: { name: "asc" } });
-    const lines = topics.map((topic) =>
-      `• **${topic.name}** - ${topic.enabled ? "on" : "off"}, every ${topic.intervalDays} day(s), ${topic.questionsPerRun} question(s), at ${topic.generationTime ?? "server default"}, ${topic.options || `AI chooses ${topic.optionCount}`}`
-    );
-    await interaction.reply({ content: lines.length ? lines.join("\n") : "No topics configured yet.", ephemeral: true });
+    const lines = topics.map((topic) => topicSummary(topic, language));
+    await reply(lines.length ? lines.join("\n") : text("emptyTopics"));
     return;
   }
 
   if (subcommand === "random") {
     const channel = interaction.channel;
     if (!channel?.isSendable()) {
-      await interaction.reply({ content: "This channel cannot receive questions.", ephemeral: true });
+      await reply(text("channel"));
       return;
     }
-    await interaction.deferReply({ ephemeral: true });
     const settings = await db.guildSettings.upsert({
       where: { guildId: interaction.guildId },
       create: { guildId: interaction.guildId },
       update: {}
     });
     const optionCount = interaction.options.getInteger("option_count", true);
+    const difficulty = parseDifficulty(interaction.options.getString("difficulty") ?? settings.defaultDifficulty);
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
-    await interaction.editReply(settings.language === "pl" ? `Tworzę losowy quiz. AI ma maksymalnie ${timeoutSeconds} sekund na odpowiedź.` : `Generating a random quiz. AI has up to ${timeoutSeconds} seconds to respond.`);
+    await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
-      const generatedTopic = await publishRandomQuestion(interaction.guildId, settings.language, optionCount, channel);
-      await interaction.editReply(`Random dilemma generated: **${generatedTopic}** with ${optionCount} option(s).`);
+      const generatedTopic = await publishRandomQuestion(interaction.guildId, language, optionCount, channel, difficulty);
+      await reply(text("randomDone", { name: generatedTopic, count: optionCount }));
     } catch (error) {
       if (error instanceof AiGenerationTimeoutError) {
-        await interaction.editReply(settings.language === "pl" ? "AI nie odpowiedziało w wyznaczonym czasie. Spróbuj ponownie za chwilę." : "AI did not respond in time. Please try again shortly.");
+        await reply(text("timeout"));
         return;
       }
       if (isOpenAIQuotaError(error)) {
-        await interaction.editReply("AI is unavailable: OpenRouter credits or limits were exhausted. Try again later.");
+        await reply(text("quota"));
         return;
       }
       console.error("Random dilemma failed:", error instanceof Error ? error.name : "unknown");
-      await interaction.editReply(settings.language === "pl" ? "Nie udało się utworzyć quizu. Sprawdź limity AI i uprawnienia bota do wysyłania ankiet." : "Could not create the quiz. Check AI limits and the bot's permission to send polls.");
+      await reply(text("generationFailed"));
     }
     return;
   }
@@ -120,16 +125,16 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const newName = interaction.options.getString("new_name", true).trim();
     const topic = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name: oldName } } });
     if (!topic) {
-      await interaction.reply({ content: `Topic **${oldName}** does not exist.`, ephemeral: true });
+      await reply(text("missing", { name: oldName }));
       return;
     }
     const existing = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name: newName } } });
     if (existing) {
-      await interaction.reply({ content: `Topic **${newName}** already exists.`, ephemeral: true });
+      await reply(text("exists", { name: newName }));
       return;
     }
     await db.topic.update({ where: { id: topic.id }, data: { name: newName } });
-    await interaction.reply({ content: `Topic renamed from **${oldName}** to **${newName}**.`, ephemeral: true });
+    await reply(text("renamed", { oldName, name: newName }));
     return;
   }
 
@@ -141,19 +146,20 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   });
 
   if (subcommand === "create") {
+    const requestedDifficulty = interaction.options.getString("difficulty");
     const rawOptions = interaction.options.getString("options")?.trim() ?? "";
     const requestedOptionCount = interaction.options.getInteger("option_count");
     const options = rawOptions ? parseOptions(rawOptions) : null;
     if (rawOptions && !options) {
-      await interaction.reply({ content: "Provide 2 to 4 answers separated by commas.", ephemeral: true });
+      await reply(text("optionsInvalid"));
       return;
     }
     if (options && requestedOptionCount !== null && requestedOptionCount !== options.length) {
-      await interaction.reply({ content: "When options are provided, option_count must match their number.", ephemeral: true });
+      await reply(text("optionsMismatch"));
       return;
     }
     if (!options && requestedOptionCount === null) {
-      await interaction.reply({ content: "Leave options empty and provide option_count from 2 to 4.", ephemeral: true });
+      await reply(text("optionsMissing"));
       return;
     }
     const optionCount = options?.length ?? requestedOptionCount!;
@@ -163,52 +169,54 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         guildId: interaction.guildId,
         name,
         language: settings.language,
+        difficulty: parseDifficulty(requestedDifficulty ?? settings.defaultDifficulty),
         intervalDays: settings.defaultIntervalDays,
         questionsPerRun: settings.defaultQuestionsPerRun,
         options: options?.join(", ") ?? "",
         optionCount,
         channelId: interaction.channelId
       },
-      update: { language: settings.language, options: options?.join(", ") ?? "", optionCount, channelId: interaction.channelId, enabled: true }
+      update: { language: settings.language, options: options?.join(", ") ?? "", optionCount, channelId: interaction.channelId, enabled: true,
+        ...(requestedDifficulty === null ? {} : { difficulty: parseDifficulty(requestedDifficulty) }) }
     });
-    await interaction.reply({ content: `Topic **${topic.name}** saved. ${options ? `Uses ${options.length} provided options.` : `AI will create ${optionCount} options.`} Defaults: every ${topic.intervalDays} day(s), ${topic.questionsPerRun} question(s).`, ephemeral: true });
+    await reply(text("saved", { name: topic.name, count: optionCount, difficulty: text(parseDifficulty(topic.difficulty)) }));
     return;
   }
 
   const topic = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name } } });
   if (!topic) {
-    await interaction.reply({ content: `Topic **${name}** does not exist.`, ephemeral: true });
+    await reply(text("missing", { name }));
     return;
   }
 
   if (subcommand === "delete") {
     await db.topic.delete({ where: { id: topic.id } });
-    await interaction.reply({ content: `Topic **${name}** deleted.`, ephemeral: true });
+    await reply(text("deleted", { name }));
     return;
   }
 
   if (subcommand === "run") {
     const channel = interaction.channel;
     if (!channel?.isSendable()) {
-      await interaction.reply({ content: "This channel cannot receive questions.", ephemeral: true });
+      await reply(text("channel"));
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await reply(text("generating", { seconds: Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000), difficulty: text(parseDifficulty(topic.difficulty)) }));
     try {
       await publishTopicQuestions(topic, channel);
     } catch (error) {
       if (error instanceof AiGenerationTimeoutError) {
-        await interaction.editReply("AI did not respond in time. Please try again shortly.");
+        await reply(text("timeout") + "\n" + text("partial"));
         return;
       }
       if (isOpenAIQuotaError(error)) {
-        await interaction.editReply("AI is unavailable: OpenAI API credits are exhausted. Add credits, then run this command again.");
+        await reply(text("quota") + "\n" + text("partial"));
         return;
       }
       throw error;
     }
-    await interaction.editReply(`Generated and published ${topic.questionsPerRun} question(s) for **${topic.name}**.`);
+    await reply(text("runDone", { count: topic.questionsPerRun, name: topic.name }));
     return;
   }
 
@@ -216,12 +224,13 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const intervalDays = interaction.options.getInteger("interval_days");
     const questionsPerRun = interaction.options.getInteger("questions_per_run");
     const generationTime = interaction.options.getString("generation_time")?.trim() || null;
-    if (intervalDays === null && questionsPerRun === null && generationTime === null) {
-      await interaction.reply({ content: "Provide at least one setting to change.", ephemeral: true });
+    const difficulty = interaction.options.getString("difficulty");
+    if (intervalDays === null && questionsPerRun === null && generationTime === null && difficulty === null) {
+      await reply(text("settingsMissing"));
       return;
     }
     if (generationTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(generationTime)) {
-      await interaction.reply({ content: "generation_time must use HH:mm format, for example 18:30.", ephemeral: true });
+      await reply(text("timeInvalid"));
       return;
     }
     const updatedTopic = await db.topic.update({
@@ -230,17 +239,18 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         ...(intervalDays === null ? {} : { intervalDays }),
         ...(questionsPerRun === null ? {} : { questionsPerRun }),
         ...(generationTime === null ? {} : { generationTime }),
+        ...(difficulty === null ? {} : { difficulty: parseDifficulty(difficulty) }),
         ...(generationTime !== null && generationTime !== topic.generationTime ? { lastGeneratedAt: null } : {}),
         enabled: true
       }
     });
-    await interaction.reply({ content: `Topic **${name}** configured: every ${updatedTopic.intervalDays} day(s), ${updatedTopic.questionsPerRun} question(s)${updatedTopic.generationTime ? ` at ${updatedTopic.generationTime}` : ""}.`, ephemeral: true });
+    await reply(text("configured", { summary: topicSummary(updatedTopic, language) }));
     return;
   }
 
   const enabled = subcommand === "enable";
   await db.topic.update({ where: { id: topic.id }, data: { enabled } });
-  await interaction.reply({ content: `Topic **${name}** ${enabled ? "enabled" : "disabled"}.`, ephemeral: true });
+  await reply(text("configured", { summary: topicSummary({ ...topic, enabled }, language) }));
 }
 
 export async function handleTopicAutocomplete(interaction: AutocompleteInteraction) {
@@ -268,7 +278,14 @@ export async function handleTopicAutocomplete(interaction: AutocompleteInteracti
 
 function parseOptions(value: string): string[] | null {
   const options = value.split(",").map((option) => option.trim()).filter(Boolean);
-  return options.length >= 2 && options.length <= 4 ? options : null;
+  return options.length >= 2 && options.length <= 4 && options.every(option => option.length <= 55) &&
+    new Set(options.map(option => option.toLowerCase())).size === options.length ? options : null;
+}
+
+function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; questionsPerRun: number; generationTime: string | null; difficulty: string; options: string; optionCount: number }, language: string) {
+  return message(language, "summary", { name: topic.name, state: message(language, topic.enabled ? "enabled" : "disabled"), days: topic.intervalDays,
+    count: topic.questionsPerRun, time: topic.generationTime ?? message(language, "automatic"), difficulty: message(language, parseDifficulty(topic.difficulty)),
+    answers: topic.options || message(language, "aiAnswers", { count: topic.optionCount }) });
 }
 
 function isOpenAIQuotaError(error: unknown): boolean {

@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
+import { openFeedback } from "../feedback.js";
 
 export const pollCommand = new SlashCommandBuilder()
   .setName("poll")
@@ -15,18 +16,19 @@ export const pollCommand = new SlashCommandBuilder()
       .setRequired(true)));
 
 export async function handlePoll(interaction: ChatInputCommandInteraction) {
+  const { text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
-    await interaction.reply({ content: "This command works only inside a server.", ephemeral: true });
+    await reply(text("serverOnly"));
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    await interaction.reply({ content: "Manage Server permission required.", ephemeral: true });
+    await reply(text("permission"));
     return;
   }
 
   const channel = interaction.channel;
   if (!channel?.isTextBased() || !channel.isSendable() || !("messages" in channel)) {
-    await interaction.reply({ content: "This channel cannot contain polls.", ephemeral: true });
+    await reply(text("channel"));
     return;
   }
 
@@ -34,14 +36,14 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
   try {
     const message = await channel.messages.fetch(messageId);
     if (!message.poll) {
-      await interaction.reply({ content: "That message is not a poll.", ephemeral: true });
+      await reply(text("notPoll"));
       return;
     }
     const generatedPoll = await db.generatedPoll.findUnique({ where: { messageId } });
     const randomPoll = generatedPoll ? null : await db.randomPoll.findUnique({ where: { messageId } });
     await message.poll.end();
     if (!generatedPoll && !randomPoll) {
-      await interaction.reply({ content: "Poll ended. Final results are now visible.", ephemeral: true });
+      await reply(text("pollDone"));
       return;
     }
 
@@ -57,9 +59,9 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
     const language = generatedPoll
       ? (await db.topic.findUnique({ where: { id: generatedPoll.topicId } }))?.language ?? "en"
       : randomPoll!.language;
-    await channel.send(getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""));
-    await interaction.reply({ content: "Poll ended and results published.", ephemeral: true });
+    await channel.send({ content: getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""), allowedMentions: { parse: [] } });
+    await reply(text("pollDone"));
   } catch {
-    await interaction.reply({ content: "Poll not found in this channel or it is already closed.", ephemeral: true });
+    await reply(text("pollFailed"));
   }
 }

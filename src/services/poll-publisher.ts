@@ -4,6 +4,8 @@ import { db } from "../db.js";
 import { generateQuestion } from "./question-generator.js";
 import { getVotePrompt } from "../brand.js";
 import { env } from "../config.js";
+import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
+import { message } from "../messages.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
   const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
@@ -14,11 +16,13 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     take: 100
   })).map((poll) => poll.question);
   for (let index = 0; index < topic.questionsPerRun; index += 1) {
-    const question = await generateUniqueQuestion(topic.name, topic.language, options, topic.optionCount, previousQuestions);
+    const difficulty = parseDifficulty(topic.difficulty);
+    const question = await generateUniqueQuestion(topic.name, topic.language, options, topic.optionCount, previousQuestions, difficulty);
     previousQuestions.push(question.question);
     const questionNumber = topic.questionsGenerated + index + 1;
     const sentPoll = await channel.send({
-      content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n\n${getVotePrompt(topic.language)}`,
+      content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(topic.language, "difficulty", { difficulty: message(topic.language, difficulty) })}\n\n${getVotePrompt(topic.language)}`,
+      allowedMentions: { parse: [] },
       poll: {
         question: { text: question.question },
         answers: question.options.map((option, optionIndex) => {
@@ -36,6 +40,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     await db.generatedPoll.create({
       data: {
         guildId: topic.guildId,
+        difficulty,
         topicId: topic.id,
         messageId: sentPoll.id,
         channelId: channel.id,
@@ -56,7 +61,8 @@ export async function publishRandomQuestion(
   guildId: string,
   language: string,
   optionCount: number,
-  channel: SendableChannels
+  channel: SendableChannels,
+  difficulty: Difficulty = defaultDifficulty
 ): Promise<string> {
   const previousQuestions = (await db.randomPoll.findMany({
     where: { guildId },
@@ -69,10 +75,12 @@ export async function publishRandomQuestion(
     language,
     [],
     optionCount,
-    previousQuestions
+    previousQuestions,
+    difficulty
   );
   const sentPoll = await channel.send({
-    content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n\n${getVotePrompt(language)}`,
+    content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
+    allowedMentions: { parse: [] },
     poll: {
       question: { text: question.question },
       answers: question.options.map((option, optionIndex) => {
@@ -86,6 +94,7 @@ export async function publishRandomQuestion(
   await db.randomPoll.create({
     data: {
       guildId,
+      difficulty,
       language,
       messageId: sentPoll.id,
       channelId: channel.id,
@@ -104,12 +113,13 @@ async function generateUniqueQuestion(
   language: string,
   allowedOptions: string[],
   optionCount: number,
-  previousQuestions: string[]
+  previousQuestions: string[],
+  difficulty: Difficulty = defaultDifficulty
 ) {
   const normalizedPrevious = new Set(previousQuestions.map(normalizeQuestionText));
   const signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal);
+    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal, difficulty);
     if (!normalizedPrevious.has(normalizeQuestionText(question.question))) return question;
     previousQuestions.push(question.question);
   }

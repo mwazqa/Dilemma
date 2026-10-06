@@ -11,10 +11,12 @@
     "register": "tsx src/register-commands.ts",
     "check": "tsc --noEmit",
     "test:db:fresh": "node scripts/test-fresh-db.mjs",
+    "test:ai": "node scripts/test-ai-generation.mjs",
+    "test:features": "node scripts/test-next-release.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:generate:postgres": "prisma generate --schema prisma/postgresql/schema.prisma",
-    "db:migrate:postgres": "prisma migrate deploy --schema prisma/postgresql/schema.prisma"
+    "db:migrate:postgres": "node scripts/migrate-postgres.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.8.4",

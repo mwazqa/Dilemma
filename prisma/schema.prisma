@@ -12,6 +12,7 @@ model Topic {
   guildId        String
   name           String
   language       String   @default("en")
+  difficulty     String   @default("medium")
   intervalDays   Int      @default(1)
   questionsPerRun Int     @default(3)
   options        String
@@ -34,11 +35,13 @@ model GuildSettings {
   language          String   @default("en")
   defaultIntervalDays Int    @default(1)
   defaultQuestionsPerRun Int @default(3)
+  defaultDifficulty String @default("medium")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
 
 model GeneratedPoll {
+  difficulty    String    @default("medium")
   id            String    @id @default(cuid())
   guildId       String
   topicId       String
@@ -57,6 +60,7 @@ model GeneratedPoll {
 }
 
 model RandomPoll {
+  difficulty    String    @default("medium")
   id            String    @id @default(cuid())
   guildId       String
   language      String
