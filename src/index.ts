@@ -19,12 +19,15 @@ import { handleHelp } from "./commands/help.js";
 import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
 import { message } from "./messages.js";
+import { startScoreScheduler } from "./services/scoring.js";
+import { handleScore } from "./commands/score.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as " + readyClient.user.tag);
   startScheduler(client);
+  startScoreScheduler(client);
 });
 
 client.on(Events.GuildCreate, async (guild) => {
@@ -85,6 +88,7 @@ async function routeCommand(interaction: ChatInputCommandInteraction) {
   if (interaction.commandName === "settings") await handleSettings(interaction);
   if (interaction.commandName === "poll") await handlePoll(interaction);
   if (interaction.commandName === "help") await handleHelp(interaction);
+  if (interaction.commandName === "score") await handleScore(interaction);
 }
 
 async function handleLanguageSelection(interaction: StringSelectMenuInteraction) {

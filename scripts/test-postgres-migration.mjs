@@ -17,8 +17,9 @@ try {
   const after = await snapshot();
   for (const table of tables) {
     const field = table === "GuildSettings" ? "defaultDifficulty" : "difficulty";
-    assert.ok(after[table].every(row => row[field] === "medium"));
-    assert.deepEqual(after[table].map(({ [field]: ignored, ...row }) => row), before[table], `Preserve ${table}`);
+    const alreadyPresent = before[table].some(row => Object.hasOwn(row, field));
+    if (!alreadyPresent) assert.ok(after[table].every(row => row[field] === "medium"));
+    assert.deepEqual(after[table].map(row => alreadyPresent ? row : Object.fromEntries(Object.entries(row).filter(([key]) => key !== field))), before[table], `Preserve ${table}`);
   }
   const guildId = "migration-difficulty-test";
   const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard" } });

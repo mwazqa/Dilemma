@@ -6,6 +6,7 @@ import { getVotePrompt } from "../brand.js";
 import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { message, normalizeLanguage } from "../messages.js";
+import { settlementData } from "./scoring.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
   const settings = await db.guildSettings.findUnique({ where: { guildId: topic.guildId } });
@@ -35,24 +36,28 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
         allowMultiselect: false
       }
     });
-    await db.topic.update({
-      where: { id: topic.id },
-      data: { questionsGenerated: { increment: 1 } }
-    });
-    await db.generatedPoll.create({
-      data: {
-        guildId: topic.guildId,
-        difficulty,
-        topicId: topic.id,
-        messageId: sentPoll.id,
-        channelId: channel.id,
-        question: question.question,
-        options: question.options.join("||"),
-        correctOption: question.correctOption,
-        explanation: question.explanation,
-        topicEmoji: question.topicEmoji,
-        optionEmojis: question.optionEmojis.join("||")
-      }
+    const settlement = settlementData(sentPoll, topic.guildId, difficulty, question.options, question.correctOption);
+    await db.$transaction(async tx => {
+      await tx.topic.update({
+        where: { id: topic.id },
+        data: { questionsGenerated: { increment: 1 } }
+      });
+      await tx.generatedPoll.create({
+        data: {
+          guildId: topic.guildId,
+          difficulty,
+          topicId: topic.id,
+          messageId: sentPoll.id,
+          channelId: channel.id,
+          question: question.question,
+          options: question.options.join("||"),
+          correctOption: question.correctOption,
+          explanation: question.explanation,
+          topicEmoji: question.topicEmoji,
+          optionEmojis: question.optionEmojis.join("||")
+        }
+      });
+      await tx.quizSettlement.create({ data: settlement });
     });
   }
   await db.topic.update({ where: { id: topic.id }, data: { channelId: channel.id, lastGeneratedAt: new Date() } });
@@ -93,19 +98,23 @@ export async function publishRandomQuestion(
       allowMultiselect: false
     }
   });
-  await db.randomPoll.create({
-    data: {
-      guildId,
-      difficulty,
-      language,
-      messageId: sentPoll.id,
-      channelId: channel.id,
-      question: question.question,
-      options: question.options.join("||"),
-      correctOption: question.correctOption,
-      explanation: question.explanation,
-      optionEmojis: question.optionEmojis.join("||")
-    }
+  const settlement = settlementData(sentPoll, guildId, difficulty, question.options, question.correctOption);
+  await db.$transaction(async tx => {
+    await tx.randomPoll.create({
+      data: {
+        guildId,
+        difficulty,
+        language,
+        messageId: sentPoll.id,
+        channelId: channel.id,
+        question: question.question,
+        options: question.options.join("||"),
+        correctOption: question.correctOption,
+        explanation: question.explanation,
+        optionEmojis: question.optionEmojis.join("||")
+      }
+    });
+    await tx.quizSettlement.create({ data: settlement });
   });
   return question.topic;
 }

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Server-specific quiz scores: easy 1, medium 2 and hard 3 points for correct answers.
+- Accuracy, current and best correct-answer streaks, and top-ten server leaderboards.
+- `/score profile`, `/score leaderboard` and confirmed self-service `/score forget`.
+- Finalized-vote pagination, bot filtering and actual Discord answer ID mapping.
+- Atomic, idempotent settlements with retry scheduling and restart recovery.
+- Chronological streak recalculation when a poll is processed out of order.
+- Scoring unit tests and isolated PostgreSQL tests for concurrency, rollback, server isolation and privacy deletion.
+- Privacy policy describing stored final votes, score visibility and deletion.
+
+### Fixed
+
+- Reject generated correct-answer indexes that do not exist in the options.
+- Restrict poll closing to recorded Dilemma quizzes in the current server and channel.
+
 ## v0.1.2-alpha - 2026-10-06
 
 ### Added

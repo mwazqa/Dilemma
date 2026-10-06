@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder, type ChatInputCommandInteract
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { openFeedback } from "../feedback.js";
+import { runDueSettlements } from "../services/scoring.js";
 
 export const pollCommand = new SlashCommandBuilder()
   .setName("poll")
@@ -41,13 +42,22 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
     }
     const generatedPoll = await db.generatedPoll.findUnique({ where: { messageId } });
     const randomPoll = generatedPoll ? null : await db.randomPoll.findUnique({ where: { messageId } });
-    await message.poll.end();
     if (!generatedPoll && !randomPoll) {
-      await reply(text("pollDone"));
+      await reply(text("notPoll"));
       return;
     }
 
     const poll = generatedPoll ?? randomPoll!;
+    if (poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
+      await reply(text("notPoll"));
+      return;
+    }
+    if (poll.endedAt) {
+      await reply(text("pollDone"));
+      return;
+    }
+    if (!message.poll.expiresTimestamp || message.poll.expiresTimestamp > Date.now()) await message.poll.end();
+    await db.quizSettlement.updateMany({ where: { messageId, guildId: interaction.guildId, scoredAt: null }, data: { closedAt: new Date(), nextCheckAt: new Date() } });
     const options = poll.options.split("||");
     const correctAnswer = options[poll.correctOption] ?? "Unknown";
     const resultEmojis = poll.optionEmojis.split("||");
@@ -58,6 +68,7 @@ export async function handlePoll(interaction: ChatInputCommandInteraction) {
     }
     await channel.send({ content: getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""), allowedMentions: { parse: [] } });
     await reply(text("pollDone"));
+    void runDueSettlements(interaction.client);
   } catch {
     await reply(text("pollFailed"));
   }

@@ -12,7 +12,7 @@ export function getHelpContent(language = "en"): string {
     ["/dilemma create", "helpCreate"], ["/dilemma configure", "helpConfigure"],
     ["/dilemma enable` / `/dilemma disable", "helpToggle"], ["/dilemma run", "helpRun"],
     ["/dilemma random", "helpRandom"], ["/dilemma list", "helpList"],
-    ["/dilemma rename` / `/dilemma delete", "helpManage"], ["/settings", "helpSettings"], ["/poll end", "helpPoll"]
+    ["/dilemma rename` / `/dilemma delete", "helpManage"], ["/settings", "helpSettings"], ["/poll end", "helpPoll"], ["/score", "helpScore"]
   ];
   return [message(language, "helpIntro"), ...lines.map(([command, key]) => `\`${command}\` - ${message(language, key)}`)].join("\n");
 }

@@ -23,6 +23,7 @@ Latest release: `v0.1.2-alpha`. See [CHANGELOG.md](CHANGELOG.md).
 - Server language onboarding when bot joins a guild
 - Easy, medium and hard question difficulty for random quizzes, saved topics and scheduled generation
 - Localized help and Dilemma-style command feedback in English, Polish, German, Spanish, French and Japanese
+- Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 
 ## Setup
 
@@ -61,6 +62,9 @@ Never commit .env or bot/API keys.
 - `/dilemma help` or `/help` - show help
 - `/settings` - set server language and defaults
 - `/poll end` - end a poll and publish its result
+- `/score profile user:optional` - show points, accuracy, current and best correct-answer streak
+- `/score leaderboard` - show the server's top ten players
+- `/score forget confirm:true` - permanently delete your stored answers and score on the current server
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/settings defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
@@ -89,10 +93,25 @@ Omitted difficulty uses the server default for random quizzes and new topics. Ex
 - Cover success confirmations, progress messages, validation errors, permission errors and AI timeouts, localized to the server language.
 - Keep errors and security warnings clear and actionable, with restrained styling. Preserve exact command names and technical details.
 
+### Implemented for the next release
+
+- User scores, correct-answer streaks and server leaderboards
+- Final-vote scoring with atomic, idempotent settlements and restart recovery
+- Self-service deletion of stored answers and scores
+
 ### Future releases
 
-1. User scores, streaks and leaderboards
-2. More languages beyond the six currently supported
+1. More languages beyond the six currently supported
+
+## Scoring
+
+Correct answers earn 1 point on easy, 2 on medium and 3 on hard. Wrong answers earn zero and reset the correct-answer streak. Not voting does not affect a streak. Streak order follows poll finish times, not background retry order. Equal finish times use message ID order for a stable tie-break.
+
+Only new polls created after scoring is enabled count. Existing quiz history is preserved without retroactive awards. Scores are calculated after Discord finalizes a closed poll; the bot checks every minute and retries unavailable polls. The bot must have View Channel and Read Message History permissions for scored polls. No privileged Discord intent is required for voter retrieval.
+
+`/poll end` can close a quiz early. Vote changes before closing are reflected in the final vote. Bot votes are excluded. Scores and leaderboards are isolated per server. Tied leaderboard scores are ordered by correct answers and then user ID. Score responses do not ping players.
+
+Deleting your answers and score is permanent. Already scored polls are not rescored after deletion, but pending polls and future votes can create new records. See [Privacy Policy](PRIVACY_POLICY.md).
 
 ## License
 

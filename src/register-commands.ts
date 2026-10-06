@@ -5,9 +5,10 @@ import { dilemmaCommand } from "./commands/topic.js";
 import { settingsCommand } from "./commands/settings.js";
 import { pollCommand } from "./commands/poll.js";
 import { helpCommand } from "./commands/help.js";
+import { scoreCommand } from "./commands/score.js";
 
 const rest = new REST({ version: "10" }).setToken(env.DISCORD_TOKEN);
-const commands = [pingCommand.toJSON(), dilemmaCommand.toJSON(), settingsCommand.toJSON(), pollCommand.toJSON(), helpCommand.toJSON()];
+const commands = [pingCommand.toJSON(), dilemmaCommand.toJSON(), settingsCommand.toJSON(), pollCommand.toJSON(), helpCommand.toJSON(), scoreCommand.toJSON()];
 if (env.DISCORD_REGISTER_GLOBAL || !env.DISCORD_GUILD_ID) {
   await rest.put(Routes.applicationCommands(env.DISCORD_CLIENT_ID), { body: commands });
   if (env.DISCORD_GUILD_ID) {

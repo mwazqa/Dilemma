@@ -25,4 +25,4 @@ jobs:
       - name: Build
         run: npm run build
       - name: Test migrations and features
-        run: npm run test:db:fresh && npm run test:ai && npm run test:features
+        run: npm run test:db:fresh && npm run test:ai && npm run test:features && npm run test:scoring

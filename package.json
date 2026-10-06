@@ -13,6 +13,7 @@
     "test:db:fresh": "node scripts/test-fresh-db.mjs",
     "test:ai": "node scripts/test-ai-generation.mjs",
     "test:features": "node scripts/test-next-release.mjs",
+    "test:scoring": "node scripts/test-scoring.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:generate:postgres": "prisma generate --schema prisma/postgresql/schema.prisma",

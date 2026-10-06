@@ -7,6 +7,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model QuizSettlement {
+  messageId       String    @id
+  guildId         String
+  channelId       String
+  difficulty      String
+  correctAnswerId Int
+  answerIds       String
+  expiresAt       DateTime
+  closedAt        DateTime?
+  scoredAt        DateTime?
+  nextCheckAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  answers         QuizAnswer[]
+
+  @@index([scoredAt, nextCheckAt])
+  @@index([guildId])
+}
+
+model QuizAnswer {
+  messageId  String
+  userId     String
+  guildId    String
+  answerId   Int
+  correct    Boolean
+  points     Int
+  finishedAt DateTime
+  settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([guildId, userId, finishedAt, messageId])
+}
+
+model UserScore {
+  guildId       String
+  userId        String
+  points        Int      @default(0)
+  answered      Int      @default(0)
+  correct       Int      @default(0)
+  currentStreak Int      @default(0)
+  bestStreak    Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@id([guildId, userId])
+  @@index([guildId, points])
+}
+
+
 model Topic {
   id             String   @id @default(cuid())
   guildId        String

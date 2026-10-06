@@ -38,6 +38,8 @@ db.randomPoll.findMany = async () => [];
 db.randomPoll.create = async ({ data }) => randomPoll = data;
 db.generatedPoll.findMany = async () => [];
 db.generatedPoll.create = async ({ data }) => generatedPoll = data;
+db.quizSettlement.create = async ({ data }) => data;
+db.$transaction = async callback => callback(db);
 let lastPrompt;
 let counter = 0;
 globalThis.fetch = async (_, options) => {
@@ -52,7 +54,7 @@ const { handleSettings, settingsCommand } = await import("../dist/commands/setti
 const { publishTopicQuestions } = await import("../dist/services/poll-publisher.js");
 const { handlePing } = await import("../dist/commands/ping.js");
 let sent;
-const channel = { id: "channel", isSendable: () => true, send: async payload => { sent = payload; return { id: `message-${counter}` }; } };
+const channel = { id: "channel", isSendable: () => true, send: async payload => { sent = payload; return { id: `message-${counter}`, channelId: "channel", poll: { allowMultiselect: false, expiresAt: new Date(Date.now() + 86400000), answers: new Map(payload.poll.answers.map((answer, i) => [7 + i * 3, { id: 7 + i * 3, text: answer.text }])) } }; } };
 function interaction(subcommand, values = {}, permitted = true) {
   const replies = [];
   let acknowledged = false;

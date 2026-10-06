@@ -12,6 +12,6 @@ export const questionSchema = z.object({
   optionEmojis: z.array(z.string().max(8)).min(2).max(4),
   correctOption: z.coerce.number().int().min(0).max(3),
   explanation: z.string().min(1)
-});
+}).refine(question => question.correctOption < question.options.length, "Correct answer must refer to an existing option");
 
 export type Question = z.infer<typeof questionSchema>;
