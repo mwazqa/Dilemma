@@ -84,7 +84,11 @@ export async function generateQuestion(
           const response = await client.chat.completions.create({
             model: env.OPENROUTER_MODEL,
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 1500
+            max_tokens: 1500,
+            ...(env.OPENROUTER_MODEL.startsWith("google/gemma-4-") ? {
+              reasoning: { enabled: false },
+              response_format: { type: "json_object" as const }
+            } : {})
           }, { signal });
           return response.choices[0]?.message.content ?? "";
         }

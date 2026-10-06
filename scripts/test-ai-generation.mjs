@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 Object.assign(process.env, {
   DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter",
   OPENROUTER_API_KEY: "test", AI_GENERATION_TIMEOUT_MS: "1000",
+  OPENROUTER_MODEL: "google/gemma-4-26b-a4b-it:free",
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "1"
 });
 const question = { language: "pl", topic: "geografia", question: "Stolica Polski?", options: ["🏙️ Warszawa", "Krakow"], topicEmoji: "", optionEmojis: ["", ""], correctOption: 0, explanation: "Warszawa jest stolica Polski." };
@@ -11,6 +12,10 @@ let mode = "success";
 globalThis.fetch = async (url, options) => {
   calls++;
   assert.match(String(url), /chat\/completions/);
+  const body = JSON.parse(options.body);
+  assert.equal(body.model, "google/gemma-4-26b-a4b-it:free");
+  assert.equal(body.reasoning.enabled, false);
+  assert.equal(body.response_format.type, "json_object");
   if (mode === "hang") {
     return await new Promise((resolve, reject) => {
       const fail = () => reject(new DOMException("Aborted", "AbortError"));

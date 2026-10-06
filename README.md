@@ -43,7 +43,7 @@ Required variables:
 - DISCORD_REGISTER_GLOBAL, set `true` for global command registration
 - `AI_PROVIDER=openrouter`
 - OPENROUTER_API_KEY
-- OPENROUTER_MODEL, default: `openrouter/free`
+- OPENROUTER_MODEL, default: `google/gemma-4-26b-a4b-it:free`. Gemma 4 requests use JSON mode with reasoning disabled. Free-provider rate limits still apply.
 - DATABASE_URL, default: `file:./dev.db`
 
 Never commit .env or bot/API keys.
@@ -78,6 +78,9 @@ Never commit .env or bot/API keys.
 - Apply the selected difficulty to random questions and saved topics, including scheduled generation.
 - Pass the difficulty to the AI prompt and display it with each quiz.
 - Preserve existing topic settings when introducing the new difficulty field.
+- Give command feedback a consistent Dilemma uwu voice: warm, playful wording with occasional kaomoji.
+- Cover success confirmations, progress messages, validation errors, permission errors and AI timeouts, localized to the server language.
+- Keep errors and security warnings clear and actionable, with restrained styling. Preserve exact command names and technical details.
 
 ### Future releases
 
