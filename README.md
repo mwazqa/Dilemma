@@ -8,6 +8,8 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
+Latest release: `v0.1.1-alpha`. See [CHANGELOG.md](CHANGELOG.md).
+
 - TypeScript + Node.js 22
 - Discord bot with `/dilemma`, `/help`, `/settings`, `/poll` and `/ping`
 - AI-generated questions, options, facts and context-aware emoji
@@ -17,6 +19,7 @@ Current MVP:
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
 - SQLite + Prisma persistence for local development
+- PostgreSQL + Neon persistence for production
 - Server language onboarding when bot joins a guild
 
 ## Setup
@@ -69,9 +72,17 @@ Never commit .env or bot/API keys.
 
 ## Roadmap
 
+### Next release
+
+- Add selectable question difficulty. Proposed levels: easy, medium and hard.
+- Apply the selected difficulty to random questions and saved topics, including scheduled generation.
+- Pass the difficulty to the AI prompt and display it with each quiz.
+- Preserve existing topic settings when introducing the new difficulty field.
+
+### Future releases
+
 1. User scores, streaks and leaderboards
 2. More languages and localized help text
-3. PostgreSQL production migration
 
 ## License
 
