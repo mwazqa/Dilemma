@@ -107,9 +107,9 @@ export async function runDueSettlements(client: Client) {
         const final = await collectFinalVotes(client, quiz);
         if (final) await applyFinalVotes(quiz, final.votes, final.finishedAt);
         else await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 60_000) } });
-      } catch (error) { console.error("Quiz scoring pending:", error instanceof Error ? error.name : "unknown"); }
+      } catch (error) { console.error("Quiz scoring pending:", privateErrorSummary(error)); }
     }
-  } catch (error) { console.error("Quiz scoring check failed:", error instanceof Error ? error.name : "unknown"); }
+  } catch (error) { console.error("Quiz scoring check failed:", privateErrorSummary(error)); }
   finally { running = false; }
 }
 
@@ -117,3 +117,4 @@ export function startScoreScheduler(client: Client) {
   void runDueSettlements(client);
   return setInterval(() => void runDueSettlements(client), 60_000);
 }
+import { privateErrorSummary } from "../private-errors.js";

@@ -1,3 +1,4 @@
+import { privateErrorSummary } from "./private-errors.js";
 import {
   ActionRowBuilder,
   Client,
@@ -23,9 +24,12 @@ import { startScoreScheduler } from "./services/scoring.js";
 import { handleScore } from "./commands/score.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+client.on(Events.Error, error => {
+  console.error("Discord client error:", privateErrorSummary(error));
+});
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log("Logged in as " + readyClient.user.tag);
+  console.log("Logged in as Discord bot");
   startScheduler(client);
   startScoreScheduler(client);
 });
@@ -69,15 +73,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.isChatInputCommand()) await routeCommand(interaction);
   } catch (error) {
-    console.error("Interaction failed:", error instanceof Error ? error.name : "unknown");
+    console.error("Interaction failed:", privateErrorSummary(error));
     if (!interaction.isRepliable()) return;
     const content = message(interactionLanguage(interaction), "error");
-    if (interaction.isChatInputCommand() && interaction.deferred) {
-      await interaction.editReply({ content, allowedMentions: { parse: [] } });
-    } else if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
-    } else {
-      await interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+    try {
+      if (interaction.isChatInputCommand() && interaction.deferred) {
+        await interaction.editReply({ content, allowedMentions: { parse: [] } });
+      } else if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+      } else {
+        await interaction.reply({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+      }
+    } catch (replyError) {
+      console.error("Interaction error response failed:", privateErrorSummary(replyError));
     }
   }
 });

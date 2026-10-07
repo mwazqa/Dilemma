@@ -1,10 +1,11 @@
 {
   "name": "dilemma",
-  "version": "0.1.2-alpha",
+  "version": "0.2.0-beta",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
   "scripts": {
+    "deploy:prod": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-prod.ps1",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -14,6 +15,15 @@
     "test:ai": "node scripts/test-ai-generation.mjs",
     "test:features": "node scripts/test-next-release.mjs",
     "test:scoring": "node scripts/test-scoring.mjs",
+    "test:privacy": "node scripts/test-private-errors.mjs",
+    "test:images": "node scripts/test-image-security.mjs",
+    "security:production": "powershell.exe -NoProfile -File scripts/audit-production.ps1",
+    "security:images:setup": "node scripts/setup-image-security.mjs",
+    "security:images": "node scripts/check-images.mjs",
+    "security:images:prepare": "node scripts/prepare-image-publication.mjs",
+    "security:publication": "node scripts/check-publication.mjs",
+    "security:setup": "node scripts/setup-secret-scanner.mjs && git config --local core.hooksPath .githooks",
+    "security:scan": "node scripts/check-secrets.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:generate:postgres": "prisma generate --schema prisma/postgresql/schema.prisma",
@@ -22,7 +32,7 @@
   "dependencies": {
     "@neon/config": "^1.8.4",
     "@neon/env": "^1.5.1",
-    "@prisma/client": "^6.16.2",
+    "@prisma/client": "6.19.3",
     "discord.js": "^14.19.3",
     "dotenv": "^16.4.7",
     "openai": "^5.12.2",
@@ -30,9 +40,18 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
-    "prisma": "^6.16.2",
+    "jsqr": "^1.4.0",
+    "prisma": "6.19.3",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0",
     "tsx": "^4.19.4",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    }
   },
   "engines": {
     "node": ">=22"

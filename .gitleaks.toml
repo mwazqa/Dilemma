@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "discord-interaction-token"
+description = "Discord interaction or webhook token in a URL"
+regex = '''(?:interactions|webhooks)/[0-9]{15,22}/([A-Za-z0-9._-]{24,})'''
+secretGroup = 1

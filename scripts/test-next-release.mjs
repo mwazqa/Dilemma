@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { messages, messageLanguages, message, normalizeLanguage } = await import("../dist/messages.js");
-const { getHelpContent } = await import("../dist/commands/help.js");
+const { getHelpContent, getHelpEmbed, handleHelp } = await import("../dist/commands/help.js");
 const { difficultySchema } = await import("../dist/difficulty.js");
 for (const [key, translations] of Object.entries(messages)) {
   assert.equal(translations.length, 6, key);
@@ -13,9 +13,19 @@ for (const [key, translations] of Object.entries(messages)) {
   }
 }
 for (const language of messageLanguages) {
-  assert.match(getHelpContent(language), /difficulty:easy\/medium\/hard/);
+  assert.doesNotMatch(getHelpContent(language), /option_count|difficulty:|confirm:true/);
   assert.match(message(language, "randomDone", { name: "Test", count: 4 }), /Test/);
   assert.ok(getHelpContent(language).length < 2000);
+  const card = getHelpEmbed(language).toJSON();
+  assert.equal(card.title, message(language, "helpIntro"));
+  assert.equal(card.fields.length, 3);
+  assert.ok(card.fields.every(field => field.value.length <= 1024));
+  const commands = card.fields.map(field => field.value).join("\n");
+  assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true/);
+  for (const command of ["create", "configure", "enable", "disable", "run", "random", "list", "rename", "delete"]) {
+    assert.ok(commands.includes(`/dilemma ${command}`));
+  }
+  assert.ok(commands.includes("/settings") && commands.includes("/poll end") && commands.includes("/score"));
 }
 assert.equal(normalizeLanguage("es-ES"), "es");
 assert.equal(normalizeLanguage("unknown"), "en");
@@ -63,6 +73,13 @@ function interaction(subcommand, values = {}, permitted = true) {
     deferReply: async () => { acknowledged = true; },
     editReply: async payload => { assert.ok(acknowledged); replies.push(payload.content ?? payload); }, replies };
 }
+const help = interaction("help"); await handleHelp(help);
+assert.equal(help.replies[0].content, null);
+assert.deepEqual(help.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
+assert.deepEqual(help.replies[0].allowedMentions.parse, []);
+const topicHelp = interaction("help"); await handleTopic(topicHelp);
+assert.equal(topicHelp.replies[0].content, null);
+assert.deepEqual(topicHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
 for (const level of ["easy", "medium", "hard"]) {
   const command = interaction("random", { option_count: 4, difficulty: level });
   await handleTopic(command);

@@ -1,4 +1,4 @@
-import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { MessageFlags, type ChatInputCommandInteraction, type InteractionEditReplyOptions } from "discord.js";
 import { db } from "./db.js";
 import { message, normalizeLanguage, type MessageKey } from "./messages.js";
 
@@ -20,6 +20,9 @@ export async function openFeedback(interaction: ChatInputCommandInteraction) {
     language,
     settings,
     text: (key: MessageKey, values?: Record<string, string | number>) => message(language, key, values),
-    reply: (content: string) => interaction.editReply({ content: content.slice(0, 2000), allowedMentions: { parse: [] } })
+    reply: (payload: string | InteractionEditReplyOptions) => {
+      const options = typeof payload === "string" ? { content: payload } : payload;
+      return interaction.editReply({ ...options, content: options.content === null ? null : options.content?.slice(0, 2000), allowedMentions: { parse: [] } });
+    }
   };
 }

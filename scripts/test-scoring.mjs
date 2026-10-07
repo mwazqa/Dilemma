@@ -61,11 +61,39 @@ db.userScore.findUnique = async ({ where }) => { assert.equal(where.guildId_user
 db.userScore.findMany = async ({ where, orderBy, take }) => { assert.equal(where.guildId, "guild"); assert.equal(take, 10); assert.equal(orderBy[0].points, "desc"); return [player]; };
 function interaction(sub, confirm = false, guildId = "guild") {
   const replies = [];
-  return { guildId, locale: "en", user: { id: "1" }, options: { getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
-    deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); }, replies };
+  const payloads = [];
+  return { guildId, locale: "en", user: { id: "1", displayName: "Testowy gracz", username: "test-player" }, options: { getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
+    deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); payloads.push(payload); }, replies, payloads };
 }
-const profile = interaction("profile"); await handleScore(profile); assert.match(profile.replies[0], /Punkty: \*\*3\*\*/);
-const leaderboard = interaction("leaderboard"); await handleScore(leaderboard); assert.match(leaderboard.replies[0], /1\. <@1>/);
+const profile = interaction("profile"); await handleScore(profile);
+assert.equal(profile.replies[0], null, "No duplicate profile text above the card");
+assert.equal(profile.payloads[0].embeds.length, 1);
+const profileEmbed = profile.payloads[0].embeds[0].toJSON();
+assert.match(profileEmbed.title, /Testowy gracz/);
+assert.doesNotMatch(profileEmbed.title, /<@/);
+assert.match(profileEmbed.description, /\*\*3\*\*/);
+assert.doesNotMatch(profileEmbed.description, /Poprawna odpowiedź:|finalizacji|scoring was enabled/);
+assert.equal(profileEmbed.description.split("\n").length, 2, "Profile contains only points and accuracy, without a rules paragraph");
+assert.equal(profileEmbed.fields.length, 3, "Keep answer and streak statistics");
+const nicknamedProfile = interaction("profile");
+nicknamedProfile.guild = { members: { cache: new Map([["1", { displayName: "Serwerowy nick" }]]) } };
+await handleScore(nicknamedProfile);
+assert.match(nicknamedProfile.payloads[0].embeds[0].toJSON().title, /Serwerowy nick/);
+const otherProfile = interaction("profile");
+otherProfile.options.getUser = () => ({ id: "1", displayName: "Wybrany gracz" });
+await handleScore(otherProfile);
+assert.match(otherProfile.payloads[0].embeds[0].toJSON().title, /Wybrany gracz/);
+const leaderboard = interaction("leaderboard"); await handleScore(leaderboard);
+assert.equal(leaderboard.replies[0], null, "No duplicate ranking text above the card");
+assert.equal(leaderboard.payloads[0].embeds.length, 1);
+assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /🥇 <@1>/);
+assert.equal(leaderboard.payloads[0].embeds[0].toJSON().footer, undefined, "Ranking has no rules footer");
+const findPlayers = db.userScore.findMany;
+db.userScore.findMany = async () => [];
+const emptyLeaderboard = interaction("leaderboard"); await handleScore(emptyLeaderboard);
+assert.equal(emptyLeaderboard.replies[0], null);
+assert.match(emptyLeaderboard.payloads[0].embeds[0].toJSON().description, /Jeszcze nie ma wyników/);
+db.userScore.findMany = findPlayers;
 const dm = interaction("profile", false, null); await handleScore(dm); assert.match(dm.replies[0], /inside a server/);
 let deletions = 0;
 db.$transaction = async cb => cb({ quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },

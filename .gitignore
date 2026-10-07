@@ -69,6 +69,17 @@ web_modules/
 .env
 .env.*
 !.env.example
+.deploy.production.json
+# Local operational review and personal agent instructions are not release files.
+/SECURITY_REVIEW.md
+/AGENTS.md
+.tools/
+*.key
+*.pem
+*.ppk
+id_rsa
+id_ed25519
+id_ecdsa
 *.db
 
 # parcel-bundler cache (https://parceljs.org/)

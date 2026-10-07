@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-const url = new URL(process.env.DATABASE_URL ?? "");
-if (url.hostname !== process.env.EXPECTED_TEST_HOST || url.hostname.includes("-pooler") || url.hostname === "ep-odd-river-b1qyocfx.c-5.eu-central-1.aws.neon.tech") throw new Error("Explicit isolated test endpoint required");
+import { requireTestDatabase } from './test-database-guard.mjs';
+requireTestDatabase(process.env);
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" });
 const { db } = await import("../dist/db.js");
 const { applyFinalVotes } = await import("../dist/services/scoring.js");

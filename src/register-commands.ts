@@ -1,3 +1,4 @@
+import "./private-errors.js";
 import { REST, Routes } from "discord.js";
 import { env } from "./config.js";
 import { pingCommand } from "./commands/ping.js";

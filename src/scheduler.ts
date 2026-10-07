@@ -1,6 +1,7 @@
 import type { Client } from "discord.js";
 import { db } from "./db.js";
 import { publishTopicQuestions } from "./services/poll-publisher.js";
+import { privateErrorSummary } from "./private-errors.js";
 
 const schedulerIntervalMs = 60_000;
 
@@ -14,7 +15,7 @@ export function startScheduler(client: Client) {
   }, millisecondsToNextMinute);
 }
 
-async function runDueTopics(client: Client) {
+export async function runDueTopics(client: Client) {
   const now = new Date();
   const topics = await db.topic.findMany({
     where: { enabled: true, generationTime: { not: null }, channelId: { not: null } }
@@ -27,9 +28,9 @@ async function runDueTopics(client: Client) {
       const channel = await client.channels.fetch(topic.channelId!);
       if (!channel?.isSendable()) continue;
       await publishTopicQuestions(topic, channel);
-      console.log(`Scheduled generation completed for ${topic.name}`);
+      console.log("Scheduled generation completed");
     } catch (error) {
-      console.error(`Scheduled generation failed for ${topic.name}`, error);
+      console.error("Scheduled generation failed:", privateErrorSummary(error));
     }
   }
 }

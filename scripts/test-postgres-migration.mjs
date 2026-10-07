@@ -2,10 +2,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 
-const url = new URL(process.env.DATABASE_URL ?? "");
-if (url.hostname !== process.env.EXPECTED_TEST_HOST || url.hostname.includes("-pooler")) {
-  throw new Error("Migration test requires the explicitly selected direct test endpoint.");
-}
+import { requireTestDatabase } from './test-database-guard.mjs';
+requireTestDatabase(process.env);
 const db = new PrismaClient();
 const tables = ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll"];
 const snapshot = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table, await db.$queryRawUnsafe(`SELECT * FROM "${table}" ORDER BY "${table === "GuildSettings" ? "guildId" : "id"}"`)])));

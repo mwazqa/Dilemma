@@ -3,6 +3,17 @@ dist
 .env
 .env.*
 !.env.example
+.deploy.production.json
+.tools
+*.key
+*.pem
+*.ppk
+**/*.key
+**/*.pem
+**/*.ppk
+**/id_rsa
+**/id_ed25519
+**/id_ecdsa
 prisma/dev.db
 prisma/dev.db-journal
 .git

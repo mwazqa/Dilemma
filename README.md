@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.1.2-alpha`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.2.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with `/dilemma`, `/help`, `/settings`, `/poll` and `/ping`
@@ -26,6 +26,10 @@ Latest release: `v0.1.2-alpha`. See [CHANGELOG.md](CHANGELOG.md).
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 
 ## Setup
+
+Before pushing code, run `npm run security:setup` once to install the checksum-verified Gitleaks scanner and local pre-push hook. Use `npm run security:scan` to scan history and current publication candidates. The scanner blocks pushes when unavailable or when a scan fails; it does not print secret values. Hooks can be bypassed, so keep GitHub push protection enabled.
+
+PostgreSQL tests require `TEST_DATABASE_CONFIRMED=true`, `EXPECTED_TEST_HOST` and `EXPECTED_TEST_DATABASE` matching a separately provisioned test database. Never use production credentials for these tests.
 
 Requirements: Node.js 22+ and a Discord application/bot.
 
@@ -93,11 +97,13 @@ Omitted difficulty uses the server default for random quizzes and new topics. Ex
 - Cover success confirmations, progress messages, validation errors, permission errors and AI timeouts, localized to the server language.
 - Keep errors and security warnings clear and actionable, with restrained styling. Preserve exact command names and technical details.
 
-### Implemented for the next release
+### Implemented in v0.2.0-beta
 
 - User scores, correct-answer streaks and server leaderboards
 - Final-vote scoring with atomic, idempotent settlements and restart recovery
 - Self-service deletion of stored answers and scores
+
+The beta marks the first release with working points, streaks and leaderboards. `v1.0.0` follows live poll validation and community feedback.
 
 ### Future releases
 
@@ -112,6 +118,35 @@ Only new polls created after scoring is enabled count. Existing quiz history is 
 `/poll end` can close a quiz early. Vote changes before closing are reflected in the final vote. Bot votes are excluded. Scores and leaderboards are isolated per server. Tied leaderboard scores are ordered by correct answers and then user ID. Score responses do not ping players.
 
 Deleting your answers and score is permanent. Already scored polls are not rescored after deletion, but pending polls and future votes can create new records. See [Privacy Policy](PRIVACY_POLICY.md).
+
+## Publication privacy checks
+
+Run `npm run security:setup` and `npm run security:images:setup` once. The latter
+downloads checksum-verified English/Polish OCR models from a pinned official
+revision. Images and recognized text stay local; no OCR service receives them.
+
+`npm run security:publication` checks Git history/current candidates for secrets,
+then checks current and historical raster images for metadata, QR codes and
+sensitive OCR text. The local pre-push hook and prepared CI workflow use these
+controls. A failed or unavailable scanner blocks publication. Hooks are bypassable.
+
+PNG/JPEG/WebP single-frame images are supported; other formats require manual
+conversion and review. Every image also requires visual review, recorded by its
+SHA256 in `image-publication-reviews.json`. Changed bytes invalidate that approval.
+Do not approve solely because OCR reports no finding. Inspect names, identifiers,
+small text, screenshots, badges and alpha-hidden content. These checks are not a
+steganography detector or a guarantee against all disclosures.
+
+`npm run security:images:prepare -- <local-image>` creates a flattened,
+metadata-free PNG copy under the ignored `.tools/image-publication` directory.
+It preserves the original and refuses detected QR codes or sensitive text.
+Review the copy before using it. For visible private data, use an opaque redaction
+or crop, then rerun the checks; do not rely on blur or a translucent overlay.
+
+`npm run security:production` audits production logs and host controls without
+printing raw logs, addresses, account names or credentials. Cloud account access,
+provider snapshots, historical backups and database role design require separate
+verification. See `SECURITY_REVIEW.md` for current scope and limitations.
 
 ## License
 

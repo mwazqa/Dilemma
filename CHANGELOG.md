@@ -2,7 +2,23 @@
 
 ## Unreleased
 
+## v0.2.0-beta - 2026-10-07
+
+### Security
+
+- Run the production bot as a non-root user with a read-only filesystem, dropped capabilities and no-new-privileges; keep one stopped rollback version.
+- Add count-only server log/access auditing and private deployment-log permissions.
+- Add local OCR, QR and metadata checks for current/historical images, visual-review fingerprints and metadata-free publication copies; block unchecked publication.
+
+- Use allowlisted error summaries for scheduled generation, registration, AI failures and scoring; omit private topic names from operational logs.
+- Add checksum-verified Gitleaks scanning before pushes, in CI and before direct deployment.
+- Replace the literal production database endpoint in tests with explicit test-only host, database name and confirmation settings.
+- Pin Prisma client and CLI to 6.19.3 and override its deepmerge-ts dependency to patched 8.0.0, with regression checks.
+
 ### Added
+
+- Grouped command-help cards for `/help` and `/dilemma help`, with concise descriptions in six languages.
+- Score profile and leaderboard cards without duplicate text or a rules paragraph; player display names replace raw mentions in profile titles.
 
 - Server-specific quiz scores: easy 1, medium 2 and hard 3 points for correct answers.
 - Accuracy, current and best correct-answer streaks, and top-ten server leaderboards.

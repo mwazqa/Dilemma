@@ -31,4 +31,6 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/scripts ./scripts
 
-CMD ["sh", "-c", "npm run db:migrate:postgres && npm run start"]
+USER node
+
+CMD ["node", "dist/index.js"]

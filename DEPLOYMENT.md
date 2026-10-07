@@ -44,9 +44,12 @@ docker run --rm \
   --entrypoint node \
   dilemma scripts/prepare-docker-env.mjs /deployment/.env /deployment/.env.docker
 sudo chown "$(id -u):$(id -g)" .env.docker
+docker run --rm --env-file .env.docker dilemma npm run db:migrate:postgres
 docker run -d \
   --name dilemma \
   --restart unless-stopped \
+  --user node --cap-drop ALL --security-opt no-new-privileges:true \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --env TZ=Europe/Warsaw \
   --env-file .env.docker \
   --log-opt max-size=10m \
@@ -54,7 +57,8 @@ docker run -d \
   dilemma
 ```
 
-The container runs PostgreSQL migrations before starting the bot.
+Apply PostgreSQL migrations explicitly before starting the read-only bot container.
+Back up production data before a schema change. The running bot never applies migrations.
 The preparation command converts dotenv quoting to Docker's environment-file
 format and writes a separate file with owner-only permissions. Rerun it whenever
 you change `.env`. The `Europe/Warsaw` timezone keeps configured quiz hours in
@@ -88,20 +92,50 @@ Global commands can take time to appear in Discord.
 
 ## Updates
 
+### Direct local deployment without GitHub
+
+On Windows, create an ignored `.deploy.production.json` with `host`, `user`, `path` and `key` (the local SSH private-key file path). Never put the key contents in this file or the repository. The SSH host must already be trusted in `known_hosts`.
+
+Run `npm run deploy:prod`. The script checks and builds the code, runs scoring and feature tests, then sends an explicit code-only archive over SSH. It builds the image while the existing bot stays online and checks that database migrations have already been applied. Pending migrations stop deployment before the production container is changed; back up the database and apply migrations separately.
+
+The old container is stopped and retained under `dilemma-rollback-<deployment-id>`. If the replacement does not confirm Discord login within 45 seconds, the old container is restored automatically. Discord login does not verify every command; manually check `/score profile` and `/score leaderboard` after deployment.
+
+The server checkout is not updated. Running `git pull` and rebuilding that checkout later can replace the directly deployed changes. Infrastructure details and raw remote output are deliberately withheld. After confirmed login, cleanup keeps the newest stopped rollback container and removes older stopped bot rollback containers, including their local logs and configuration. Docker images and volumes are not pruned.
+
+To roll back manually, identify the exact retained container locally on the server. Do not paste its configuration or logs into chat:
+
+```bash
+sudo docker stop dilemma
+sudo docker rename dilemma dilemma-rejected-<deployment-id>
+sudo docker rename dilemma-rollback-<deployment-id> dilemma
+sudo docker start dilemma
+```
+
+### Updates from GitHub
+
 ```bash
 git pull
 docker build -t dilemma .
 docker run --rm --volume "$PWD:/deployment" --entrypoint node dilemma scripts/prepare-docker-env.mjs /deployment/.env /deployment/.env.docker
 sudo chown "$(id -u):$(id -g)" .env.docker
+docker run --rm --env-file .env.docker dilemma npm run db:migrate:postgres
 docker rm -f dilemma
-docker run -d --name dilemma --restart unless-stopped --env TZ=Europe/Warsaw --env-file .env.docker --log-opt max-size=10m --log-opt max-file=3 dilemma
+docker run -d --name dilemma --restart unless-stopped --user node --cap-drop ALL --security-opt no-new-privileges:true --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --env TZ=Europe/Warsaw --env-file .env.docker --log-opt max-size=10m --log-opt max-file=3 dilemma
 ```
 
 ## Logs
 
-```bash
-docker logs -f dilemma
-```
+Run `npm run security:production` from the local Windows checkout for sanitized
+log-scan counts and host access checks. Logs remain on the server. Never paste raw
+Docker logs, environment inspections or exceptions into chat or public issues.
+The audit checks bot containers and migration-status logs against their configured
+credentials and recognizable credential patterns. It does not prove all secrets
+are absent and does not audit Oracle IAM, provider snapshots or remote backup storage.
+
+Only trusted host administrators and users with Docker control should have log
+access. Docker access also permits reading container environment secrets.
+The active bot runs as `node`, drops Linux capabilities, forbids new privileges,
+and uses a read-only root filesystem with a bounded temporary directory.
 
 ## Backups
 

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { privateErrorSummary } from "../private-errors.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { env } from "../config.js";
 import { questionSchema, type Question } from "../types/question.js";
@@ -106,7 +107,7 @@ export async function generateQuestion(
     } catch (error) {
       lastError = error;
       if (signal.aborted || error instanceof OpenAI.APIConnectionTimeoutError) throw new AiGenerationTimeoutError();
-      console.warn(`AI generation failed: attempt=${attempt + 1}, type=${error instanceof Error ? error.name : "unknown"}`);
+      console.warn(`AI generation failed: attempt=${attempt + 1}, type=${privateErrorSummary(error)}`);
       if (attempt >= env.AI_MAX_RETRIES || !isRetryableAiError(error)) throw error;
       try {
         await delay(Math.min(8_000, 1_000 * 2 ** attempt), undefined, { signal });

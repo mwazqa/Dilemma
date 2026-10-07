@@ -1,12 +1,13 @@
 import { PermissionFlagsBits, SlashCommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { publishRandomQuestion, publishTopicQuestions } from "../services/poll-publisher.js";
-import { getHelpContent } from "./help.js";
+import { getHelpEmbed } from "./help.js";
 import { AiGenerationTimeoutError } from "../services/question-generator.js";
 import { env } from "../config.js";
 import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
+import { privateErrorSummary } from "../private-errors.js";
 
 export const dilemmaCommand = new SlashCommandBuilder()
   .setName("dilemma")
@@ -72,7 +73,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   }
   const subcommand = interaction.options.getSubcommand();
   if (subcommand === "help") {
-    await reply(getHelpContent(language));
+    await reply({ content: null, embeds: [getHelpEmbed(language)] });
     return;
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
@@ -114,7 +115,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         await reply(text("quota"));
         return;
       }
-      console.error("Random dilemma failed:", error instanceof Error ? error.name : "unknown");
+      console.error("Random dilemma failed:", privateErrorSummary(error));
       await reply(text("generationFailed"));
     }
     return;
