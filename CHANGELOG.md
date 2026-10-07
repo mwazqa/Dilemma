@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.3.0-beta - 2026-10-08
+
+- Add localized **End quiz** buttons to topic and random polls, with Manage Server permission checks, private feedback, duplicate-close protection and finalized-vote scoring. Keep `/poll end` as a fallback.
+
+- Remove `questions_per_run`: each topic run publishes exactly one question.
+- Share one daily run per topic between manual commands and scheduled generation; an early manual run replaces that day's scheduled run.
+- Limit random quizzes to three per server per calendar day, with persistent concurrency-safe reservations.
+- Add `duration_hours:1-24` for topic configuration, defaults, manual runs and random quizzes; preserve 24 hours for existing topics.
+- Use configurable `QUIZ_TIMEZONE` (default `Europe/Warsaw`) for daily limits and scheduled times.
+
 ## v0.2.0-beta - 2026-10-07
 
 ### Security

@@ -4,6 +4,8 @@ umask 077
 package_dir="$1"
 production_dir="$2"
 deployment_id="$3"
+migration_mode="${4:-check}"
+[[ "$migration_mode" == check || "$migration_mode" == migrate ]]
 [[ "$package_dir" =~ ^/home/[a-zA-Z0-9_-]+/\.dilemma-deploy/[a-zA-Z0-9-]+$ ]]
 [[ "$production_dir" =~ ^/[a-zA-Z0-9/_-]+$ ]]
 [[ "$deployment_id" =~ ^[a-zA-Z0-9-]+$ ]]
@@ -33,7 +35,14 @@ tar -xzf "$package_dir/code.tar.gz" -C "$package_dir/code"
 find "$package_dir/code" -type d -exec chmod 755 {} +
 find "$package_dir/code" -type f -exec chmod 644 {} +
 sudo -n docker build -t "$image" "$package_dir/code"
-# Schema changes require a separate backed-up migration before deployment.
+# Opt in only after a backup and isolated migration validation. Keep the old container running during additive migration.
+if [[ "$migration_mode" == migrate ]]; then
+  if ! sudo -n docker run --rm --env-file "$production_dir/.env.docker" "$image" node scripts/migrate-postgres.mjs >"$package_dir/migration-apply.log" 2>&1; then
+    echo 'Database migration failed. Previous production container remains running.'
+    exit 1
+  fi
+fi
+# Default deployments still refuse pending migrations.
 if ! sudo -n docker run --rm --env-file "$production_dir/.env.docker" "$image" node node_modules/prisma/build/index.js migrate status --schema prisma/postgresql/schema.prisma >"$package_dir/migration-status.log" 2>&1; then
   echo 'Database schema is not ready. Production remains running. Review migrations and back up before applying them.'
   exit 1

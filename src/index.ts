@@ -15,13 +15,14 @@ import { db } from "./db.js";
 import { handlePing } from "./commands/ping.js";
 import { handleSettings, supportedLanguages } from "./commands/settings.js";
 import { handleTopic, handleTopicAutocomplete } from "./commands/topic.js";
-import { handlePoll } from "./commands/poll.js";
+import { handlePoll, handleEndPollButton } from "./commands/poll.js";
 import { handleHelp } from "./commands/help.js";
 import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
 import { message } from "./messages.js";
 import { startScoreScheduler } from "./services/scoring.js";
 import { handleScore } from "./commands/score.js";
+import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.on(Events.Error, error => {
@@ -69,6 +70,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.isStringSelectMenu() && interaction.customId === "settings:language") {
       await handleLanguageSelection(interaction);
+      return;
+    }
+    if (interaction.isButton() && interaction.customId === END_QUIZ_BUTTON_ID) {
+      await handleEndPollButton(interaction);
       return;
     }
     if (interaction.isChatInputCommand()) await routeCommand(interaction);

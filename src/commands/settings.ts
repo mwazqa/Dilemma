@@ -33,7 +33,7 @@ export const settingsCommand = new SlashCommandBuilder()
     .setName("defaults")
     .setDescription("Set default AI generation settings for new topics.")
     .addIntegerOption((option) => option.setName("interval_days").setDescription("Days between generations.").setRequired(true).setMinValue(1).setMaxValue(30))
-    .addIntegerOption((option) => option.setName("questions_per_run").setDescription("Questions generated each time.").setRequired(true).setMinValue(1).setMaxValue(20))
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Default poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24))
     .addStringOption(difficultyOption));
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {
@@ -59,14 +59,15 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
   }
 
   const intervalDays = interaction.options.getInteger("interval_days", true);
-  const questionsPerRun = interaction.options.getInteger("questions_per_run", true);
+  const durationHours = interaction.options.getInteger("duration_hours");
   const requestedDifficulty = interaction.options.getString("difficulty");
   const settings = await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
-    create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun,
+    create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays, defaultPollDurationHours: durationHours ?? 24,
       defaultDifficulty: parseDifficulty(requestedDifficulty) },
-    update: { defaultIntervalDays: intervalDays, defaultQuestionsPerRun: questionsPerRun,
+    update: { defaultIntervalDays: intervalDays,
+      ...(durationHours === null ? {} : { defaultPollDurationHours: durationHours }),
       ...(requestedDifficulty === null ? {} : { defaultDifficulty: parseDifficulty(requestedDifficulty) }) }
   });
-  await reply(text("defaultsSet", { days: intervalDays, count: questionsPerRun, difficulty: message(currentLanguage, parseDifficulty(settings.defaultDifficulty)) }));
+  await reply(text("defaultsSet", { days: intervalDays, hours: settings.defaultPollDurationHours, difficulty: message(currentLanguage, parseDifficulty(settings.defaultDifficulty)) }));
 }

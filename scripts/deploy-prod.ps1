@@ -1,4 +1,4 @@
-param([string]$ConfigPath = "$PSScriptRoot/../.deploy.production.json")
+param([string]$ConfigPath = "$PSScriptRoot/../.deploy.production.json", [switch]$ApplyMigrations)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 & node scripts/check-secrets.mjs
@@ -20,7 +20,7 @@ function Invoke-Checked([string]$Executable, [string[]]$Arguments) {
   if ($commandExitCode -ne 0) { throw "$Executable failed with exit code $commandExitCode. Raw output withheld for privacy." }
   Write-Host "$Executable completed successfully."
 }
-foreach ($testName in @('check', 'build', 'test:scoring', 'test:features', 'test:privacy')) {
+foreach ($testName in @('check', 'build', 'test:db:fresh', 'test:scoring', 'test:features', 'test:quiz-limits', 'test:poll-controls', 'test:privacy')) {
   Write-Host "Running $testName."
   Invoke-Checked 'npm.cmd' @('run', $testName)
 }
@@ -43,5 +43,6 @@ $remoteDirectory = "/home/$($deploymentConfig.user)/.dilemma-deploy/$deploymentI
 Invoke-Checked 'ssh.exe' ($sshOptions + @($deploymentTarget, "umask 077; mkdir -p '$remoteDirectory'; chmod 700 '$remoteDirectory'"))
 Invoke-Checked 'scp.exe' ($sshOptions + @($deploymentArchive, "${deploymentTarget}:${remoteDirectory}/code.tar.gz"))
 Invoke-Checked 'scp.exe' ($sshOptions + @('scripts/deploy-prod.sh', "${deploymentTarget}:${remoteDirectory}/deploy-prod.sh"))
-Invoke-Checked 'ssh.exe' ($sshOptions + @($deploymentTarget, "bash '$remoteDirectory/deploy-prod.sh' '$remoteDirectory' '$($deploymentConfig.path)' '$deploymentId'"))
+$migrationMode = if ($ApplyMigrations) { 'migrate' } else { 'check' }
+Invoke-Checked 'ssh.exe' ($sshOptions + @($deploymentTarget, "bash '$remoteDirectory/deploy-prod.sh' '$remoteDirectory' '$($deploymentConfig.path)' '$deploymentId' '$migrationMode'"))
 Write-Host 'Production deployment completed. GitHub was not changed.'

@@ -54,6 +54,17 @@ model UserScore {
 }
 
 
+model DailyQuizRun {
+  guildId   String
+  scope     String
+  day       String
+  slot      Int
+  messageId String?
+  createdAt DateTime @default(now())
+
+  @@id([guildId, scope, day, slot])
+}
+
 model Topic {
   id                  String   @id @default(cuid())
   guildId             String
@@ -61,7 +72,7 @@ model Topic {
   language            String   @default("en")
   difficulty          String   @default("medium")
   intervalDays        Int      @default(1)
-  questionsPerRun     Int      @default(3)
+  pollDurationHours   Int      @default(24)
   options             String
   optionCount         Int      @default(4)
   questionsGenerated  Int      @default(0)
@@ -81,7 +92,7 @@ model GuildSettings {
   guildId                String   @id
   language               String   @default("en")
   defaultIntervalDays    Int      @default(1)
-  defaultQuestionsPerRun Int      @default(3)
+  defaultPollDurationHours Int    @default(24)
   defaultDifficulty      String   @default("medium")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt

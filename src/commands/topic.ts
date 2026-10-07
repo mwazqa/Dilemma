@@ -8,6 +8,7 @@ import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
+import { DailyQuizLimitError } from "../services/quiz-limits.js";
 
 export const dilemmaCommand = new SlashCommandBuilder()
   .setName("dilemma")
@@ -24,8 +25,8 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setDescription("Override generation settings for one topic.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
     .addIntegerOption((option) => option.setName("interval_days").setDescription("Optional: days between AI generations.").setRequired(false).setMinValue(1).setMaxValue(30))
-    .addIntegerOption((option) => option.setName("questions_per_run").setDescription("Optional: questions generated each time.").setRequired(false).setMinValue(1).setMaxValue(20))
-    .addStringOption((option) => option.setName("generation_time").setDescription("Optional local time, HH:mm, for automatic generation.").setRequired(false).setMaxLength(5))
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24))
+    .addStringOption((option) => option.setName("generation_time").setDescription("Optional HH:mm in the bot quiz timezone for automatic generation.").setRequired(false).setMaxLength(5))
     .addStringOption(difficultyOption))
   .addSubcommand((subcommand) => subcommand
     .setName("enable")
@@ -52,18 +53,20 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setDescription("Show Dilemma commands."))
   .addSubcommand((subcommand) => subcommand
     .setName("random")
-    .setDescription("Generate one random dilemma now.")
+    .setDescription("Generate one random quiz now, up to three per server per day.")
     .addIntegerOption((option) => option
       .setName("option_count")
       .setDescription("Number of AI-generated answers.")
       .setRequired(true)
       .setMinValue(2)
       .setMaxValue(4))
-    .addStringOption(difficultyOption))
+    .addStringOption(difficultyOption)
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24)))
   .addSubcommand((subcommand) => subcommand
     .setName("run")
-    .setDescription("Generate questions now with AI.")
-    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)));
+    .setDescription("Publish the topic's daily quiz early, instead of its scheduled run.")
+    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional duration override for this poll (1-24 hours).").setRequired(false).setMinValue(1).setMaxValue(24)));
 
 export async function handleTopic(interaction: ChatInputCommandInteraction) {
   const { language, text, reply } = await openFeedback(interaction);
@@ -104,9 +107,14 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
-      const generatedTopic = await publishRandomQuestion(interaction.guildId, language, optionCount, channel, difficulty);
+      const generatedTopic = await publishRandomQuestion(interaction.guildId, language, optionCount, channel, difficulty,
+        interaction.options.getInteger("duration_hours") ?? settings.defaultPollDurationHours);
       await reply(text("randomDone", { name: generatedTopic, count: optionCount }));
     } catch (error) {
+      if (error instanceof DailyQuizLimitError) {
+        await reply(text("randomDailyLimit"));
+        return;
+      }
       if (error instanceof AiGenerationTimeoutError) {
         await reply(text("timeout"));
         return;
@@ -172,7 +180,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         language: settings.language,
         difficulty: parseDifficulty(requestedDifficulty ?? settings.defaultDifficulty),
         intervalDays: settings.defaultIntervalDays,
-        questionsPerRun: settings.defaultQuestionsPerRun,
+        pollDurationHours: settings.defaultPollDurationHours,
         options: options?.join(", ") ?? "",
         optionCount,
         channelId: interaction.channelId
@@ -205,28 +213,33 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
 
     await reply(text("generating", { seconds: Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000), difficulty: text(parseDifficulty(topic.difficulty)) }));
     try {
-      await publishTopicQuestions(topic, channel);
+      await publishTopicQuestions({ ...topic,
+        pollDurationHours: interaction.options.getInteger("duration_hours") ?? topic.pollDurationHours }, channel);
     } catch (error) {
+      if (error instanceof DailyQuizLimitError) {
+        await reply(text("topicDailyLimit"));
+        return;
+      }
       if (error instanceof AiGenerationTimeoutError) {
-        await reply(text("timeout") + "\n" + text("partial"));
+        await reply(text("timeout"));
         return;
       }
       if (isOpenAIQuotaError(error)) {
-        await reply(text("quota") + "\n" + text("partial"));
+        await reply(text("quota"));
         return;
       }
       throw error;
     }
-    await reply(text("runDone", { count: topic.questionsPerRun, name: topic.name }));
+    await reply(text("runDone", { name: topic.name }));
     return;
   }
 
   if (subcommand === "configure") {
     const intervalDays = interaction.options.getInteger("interval_days");
-    const questionsPerRun = interaction.options.getInteger("questions_per_run");
+    const pollDurationHours = interaction.options.getInteger("duration_hours");
     const generationTime = interaction.options.getString("generation_time")?.trim() || null;
     const difficulty = interaction.options.getString("difficulty");
-    if (intervalDays === null && questionsPerRun === null && generationTime === null && difficulty === null) {
+    if (intervalDays === null && pollDurationHours === null && generationTime === null && difficulty === null) {
       await reply(text("settingsMissing"));
       return;
     }
@@ -238,10 +251,9 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       where: { id: topic.id },
       data: {
         ...(intervalDays === null ? {} : { intervalDays }),
-        ...(questionsPerRun === null ? {} : { questionsPerRun }),
+        ...(pollDurationHours === null ? {} : { pollDurationHours }),
         ...(generationTime === null ? {} : { generationTime }),
         ...(difficulty === null ? {} : { difficulty: parseDifficulty(difficulty) }),
-        ...(generationTime !== null && generationTime !== topic.generationTime ? { lastGeneratedAt: null } : {}),
         enabled: true
       }
     });
@@ -283,9 +295,9 @@ function parseOptions(value: string): string[] | null {
     new Set(options.map(option => option.toLowerCase())).size === options.length ? options : null;
 }
 
-function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; questionsPerRun: number; generationTime: string | null; difficulty: string; options: string; optionCount: number }, language: string) {
+function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; pollDurationHours: number; generationTime: string | null; difficulty: string; options: string; optionCount: number }, language: string) {
   return message(language, "summary", { name: topic.name, state: message(language, topic.enabled ? "enabled" : "disabled"), days: topic.intervalDays,
-    count: topic.questionsPerRun, time: topic.generationTime ?? message(language, "automatic"), difficulty: message(language, parseDifficulty(topic.difficulty)),
+    hours: topic.pollDurationHours, time: topic.generationTime ?? message(language, "automatic"), difficulty: message(language, parseDifficulty(topic.difficulty)),
     answers: topic.options || message(language, "aiAnswers", { count: topic.optionCount }) });
 }
 

@@ -7,6 +7,10 @@ const envSchema = z.object({
   DISCORD_GUILD_ID: z.string().optional(),
   DISCORD_REGISTER_GLOBAL: z.preprocess((value) => value === true || value === "true", z.boolean()).default(false),
   AI_PROVIDER: z.enum(["openai", "openrouter"]).default("openrouter"),
+  QUIZ_TIMEZONE: z.string().refine(value => {
+    try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; }
+    catch { return false; }
+  }, "Invalid quiz timezone").default("Europe/Warsaw"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-5-mini"),
   OPENROUTER_API_KEY: z.string().optional(),

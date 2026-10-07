@@ -2,6 +2,7 @@ import { Routes, type Client, type Message, type APIMessage, type APIUser } from
 import { Prisma, type QuizSettlement } from "@prisma/client";
 import { db } from "../db.js";
 import { parseDifficulty } from "../difficulty.js";
+import { disablePollControls } from "./poll-controls.js";
 
 const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
@@ -105,7 +106,11 @@ export async function runDueSettlements(client: Client) {
       try {
         await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
         const final = await collectFinalVotes(client, quiz);
-        if (final) await applyFinalVotes(quiz, final.votes, final.finishedAt);
+        if (final) {
+          await applyFinalVotes(quiz, final.votes, final.finishedAt);
+          const settings = await db.guildSettings.findUnique({ where: { guildId: quiz.guildId } });
+          await disablePollControls(client, quiz.channelId, quiz.messageId, settings?.language ?? "en");
+        }
         else await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 60_000) } });
       } catch (error) { console.error("Quiz scoring pending:", privateErrorSummary(error)); }
     }

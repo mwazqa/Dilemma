@@ -36,10 +36,11 @@ try:
     for path in deployment.iterdir():
         if path.is_dir() and not path.is_symlink() and re.fullmatch(r"[0-9]{14}-[a-f0-9]{8}", path.name):
             path.chmod(0o700)
-            log = path / "migration-status.log"
-            if log.is_file() and not log.is_symlink():
-                log.chmod(0o600)
-                secured += 1
+            for name in ("migration-status.log", "migration-apply.log"):
+                log = path / name
+                if log.is_file() and not log.is_symlink():
+                    log.chmod(0o600)
+                    secured += 1
     print(json.dumps({"obsolete_containers_removed": removed, "rollback_containers_retained": min(1, len(targets)), "deployment_logs_secured": secured}))
 except Exception:
     print('{"cleanup_failed":true}')

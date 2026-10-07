@@ -8,14 +8,14 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.2.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.3.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with `/dilemma`, `/help`, `/settings`, `/poll` and `/ping`
 - AI-generated questions, options, facts and context-aware emoji
 - OpenRouter support with configurable model
 - Custom answer options or AI-generated options
-- Topic intervals, questions per run and fixed local generation time
+- Topic intervals, one question per run, configurable poll duration and fixed generation time
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
 - SQLite + Prisma persistence for local development
@@ -58,19 +58,32 @@ Never commit .env or bot/API keys.
 ## Commands
 
 - `/dilemma create` - create a topic with optional `difficulty:easy|medium|hard`
-- `/dilemma configure` - configure interval, question count, generation time or difficulty
-- `/dilemma run` - generate questions immediately
+- `/dilemma configure` - configure interval, `duration_hours:1-24`, generation time or difficulty
+- `/dilemma run` - publish one question early instead of today's scheduled run; optional `duration_hours:1-24` overrides this poll only
 - `/dilemma random option_count:2-4 difficulty:easy|medium|hard` - generate one random dilemma without a saved topic or topic counter; difficulty is optional
 - `/dilemma list` - list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma rename`, `/dilemma delete`
 - `/dilemma help` or `/help` - show help
 - `/settings` - set server language and defaults
 - `/poll end` - end a poll and publish its result
+- Each new quiz also has an **End quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
 - `/score profile user:optional` - show points, accuracy, current and best correct-answer streak
 - `/score leaderboard` - show the server's top ten players
 - `/score forget confirm:true` - permanently delete your stored answers and score on the current server
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/settings defaults` can set a new default without changing existing topics. Existing data migrates to medium.
+
+Each topic can publish at most one quiz per calendar day, shared by manual and scheduled runs. An early manual run replaces that day's scheduled run. Different topics have independent limits. Changing a schedule, renaming, enabling a topic or restarting the bot does not reset quota. Deleting and recreating a topic creates a new topic with a new quota.
+
+Random quizzes have a separate limit of three per server per calendar day, shared across channels and administrators. Days and scheduled times use `QUIZ_TIMEZONE` (default `Europe/Warsaw`), including daylight-saving changes, rather than a rolling 24-hour cooldown.
+
+Polls last 24 hours by default. Set `duration_hours:1-24` in topic configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset daily quota.
+
+Quota reservations persist in the database and prevent concurrent commands from exceeding limits. AI failures before a Discord send attempt release their reservation. A failed or uncertain send, or a process crash, conservatively keeps the reservation for that day to prevent duplicates. Existing polls published earlier on the migration day also count.
+
+The v0.3.0-beta migration only adds duration fields and quota storage. Legacy question-count columns remain unused for compatibility with the previous container during rollback. Apply the migration before starting this version, then re-register slash commands to replace `questions_per_run` with `duration_hours`.
+
+Direct deployment normally rejects pending migrations. After creating a backup and testing the migration on an isolated copy, explicitly use `npm run deploy:prod -- -ApplyMigrations` to apply it through the direct database connection before switching containers. Migration logs remain private on the host.
 
 `/settings language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. Previously published questions and explanations are not retroactively translated. Custom answer options remain exactly as provided.
 
