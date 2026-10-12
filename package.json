@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "0.3.0-beta",
+  "version": "0.4.0-beta",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -12,11 +12,13 @@
     "register": "tsx src/register-commands.ts",
     "check": "tsc --noEmit",
     "test:db:fresh": "node scripts/test-fresh-db.mjs",
-    "test:ai": "node scripts/test-ai-generation.mjs",
+    "test:ai": "node scripts/test-ai-generation.mjs && node scripts/test-ai-generation.mjs --openai",
     "test:features": "node scripts/test-next-release.mjs",
     "test:quiz-limits": "node scripts/test-quiz-limits.mjs",
     "test:poll-controls": "node scripts/test-poll-controls.mjs",
     "test:scoring": "node scripts/test-scoring.mjs",
+    "test:experience": "node scripts/test-experience.mjs",
+    "test:score-card": "node scripts/test-score-card.mjs",
     "test:privacy": "node scripts/test-private-errors.mjs",
     "test:images": "node scripts/test-image-security.mjs",
     "security:production": "powershell.exe -NoProfile -File scripts/audit-production.ps1",
@@ -38,6 +40,7 @@
     "discord.js": "^14.19.3",
     "dotenv": "^16.4.7",
     "openai": "^5.12.2",
+    "sharp": "^0.35.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -45,7 +48,6 @@
     "jsqr": "^1.4.0",
     "prisma": "6.19.3",
     "qrcode": "^1.5.4",
-    "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.19.4",
     "typescript": "^5.9.2"

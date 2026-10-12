@@ -7,7 +7,7 @@ import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { message, normalizeLanguage } from "../messages.js";
 import { settlementData } from "./scoring.js";
-import { claimQuizRun, quizDay, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
+import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { pollControls } from "./poll-controls.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
@@ -80,7 +80,6 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
 
 export async function publishRandomQuestion(
   guildId: string,
-  language: string,
   optionCount: number,
   channel: SendableChannels,
   difficulty: Difficulty = defaultDifficulty,
@@ -90,6 +89,8 @@ export async function publishRandomQuestion(
   let run = await claimQuizRun(guildId);
   let sendAttempted = false;
   try {
+    const settings = await db.guildSettings.findUnique({ where: { guildId } });
+    const language = normalizeLanguage(settings?.language ?? "en");
     const previousQuestions = (await db.randomPoll.findMany({
       where: { guildId },
       select: { question: true },
@@ -104,10 +105,7 @@ export async function publishRandomQuestion(
       previousQuestions,
       difficulty
     );
-    if (run.day !== quizDay(new Date())) {
-      await releaseQuizRun(run);
-      run = await claimQuizRun(guildId);
-    }
+    run = await refreshRandomQuizRun(run);
     sendAttempted = true;
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
@@ -140,7 +138,8 @@ export async function publishRandomQuestion(
         }
       });
       await tx.quizSettlement.create({ data: settlement });
-      await tx.dailyQuizRun.update({ where: runKey(run), data: { messageId: sentPoll.id } });
+      await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot, createdAt: run.createdAt },
+        data: { messageId: sentPoll.id, createdAt: new Date() } });
     });
     return question.topic;
   } finally {

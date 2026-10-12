@@ -93,6 +93,7 @@ model GuildSettings {
   language               String   @default("en")
   defaultIntervalDays    Int      @default(1)
   defaultPollDurationHours Int    @default(24)
+  defaultGenerationTime   String?
   defaultDifficulty      String   @default("medium")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt

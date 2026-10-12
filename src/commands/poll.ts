@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, SlashCommandBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { PermissionFlagsBits, SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { openFeedback } from "../feedback.js";
@@ -7,10 +7,9 @@ import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-contro
 
 const closingPolls = new Set<string>();
 
-export const pollCommand = new SlashCommandBuilder()
+export const pollCommand = new SlashCommandSubcommandGroupBuilder()
   .setName("poll")
   .setDescription("Manage Dilemma polls.")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild.toString())
   .addSubcommand((subcommand) => subcommand
     .setName("end")
     .setDescription("End a poll immediately.")

@@ -8,7 +8,7 @@ database.exec("PRAGMA foreign_keys = ON");
 try {
   const migrations = readdirSync("prisma/migrations", { withFileTypes: true }).filter(item => item.isDirectory()).map(item => item.name).sort();
   database.exec(readFileSync(`prisma/migrations/${migrations[0]}/migration.sql`, "utf8"));
-  database.exec(`INSERT INTO "Topic" (id, guildId, name, options, intervalDays, updatedAt) VALUES ('legacy', 'test', 'Legacy', '', 7, CURRENT_TIMESTAMP);
+  database.exec(`INSERT INTO "Topic" (id, guildId, name, options, intervalDays, generationTime, updatedAt) VALUES ('legacy', 'test', 'Legacy', '', 7, '06:45', CURRENT_TIMESTAMP);
     INSERT INTO "GuildSettings" (guildId, language, updatedAt) VALUES ('test', 'pl', CURRENT_TIMESTAMP);
     INSERT INTO "GeneratedPoll" (id, guildId, topicId, messageId, channelId, question, options, correctOption, explanation) VALUES ('g', 'test', 'legacy', 'gmsg', 'channel', 'Question', 'A||B', 0, 'Fact');
     INSERT INTO "RandomPoll" (id, guildId, language, messageId, channelId, question, options, correctOption, explanation) VALUES ('r', 'test', 'pl', 'rmsg', 'channel', 'Question', 'A||B', 0, 'Fact');`);
@@ -21,12 +21,19 @@ try {
   assert.equal(topic.difficulty, "medium");
   assert.equal(topic.intervalDays, 7);
   assert.equal(topic.name, "Legacy");
+  assert.equal(topic.generationTime, "06:45", "Do not replace existing topic schedules");
   assert.equal(topic.pollDurationHours, 24);
   assert.equal(topic.questionsPerRun, 3, "Legacy column remains usable by the rollback version");
   const settings = database.prepare('SELECT * FROM "GuildSettings" WHERE guildId = ?').get("test");
   assert.equal(settings.defaultDifficulty, "medium");
   assert.equal(settings.language, "pl");
   assert.equal(settings.defaultPollDurationHours, 24);
+  assert.equal(settings.defaultGenerationTime, null, "Do not automatically enable schedules for existing servers");
+  const scheduleMigration = "20261012120000_default_generation_time/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${scheduleMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${scheduleMigration}`, "utf8"), "Keep the additive schedule migration aligned across providers");
+  database.exec(`UPDATE "GuildSettings" SET "defaultGenerationTime" = '18:30' WHERE "guildId" = 'test'`);
+  assert.equal(database.prepare('SELECT defaultGenerationTime FROM "GuildSettings" WHERE guildId = ?').get("test").defaultGenerationTime, "18:30");
+  assert.equal(database.prepare('SELECT generationTime FROM "Topic" WHERE id = ?').get("legacy").generationTime, "06:45");
   assert.equal(settings.defaultQuestionsPerRun, 3, "Preserve rollback compatibility");
   database.exec(`INSERT INTO "DailyQuizRun" (guildId, scope, day, slot) VALUES ('test', 'random', '2026-10-08', 1)`);
   assert.throws(() => database.exec(`INSERT INTO "DailyQuizRun" (guildId, scope, day, slot) VALUES ('test', 'random', '2026-10-08', 1)`));

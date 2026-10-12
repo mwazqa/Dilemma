@@ -7,21 +7,18 @@ import {
   MessageFlags,
   PermissionFlagsBits,
   StringSelectMenuBuilder,
-  type ChatInputCommandInteraction,
   type StringSelectMenuInteraction
 } from "discord.js";
 import { env } from "./config.js";
 import { db } from "./db.js";
-import { handlePing } from "./commands/ping.js";
-import { handleSettings, supportedLanguages } from "./commands/settings.js";
-import { handleTopic, handleTopicAutocomplete } from "./commands/topic.js";
-import { handlePoll, handleEndPollButton } from "./commands/poll.js";
-import { handleHelp } from "./commands/help.js";
+import { supportedLanguages } from "./commands/settings.js";
+import { handleTopicAutocomplete } from "./commands/topic.js";
+import { handleEndPollButton } from "./commands/poll.js";
+import { routeCommand } from "./commands/dilemma.js";
 import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
 import { message } from "./messages.js";
 import { startScoreScheduler } from "./services/scoring.js";
-import { handleScore } from "./commands/score.js";
 import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -94,15 +91,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 });
-
-async function routeCommand(interaction: ChatInputCommandInteraction) {
-  if (interaction.commandName === "ping") await handlePing(interaction);
-  if (interaction.commandName === "dilemma") await handleTopic(interaction);
-  if (interaction.commandName === "settings") await handleSettings(interaction);
-  if (interaction.commandName === "poll") await handlePoll(interaction);
-  if (interaction.commandName === "help") await handleHelp(interaction);
-  if (interaction.commandName === "score") await handleScore(interaction);
-}
 
 async function handleLanguageSelection(interaction: StringSelectMenuInteraction) {
   if (!interaction.guildId) return;

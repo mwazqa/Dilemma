@@ -8,9 +8,9 @@ import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
-import { DailyQuizLimitError } from "../services/quiz-limits.js";
+import { DailyQuizLimitError, RandomQuizCooldownError, isGenerationTime } from "../services/quiz-limits.js";
 
-export const dilemmaCommand = new SlashCommandBuilder()
+export const topicCommand = new SlashCommandBuilder()
   .setName("dilemma")
   .setDescription("Configure Dilemma quiz topics.")
   .addSubcommand((subcommand) => subcommand
@@ -41,11 +41,6 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setDescription("Delete a quiz topic configuration.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)))
   .addSubcommand((subcommand) => subcommand
-    .setName("rename")
-    .setDescription("Rename a quiz topic.")
-    .addStringOption((option) => option.setName("old_name").setDescription("Current topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
-    .addStringOption((option) => option.setName("new_name").setDescription("New topic name.").setRequired(true).setMaxLength(80)))
-  .addSubcommand((subcommand) => subcommand
     .setName("list")
     .setDescription("List quiz topics for this server."))
   .addSubcommand((subcommand) => subcommand
@@ -53,7 +48,7 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .setDescription("Show Dilemma commands."))
   .addSubcommand((subcommand) => subcommand
     .setName("random")
-    .setDescription("Generate one random quiz now, up to three per server per day.")
+    .setDescription("Generate one random quiz now, with a two-hour server cooldown.")
     .addIntegerOption((option) => option
       .setName("option_count")
       .setDescription("Number of AI-generated answers.")
@@ -68,6 +63,8 @@ export const dilemmaCommand = new SlashCommandBuilder()
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
     .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional duration override for this poll (1-24 hours).").setRequired(false).setMinValue(1).setMaxValue(24)));
 
+const topicSubcommands = new Set(topicCommand.toJSON().options?.map(sub => sub.name));
+
 export async function handleTopic(interaction: ChatInputCommandInteraction) {
   const { language, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
@@ -75,7 +72,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     return;
   }
   const subcommand = interaction.options.getSubcommand();
-  if (subcommand === "help") {
+  if (subcommand === "help" || !topicSubcommands.has(subcommand)) {
     await reply({ content: null, embeds: [getHelpEmbed(language)] });
     return;
   }
@@ -107,12 +104,12 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
-      const generatedTopic = await publishRandomQuestion(interaction.guildId, language, optionCount, channel, difficulty,
+      const generatedTopic = await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty,
         interaction.options.getInteger("duration_hours") ?? settings.defaultPollDurationHours);
       await reply(text("randomDone", { name: generatedTopic, count: optionCount }));
     } catch (error) {
-      if (error instanceof DailyQuizLimitError) {
-        await reply(text("randomDailyLimit"));
+      if (error instanceof RandomQuizCooldownError) {
+        await reply(text("randomCooldown", { minutes: Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000)) }));
         return;
       }
       if (error instanceof AiGenerationTimeoutError) {
@@ -126,24 +123,6 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       console.error("Random dilemma failed:", privateErrorSummary(error));
       await reply(text("generationFailed"));
     }
-    return;
-  }
-
-  if (subcommand === "rename") {
-    const oldName = interaction.options.getString("old_name", true).trim();
-    const newName = interaction.options.getString("new_name", true).trim();
-    const topic = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name: oldName } } });
-    if (!topic) {
-      await reply(text("missing", { name: oldName }));
-      return;
-    }
-    const existing = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name: newName } } });
-    if (existing) {
-      await reply(text("exists", { name: newName }));
-      return;
-    }
-    await db.topic.update({ where: { id: topic.id }, data: { name: newName } });
-    await reply(text("renamed", { oldName, name: newName }));
     return;
   }
 
@@ -180,6 +159,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         language: settings.language,
         difficulty: parseDifficulty(requestedDifficulty ?? settings.defaultDifficulty),
         intervalDays: settings.defaultIntervalDays,
+        generationTime: settings.defaultGenerationTime ?? null,
         pollDurationHours: settings.defaultPollDurationHours,
         options: options?.join(", ") ?? "",
         optionCount,
@@ -243,7 +223,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       await reply(text("settingsMissing"));
       return;
     }
-    if (generationTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(generationTime)) {
+    if (generationTime && !isGenerationTime(generationTime)) {
       await reply(text("timeInvalid"));
       return;
     }
@@ -273,7 +253,7 @@ export async function handleTopicAutocomplete(interaction: AutocompleteInteracti
   }
 
   const focused = interaction.options.getFocused(true);
-  if (focused.name !== "name" && focused.name !== "old_name") {
+  if (focused.name !== "name") {
     await interaction.respond([]);
     return;
   }

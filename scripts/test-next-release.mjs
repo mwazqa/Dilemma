@@ -13,7 +13,7 @@ for (const [key, translations] of Object.entries(messages)) {
   }
 }
 for (const language of messageLanguages) {
-  assert.doesNotMatch(getHelpContent(language), /option_count|difficulty:|confirm:true/);
+  assert.doesNotMatch(getHelpContent(language), /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
   assert.match(message(language, "randomDone", { name: "Test", count: 4 }), /Test/);
   assert.ok(getHelpContent(language).length < 2000);
   const card = getHelpEmbed(language).toJSON();
@@ -21,22 +21,25 @@ for (const language of messageLanguages) {
   assert.equal(card.fields.length, 3);
   assert.ok(card.fields.every(field => field.value.length <= 1024));
   const commands = card.fields.map(field => field.value).join("\n");
-  assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true/);
-  for (const command of ["create", "configure", "enable", "disable", "run", "random", "list", "rename", "delete"]) {
+  assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
+  for (const command of ["create", "configure", "enable", "disable", "run", "random", "list", "delete"]) {
     assert.ok(commands.includes(`/dilemma ${command}`));
   }
-  assert.ok(commands.includes("/settings") && commands.includes("/poll end") && commands.includes("/score"));
+  assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma defaults") && commands.includes("/dilemma poll end") && commands.includes("/dilemma score"));
+  assert.doesNotMatch(commands, /`\/(?:settings|help|score|poll|ping)(?: |`)/);
+  for (const sub of ["profile", "leaderboard", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
 }
 assert.equal(normalizeLanguage("es-ES"), "es");
 assert.equal(normalizeLanguage("unknown"), "en");
 assert.throws(() => difficultySchema.parse("expert"));
 const { db } = await import("../dist/db.js");
-let settings = { guildId: "guild", language: "pl", defaultDifficulty: "hard", defaultIntervalDays: 7, defaultPollDurationHours: 24 };
+let settings = { guildId: "guild", language: "pl", defaultDifficulty: "hard", defaultIntervalDays: 7, defaultPollDurationHours: 24, defaultGenerationTime: null };
 let topic;
 let randomPoll;
 let generatedPoll;
 db.dailyQuizRun.findMany = async () => [];
-db.dailyQuizRun.create = async ({ data }) => data;
+db.dailyQuizRun.create = async ({ data }) => ({ ...data, createdAt: data.createdAt ?? new Date(), messageId: null });
+db.dailyQuizRun.updateMany = async () => ({ count: 1 });
 db.dailyQuizRun.update = async ({ data }) => data;
 db.dailyQuizRun.deleteMany = async () => ({ count: 1 });
 db.generatedPoll.count = db.randomPoll.count = async () => 0;
@@ -51,6 +54,7 @@ db.topic.update = async ({ data }) => {
   return topic;
 };
 db.randomPoll.findMany = async () => [];
+db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => randomPoll = data;
 db.generatedPoll.findMany = async () => [];
 db.generatedPoll.create = async ({ data }) => generatedPoll = data;
@@ -60,15 +64,35 @@ let lastPrompt;
 let counter = 0;
 globalThis.fetch = async (_, options) => {
   const body = JSON.parse(options.body);
-  lastPrompt = body.messages[0].content;
+  assert.equal(body.messages[0].role, "system");
+  assert.ok(body.messages[0].content.includes(`(${settings.language})`));
+  lastPrompt = body.messages[1].content;
   assert.equal(body.reasoning.enabled, false);
-  const q = { language: "pl", topic: "Test", question: `Pytanie ${++counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
+  const q = { language: settings.language, topic: "Test", question: `Pytanie ${++counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
   return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(q) } }] }), { headers: { "content-type": "application/json" } });
 };
-const { handleTopic, dilemmaCommand } = await import("../dist/commands/topic.js");
-const { handleSettings, settingsCommand } = await import("../dist/commands/settings.js");
+const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
+const { dilemmaCommand, routeCommand } = await import("../dist/commands/dilemma.js");
+assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
+  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "defaults", "ping", "score", "poll"].sort());
+assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
+for (const language of messageLanguages) {
+  const content = getHelpContent(language);
+  const fields = getHelpEmbed(language).toJSON().fields.map(field => field.value).join("\n");
+  for (const sub of dilemmaCommand.toJSON().options) {
+    if (sub.name === "help") continue; // Keep the command, but do not advertise help inside itself.
+    const paths = sub.type === 2 ? sub.options.map(child => `/dilemma ${sub.name} ${child.name}`) : [`/dilemma ${sub.name}`];
+    for (const path of paths) {
+      assert.ok(content.includes(`\`${path}\``), `Text help covers ${path} in ${language}`);
+      assert.ok(fields.includes(`\`${path}\``), `Help card covers ${path} in ${language}`);
+    }
+  }
+  for (const match of fields.matchAll(/`(\/[^`]+)`/g)) assert.ok(match[1].startsWith("/dilemma "));
+  assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
+}
+const { handleSettings } = await import("../dist/commands/settings.js");
 const { publishTopicQuestions } = await import("../dist/services/poll-publisher.js");
-const { DailyQuizLimitError } = await import("../dist/services/quiz-limits.js");
+const { DailyQuizLimitError, RandomQuizCooldownError } = await import("../dist/services/quiz-limits.js");
 const { handlePing } = await import("../dist/commands/ping.js");
 let sent;
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
@@ -79,8 +103,8 @@ const channel = { id: "channel", isSendable: () => true, send: async payload => 
 function interaction(subcommand, values = {}, permitted = true) {
   const replies = [];
   let acknowledged = false;
-  return { guildId: "guild", locale: "en-US", channel, channelId: "channel", memberPermissions: { has: () => permitted },
-    options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
+  return { commandName: "dilemma", guildId: "guild", locale: "en-US", channel, channelId: "channel", memberPermissions: { has: () => permitted },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => subcommand, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     deferReply: async () => { acknowledged = true; },
     editReply: async payload => { assert.ok(acknowledged); replies.push(payload.content ?? payload); }, replies };
 }
@@ -91,6 +115,16 @@ assert.deepEqual(help.replies[0].allowedMentions.parse, []);
 const topicHelp = interaction("help"); await handleTopic(topicHelp);
 assert.equal(topicHelp.replies[0].content, null);
 assert.deepEqual(topicHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
+const retiredRename = interaction("rename", { old_name: "Old", new_name: "New", name: "Test" });
+retiredRename.options.getString = () => { throw new Error("Retired commands must not read topic options"); };
+await handleTopic(retiredRename);
+assert.deepEqual(retiredRename.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
+const findTopics = db.topic.findMany;
+try {
+  db.topic.findMany = async () => { throw new Error("Retired autocomplete must not query topics"); };
+  await handleTopicAutocomplete({ guildId: "guild", options: { getFocused: () => ({ name: "old_name", value: "Old" }) },
+    respond: async choices => assert.deepEqual(choices, []) });
+} finally { db.topic.findMany = findTopics; }
 for (const level of ["easy", "medium", "hard"]) {
   const command = interaction("random", { option_count: 4, difficulty: level });
   await handleTopic(command);
@@ -103,6 +137,7 @@ await handleTopic(interaction("random", { option_count: 4 }));
 assert.equal(randomPoll.difficulty, "hard");
 await handleTopic(interaction("create", { name: "Test", option_count: 4 }));
 assert.equal(topic.difficulty, "hard");
+assert.equal(topic.generationTime, null, "No schedule is enabled until a default time is chosen");
 const originalInterval = topic.intervalDays;
 topic.lastGeneratedAt = new Date();
 const lastRun = topic.lastGeneratedAt;
@@ -136,6 +171,54 @@ assert.equal(topic.difficulty, "easy", "Server defaults do not overwrite existin
 await handleSettings(interaction("defaults", { interval_days: 4 }));
 assert.equal(settings.defaultPollDurationHours, 2);
 assert.equal(settings.defaultDifficulty, "medium");
+const defaultsOption = dilemmaCommand.toJSON().options.find(sub => sub.name === "defaults");
+const generationOption = defaultsOption.options.find(option => option.name === "generation_hours");
+assert.equal(generationOption.type, 3, "Publication time is a string, not an hourly interval");
+assert.equal(generationOption.min_length, 5);
+assert.equal(generationOption.max_length, 5);
+assert.ok(defaultsOption.options.every(option => !option.required), "Allow changing the publication time alone");
+const { isGenerationTime, isTopicDue } = await import("../dist/services/quiz-limits.js");
+for (const time of ["00:00", "18:30", "23:59"]) assert.equal(isGenerationTime(time), true);
+for (const time of ["", " ", "9:00", "24:00", "18:60", "-1:00", "18.30", "18:30:00"]) {
+  assert.equal(isGenerationTime(time), false);
+  const before = { ...settings };
+  const invalidTime = interaction("defaults", { generation_hours: time });
+  await routeCommand(invalidTime);
+  assert.equal(invalidTime.replies[0], message("pl", "timeInvalid"));
+  assert.deepEqual(settings, before, "Invalid hours must not write settings");
+}
+const beforeEmpty = { ...settings };
+const emptyDefaults = interaction("defaults");
+await routeCommand(emptyDefaults);
+assert.equal(emptyDefaults.replies[0], message("pl", "settingsMissing"));
+assert.deepEqual(settings, beforeEmpty);
+const beforeSchedule = { ...topic };
+const setTime = interaction("defaults", { generation_hours: "18:30" });
+await routeCommand(setTime);
+assert.equal(settings.defaultGenerationTime, "18:30");
+assert.equal(settings.defaultIntervalDays, 4);
+assert.equal(settings.defaultPollDurationHours, 2);
+assert.equal(settings.defaultDifficulty, "medium");
+assert.ok(setTime.replies[0].includes("18:30") && setTime.replies[0].includes("Europe/Warsaw"));
+assert.deepEqual(topic, beforeSchedule, "Defaults must not update existing schedules or last run");
+await routeCommand(interaction("create", { name: "Test", option_count: 4 }));
+assert.equal(topic.generationTime, "18:00", "Updating an existing topic preserves its explicit time");
+const existingTopic = topic;
+topic = undefined;
+await routeCommand(interaction("create", { name: "Scheduled", option_count: 4 }));
+assert.equal(topic.generationTime, "18:30", "A new topic inherits the default publication time");
+assert.equal(topic.intervalDays, 4);
+assert.equal(isTopicDue(topic, new Date("2026-10-12T16:29:00Z")), false);
+assert.equal(isTopicDue(topic, new Date("2026-10-12T16:30:00Z")), true);
+await routeCommand(interaction("configure", { name: "Scheduled", generation_time: "19:45" }));
+assert.equal(topic.generationTime, "19:45", "Per-topic time can override the inherited default");
+assert.equal(settings.defaultGenerationTime, "18:30");
+topic = existingTopic;
+await routeCommand(interaction("defaults", { duration_hours: 3 }));
+assert.equal(settings.defaultGenerationTime, "18:30", "Omitting the time preserves the saved default");
+for (const language of messageLanguages) {
+  assert.ok(message(language, "defaultsSet", { days: 1, hours: 24, difficulty: "Easy", time: "18:30", timezone: "Europe/Warsaw" }).includes("18:30"));
+}
 await handleSettings(interaction("language", { value: "ja" }));
 topic.language = "en";
 const savedDuration = topic.pollDurationHours;
@@ -150,11 +233,13 @@ assert.match(lastPrompt, / in ja\./, "Scheduled publisher uses global language")
 assert.equal(topic.pollDurationHours, savedDuration);
 assert.equal(topic.difficulty, savedDifficulty);
 const createRun = db.dailyQuizRun.create;
-db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("random"); };
+const updateRuns = db.dailyQuizRun.updateMany;
+db.dailyQuizRun.updateMany = async () => { throw new RandomQuizCooldownError(new Date(Date.now() + 120 * 60_000)); };
 const randomLimited = interaction("random", { option_count: 4 });
 const callsAtLimit = counter;
 await handleTopic(randomLimited);
-assert.match(randomLimited.replies.at(-1), /3/);
+assert.match(randomLimited.replies.at(-1), /120/);
+db.dailyQuizRun.updateMany = updateRuns;
 resetTopicDay();
 db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("topic"); };
 const topicLimited = interaction("run", { name: "Test" });
@@ -172,7 +257,7 @@ await handleSettings(interaction("language", { value: "ja" }));
 const ping = interaction("ping");
 await handlePing(ping);
 assert.match(ping.replies[0], /ここにいる/);
-for (const command of [dilemmaCommand.toJSON(), settingsCommand.toJSON()]) {
+for (const command of [dilemmaCommand.toJSON()]) {
   for (const sub of command.options) {
     assert.ok(!sub.options?.some(option => option.name === "questions_per_run"));
     const duration = sub.options?.find(option => option.name === "duration_hours");
@@ -184,5 +269,44 @@ for (const command of [dilemmaCommand.toJSON(), settingsCommand.toJSON()]) {
     assert.ok(!option.required);
   }
 }
+assert.equal(dilemmaCommand.toJSON().default_member_permissions, undefined, "The root must remain available to ordinary players");
+const routedHelp = interaction("help", {}, false);
+await routeCommand(routedHelp);
+assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("ja").toJSON());
+const routedPing = interaction("ping", {}, false);
+await routeCommand(routedPing);
+assert.equal(routedPing.replies[0], message("ja", "ping"));
+for (const sub of ["language", "defaults", "create", "configure", "enable", "disable", "delete", "run", "random", "list"]) {
+  const deniedRoute = interaction(sub, { value: "en", name: "Test" }, false);
+  const topicBefore = { ...topic };
+  const settingsBefore = { ...settings };
+  await routeCommand(deniedRoute);
+  assert.equal(deniedRoute.replies[0], message("ja", "permission"));
+  assert.deepEqual(topic, topicBefore);
+  assert.deepEqual(settings, settingsBefore);
+}
+await routeCommand(interaction("language", { value: "pl" }));
+assert.equal(settings.language, "pl");
+await routeCommand(interaction("defaults", { interval_days: 5, duration_hours: 4 }));
+assert.equal(settings.defaultIntervalDays, 5);
+assert.equal(settings.defaultPollDurationHours, 4);
+const routedList = interaction("list");
+await routeCommand(routedList);
+assert.ok(routedList.replies[0].includes("Test"));
+for (const name of ["settings", "language", "help", "ping", "score", "poll"]) {
+  const legacy = interaction("help");
+  legacy.commandName = name;
+  await routeCommand(legacy);
+  assert.equal(legacy.replies.length, 0, "No legacy top-level aliases");
+}
+const establishedSettings = settings;
+settings = undefined;
+const firstDefaults = interaction("defaults", { generation_hours: "00:00" });
+await routeCommand(firstDefaults);
+assert.equal(settings.defaultGenerationTime, "00:00", "A new server can set the time without an interval");
+assert.equal(settings.defaultIntervalDays, 1);
+assert.equal(settings.defaultPollDurationHours, 24);
+assert.equal(settings.defaultDifficulty, "medium");
+settings = establishedSettings;
 await db.$disconnect();
-console.log("PASS: six locales, feedback, difficulty, global language, preserved settings, permissions and validation");
+console.log("PASS: six-locale help without a self-entry, default publication times, inheritance, timezone, partial updates, preserved schedules and permissions");

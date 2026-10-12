@@ -3,6 +3,7 @@ Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" })
 const { MessageFlags, PermissionFlagsBits } = await import("discord.js");
 const { db } = await import("../dist/db.js");
 const { handlePoll, handleEndPollButton } = await import("../dist/commands/poll.js");
+const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { pollControls, END_QUIZ_BUTTON_ID } = await import("../dist/services/poll-controls.js");
 const { runDueSettlements } = await import("../dist/services/scoring.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
@@ -68,9 +69,9 @@ db.dailyQuizRun.deleteMany = async () => { throw new Error("Closing must not res
 function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID } = {}) {
   const replies = [];
   let deferred = false;
-  return { guildId, customId, locale: "en", channel, message: { id: "poll" }, client,
+  return { commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client,
     memberPermissions: { has: permission => { assert.equal(permission, PermissionFlagsBits.ManageGuild); return permitted; } },
-    options: { getString: () => "poll" },
+    options: { getSubcommandGroup: () => "poll", getSubcommand: () => "end", getString: () => "poll" },
     deferReply: async payload => { assert.equal(payload.flags, MessageFlags.Ephemeral); deferred = true; },
     editReply: async payload => { assert.ok(deferred); assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); },
     replies };
@@ -114,9 +115,14 @@ for (const useRandom of [false, true]) {
   assert.equal(results.length, 1, "Repeated button and fallback command never duplicate results");
 }
 reset();
-await handlePoll(interaction());
+await routeCommand(interaction());
 assert.equal(ends, 1, "Fallback command uses the same closing flow");
 assert.equal(results.length, 1);
+reset();
+const deniedCommand = interaction({ permitted: false });
+await routeCommand(deniedCommand);
+assert.equal(ends, 0, "Nested poll command preserves the administrative permission check");
+assert.match(deniedCommand.replies.at(-1), /Zarządzanie serwerem/);
 reset();
 let release;
 gate = new Promise(resolve => { release = resolve; });

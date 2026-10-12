@@ -8,10 +8,10 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.3.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.4.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
-- Discord bot with `/dilemma`, `/help`, `/settings`, `/poll` and `/ping`
+- Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
 - OpenRouter support with configurable model
 - Custom answer options or AI-generated options
@@ -62,30 +62,41 @@ Never commit .env or bot/API keys.
 - `/dilemma run` - publish one question early instead of today's scheduled run; optional `duration_hours:1-24` overrides this poll only
 - `/dilemma random option_count:2-4 difficulty:easy|medium|hard` - generate one random dilemma without a saved topic or topic counter; difficulty is optional
 - `/dilemma list` - list topics
-- `/dilemma enable`, `/dilemma disable`, `/dilemma rename`, `/dilemma delete`
-- `/dilemma help` or `/help` - show help
-- `/settings` - set server language and defaults
-- `/poll end` - end a poll and publish its result
-- Each new quiz also has an **End quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
-- `/score profile user:optional` - show points, accuracy, current and best correct-answer streak
-- `/score leaderboard` - show the server's top ten players
-- `/score forget confirm:true` - permanently delete your stored answers and score on the current server
+- `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
+- `/dilemma help` - show the grouped command guide without parameter examples or a self-referential help entry
+- `/dilemma language value:en|pl|de|es|fr|ja` - set the server language
+- `/dilemma defaults` - set generation defaults; optional `generation_hours:HH:mm` sets the publication time inherited by new topics
+- `/dilemma ping` - check whether the bot is online
+- `/dilemma poll end` - end a poll and publish its result
+- Each new quiz also has an **End quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
+- `/dilemma score profile user:optional` - show points, accuracy, current and best correct-answer streak
+- Score cards also show the player's level and EXP progress, separately from answer accuracy.
+- Profile headers show only the player's display name, without a title prefix or added decorations. A compact rank badge sits beside the avatar on the same line as the name. The top three places have prominent gold, silver and bronze styling; other places use a muted badge. Ranking matches `/dilemma score leaderboard`: points descending, correct answers descending, then user ID ascending to resolve ties. Players without settled answers show a dash, with a localized explanation in accessible text; incorrect settled answers still count as participation.
+- `/dilemma score profile` renders a navy/lavender/gold PNG card locally, with a Discord avatar (or placeholder), a document icon for answers and a measured EXP bar. Long names shrink and then truncate at grapheme boundaries. Attachment alt text preserves the player name and statistics; rendering failures fall back to a text embed. Cards and avatars stay in memory, never in application files or logs. Avatar downloads are restricted to Discord CDN image paths, with a three-second timeout and size limits. The Docker image includes fonts; no AI generation is used for cards.
+- `/dilemma score leaderboard` - show the server's top ten players, with level, points, total answers, correct answers, accuracy and best streak
+- `/dilemma score forget confirm:true` - permanently delete your stored answers and score on the current server
 
-Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/settings defaults` can set a new default without changing existing topics. Existing data migrates to medium.
+Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to replace the old command list. Help, ping and score commands remain available to ordinary players; language, defaults, topic management and poll closing require Manage Server permission, checked in their handlers rather than on the shared root command.
 
-Each topic can publish at most one quiz per calendar day, shared by manual and scheduled runs. An early manual run replaces that day's scheduled run. Different topics have independent limits. Changing a schedule, renaming, enabling a topic or restarting the bot does not reset quota. Deleting and recreating a topic creates a new topic with a new quota.
+Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
-Random quizzes have a separate limit of three per server per calendar day, shared across channels and administrators. Days and scheduled times use `QUIZ_TIMEZONE` (default `Europe/Warsaw`), including daylight-saving changes, rather than a rolling 24-hour cooldown.
+Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Each defaults option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Existing topics keep their schedule, enabled state, last run and daily quota, including when updated through `create`; use `/dilemma configure generation_time:HH:mm` to change one topic. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
 
-Polls last 24 hours by default. Set `duration_hours:1-24` in topic configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset daily quota.
+Before deploying these defaults changes, test and apply the additive `20261012120000_default_generation_time` migration, then re-register commands. The migration adds a nullable setting without rewriting topic schedules or player scores. Local in-memory SQLite migration tests do not replace verification on an isolated PostgreSQL branch before production.
 
-Quota reservations persist in the database and prevent concurrent commands from exceeding limits. AI failures before a Discord send attempt release their reservation. A failed or uncertain send, or a process crash, conservatively keeps the reservation for that day to prevent duplicates. Existing polls published earlier on the migration day also count.
+Each topic can publish at most one quiz per calendar day, shared by manual and scheduled runs. An early manual run replaces that day's scheduled run. Different topics have independent limits. Changing a schedule, enabling a topic or restarting the bot does not reset quota. Deleting and recreating a topic creates a new topic with a new quota.
+
+Random quizzes have no daily use quota, only a rolling two-hour cooldown per server, shared across channels and administrators. The cooldown persists across restarts and midnight; it uses elapsed time, independent of timezone or daylight-saving changes. Existing random polls and in-progress reservations from the previous version also count if less than two hours old. Topic days and scheduled times still use `QUIZ_TIMEZONE` (default `Europe/Warsaw`).
+
+Polls last 24 hours by default. Set `duration_hours:1-24` in topic configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset a topic's daily quota or the random cooldown.
+
+Reservations persist in the database and prevent concurrent commands from exceeding limits. AI failures before a Discord send attempt release their reservation. A failed or uncertain send, or a process crash, conservatively keeps the reservation until the topic's day ends or the random cooldown expires. A successful random publication starts a full two-hour cooldown. The rolling random reservation reuses existing quota storage without a new migration.
 
 The v0.3.0-beta migration only adds duration fields and quota storage. Legacy question-count columns remain unused for compatibility with the previous container during rollback. Apply the migration before starting this version, then re-register slash commands to replace `questions_per_run` with `duration_hours`.
 
 Direct deployment normally rejects pending migrations. After creating a backup and testing the migration on an isolated copy, explicitly use `npm run deploy:prod -- -ApplyMigrations` to apply it through the direct database connection before switching containers. Migration logs remain private on the host.
 
-`/settings language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. Previously published questions and explanations are not retroactively translated. Custom answer options remain exactly as provided.
+`/dilemma language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. The generator must use this language for the question, generated answers, explanation and generated topic title, irrespective of the input topic's or previous questions' language. Responses declaring another language are retried within the existing retry and timeout limits, then rejected rather than published. Previously published questions and explanations are not retroactively translated. Saved topic names and custom answer options remain as provided.
 
 ## Production notes
 
@@ -124,11 +135,21 @@ The beta marks the first release with working points, streaks and leaderboards. 
 
 ## Scoring
 
+### Levels and EXP
+
+Players start at level 1. Correct answers grant 10 EXP on easy, 20 on medium and 30 on hard; wrong answers and missing votes grant no EXP. EXP is derived from settled points at 10 EXP per point, so existing scores immediately contribute without a database migration or reset.
+
+Advancing from level L to L+1 requires 100 × L EXP. Total EXP needed to reach level L is 50 × L × (L-1): level 2 starts at 100 EXP, level 3 at 300 and level 4 at 600. Surplus EXP carries into the next level. At a threshold the level advances and the bar resets to the new level's progress; the card never displays a rounded-up 100% before an advance.
+
+The profile progress bar tracks EXP, not correct-answer accuracy. Accuracy is shown separately beside the correct answer count. Points remain the leaderboard sorting criterion; leaderboard rows also show level. Levels and EXP are server-specific and are removed with the score by `/dilemma score forget`.
+
+### Quiz points
+
 Correct answers earn 1 point on easy, 2 on medium and 3 on hard. Wrong answers earn zero and reset the correct-answer streak. Not voting does not affect a streak. Streak order follows poll finish times, not background retry order. Equal finish times use message ID order for a stable tie-break.
 
 Only new polls created after scoring is enabled count. Existing quiz history is preserved without retroactive awards. Scores are calculated after Discord finalizes a closed poll; the bot checks every minute and retries unavailable polls. The bot must have View Channel and Read Message History permissions for scored polls. No privileged Discord intent is required for voter retrieval.
 
-`/poll end` can close a quiz early. Vote changes before closing are reflected in the final vote. Bot votes are excluded. Scores and leaderboards are isolated per server. Tied leaderboard scores are ordered by correct answers and then user ID. Score responses do not ping players.
+`/dilemma poll end` can close a quiz early. Vote changes before closing are reflected in the final vote. Bot votes are excluded. Scores and leaderboards are isolated per server. Tied leaderboard scores are ordered by correct answers and then user ID. Score responses do not ping players.
 
 Deleting your answers and score is permanent. Already scored polls are not rescored after deletion, but pending polls and future votes can create new records. See [Privacy Policy](PRIVACY_POLICY.md).
 

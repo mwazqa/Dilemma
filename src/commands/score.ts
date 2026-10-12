@@ -1,9 +1,12 @@
-import { EmbedBuilder, SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
+import { AttachmentBuilder, EmbedBuilder, SlashCommandSubcommandGroupBuilder, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { openFeedback } from "../feedback.js";
+import { experienceProgress } from "../services/experience.js";
+import { boundedText, renderScoreCard } from "../services/score-card.js";
+import { serverRank } from "../services/score-ranking.js";
 
-export const scoreCommand = new SlashCommandBuilder().setName("score").setDescription("Your Dilemma score and server leaderboard.")
-  .addSubcommand(sub => sub.setName("profile").setDescription("Show quiz points, accuracy and correct-answer streaks.")
+export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("score").setDescription("Your Dilemma score and server leaderboard.")
+  .addSubcommand(sub => sub.setName("profile").setDescription("Show quiz level, EXP, points, accuracy and correct-answer streaks.")
     .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
   .addSubcommand(sub => sub.setName("leaderboard").setDescription("Show this server's top ten players."))
   .addSubcommand(sub => sub.setName("forget").setDescription("Delete your stored quiz answers and score on this server.")
@@ -12,12 +15,12 @@ export const scoreCommand = new SlashCommandBuilder().setName("score").setDescri
 const rankIcons = ["🥇", "🥈", "🥉"];
 
 function progressBar(value: number, size = 10) {
-  const filled = Math.round(value / 100 * size);
+  const filled = Math.floor(value / 100 * size);
   return `${"▰".repeat(filled)}${"▱".repeat(size - filled)} ${value}%`;
 }
 
-function avatarUrl(user: { displayAvatarURL?: (options: { size: number }) => string }) {
-  return user.displayAvatarURL?.({ size: 128 });
+function avatarUrl(user: { displayAvatarURL?: (options: { size: number; extension: "png"; forceStatic: boolean }) => string }) {
+  return user.displayAvatarURL?.({ size: 128, extension: "png", forceStatic: true });
 }
 
 export async function handleScore(interaction: ChatInputCommandInteraction) {
@@ -39,7 +42,9 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
       orderBy: [{ points: "desc" }, { correct: "desc" }, { userId: "asc" }], take: 10 });
     const description = players.length ? players.map((player, i) => {
       const rank = rankIcons[i] ?? `**${i + 1}.**`;
-      return `${rank} <@${player.userId}>\n> **${player.points}** pts · ${player.correct}/${player.answered} correct · 🔥 ${player.bestStreak}`;
+      const progress = experienceProgress(player.points);
+      const accuracy = player.answered ? Math.round(player.correct / player.answered * 100) : 0;
+      return `${rank} <@${player.userId}>\n> ${text("scoreLevel", { level: progress.level })} · ${text("scorePoints", { points: player.points })}\n> ${text("scoreAnswers")}: ${player.answered} · ${text("scoreCorrect")}: ${player.correct} (${accuracy}%) · 🔥 ${player.bestStreak}`;
     }).join("\n\n") : text("scoreEmpty");
     const embed = new EmbedBuilder()
       .setColor(0x8b5cf6)
@@ -56,19 +61,41 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   const answered = player?.answered ?? 0;
   const correct = player?.correct ?? 0;
   const accuracy = answered ? Math.round(correct / answered * 100) : 0;
+  const progress = experienceProgress(player?.points ?? 0);
+  const rank = await serverRank(guildId, user.id, player);
   const displayName = (interaction.guild?.members.cache.get(user.id)?.displayName
     ?? user.displayName ?? user.username ?? text("scorePlayer")).replace(/[\r\n]+/g, " ");
+  const title = displayName;
+  const rankLabel = rank === null ? text("scoreUnranked") : text("scoreRank", { rank });
+  const avatar = avatarUrl(user);
+  const cardData = {
+    title, level: text("scoreLevel", { level: progress.level }),
+    rank,
+    points: text("scorePoints", { points: player?.points ?? 0 }).replace(/\*\*/g, ""),
+    experience: text("scoreExpProgress", { earned: progress.earned, required: progress.required }),
+    percent: progress.percent,
+    answersLabel: text("scoreAnswers"), answers: String(answered),
+    correctLabel: text("scoreCorrect"), correct: `${correct} (${accuracy}%)`,
+    streakLabel: text("scoreStreak"), streak: `${player?.currentStreak ?? 0} / ${player?.bestStreak ?? 0}`
+  };
+  let card: Buffer | undefined;
+  try { card = await renderScoreCard(cardData, avatar); }
+  catch { /* Keep the textual fallback; never log players' data or native image errors. */ }
+  if (card) {
+    const alt = `${title}\n${cardData.level} · ${cardData.points}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}`;
+    const attachment = new AttachmentBuilder(card, { name: "quiz-profile.png", description: boundedText(alt, 1000) });
+    await reply({ content: null, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
+    return;
+  }
   const embed = new EmbedBuilder()
-    .setColor(0x06b6d4)
-    .setTitle(text("scoreProfile", { user: displayName, points: player?.points ?? 0, answered, correct, accuracy,
-      streak: player?.currentStreak ?? 0, best: player?.bestStreak ?? 0 }).split("\n")[0].replace(/\*\*/g, ""))
-    .setDescription(`**${player?.points ?? 0}** points\n${progressBar(accuracy)}`)
+    .setColor(0xad94f3)
+    .setTitle(boundedText(title, 250))
+    .setDescription(`**${cardData.level}** · ${rank === null ? rankLabel : `#${rank}`}\n${text("scorePoints", { points: player?.points ?? 0 })}\n${cardData.experience}\n${progressBar(progress.percent)}`)
     .addFields(
       { name: `📚 ${text("scoreAnswers")}`, value: String(answered), inline: true },
-      { name: `✅ ${text("scoreCorrect")}`, value: String(correct), inline: true },
+      { name: `✅ ${text("scoreCorrect")}`, value: cardData.correct, inline: true },
       { name: `🔥 ${text("scoreStreak")}`, value: `${player?.currentStreak ?? 0} / ${player?.bestStreak ?? 0}`, inline: true }
     );
-  const avatar = avatarUrl(user);
   if (avatar) embed.setThumbnail(avatar);
   await reply({
     content: null,

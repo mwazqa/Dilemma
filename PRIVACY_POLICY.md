@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 6, 2026
+Last updated: October 12, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -9,8 +9,15 @@ This policy explains what data Dilemma processes when used on a Discord server.
 Dilemma stores Discord server IDs, channel IDs, topic configuration, generated
 questions, poll options, results, and timestamps. For quiz scoring, it stores
 Discord user IDs, final answer selections, points, accuracy and correct-answer
-streaks. Server leaderboards and profiles can display these scores to other
+streaks. Levels and EXP are calculated from settled points, without storing additional personal data.
+Server leaderboards and profiles can display these scores to other
 members of the same server. Usernames and avatars are not stored for scoring.
+
+Profile cards temporarily process the player's Discord display name, avatar and
+score in memory to render an image. Avatars are fetched only from Discord's CDN.
+Card rendering does not send this data to an AI provider, write player images to
+application files, or include them in application logs. The resulting card is
+sent back through Discord, whose own data handling applies to the attachment.
 
 Dilemma does not intentionally request names, email addresses, message history,
 or private messages. Do not enter sensitive personal information into topics,
@@ -27,7 +34,7 @@ that provider's own privacy policy and terms.
 
 Data is used to configure scheduled generation, publish polls, prevent duplicate
 questions, show results, and calculate server-specific scores and streaks.
-Use `/score forget confirm:true` to permanently delete your stored answers and
+Use `/dilemma score forget confirm:true` to permanently delete your stored answers and
 score on the current server. Polls that have not yet been scored and future
 votes can create new records. Already scored polls are not scored again after
 deletion. This command does not remove your vote from Discord itself.

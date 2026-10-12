@@ -3,6 +3,7 @@ Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" })
 const { settlementData, scoreHistory, collectFinalVotes, applyFinalVotes, runDueSettlements } = await import("../dist/services/scoring.js");
 const { db } = await import("../dist/db.js");
 const { handleScore, scoreCommand } = await import("../dist/commands/score.js");
+const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { questionSchema } = await import("../dist/types/question.js");
 
 assert.deepEqual(scoreHistory([{ correct: true, points: 1 }, { correct: true, points: 3 }, { correct: false, points: 0 }, { correct: true, points: 2 }]),
@@ -58,35 +59,45 @@ await assert.rejects(applyFinalVotes(quiz, [{ userId: "1", answerId: 999 }], new
 
 db.guildSettings.findUnique = async () => ({ language: "pl" });
 db.userScore.findUnique = async ({ where }) => { assert.equal(where.guildId_userId.guildId, "guild"); return player; };
+db.userScore.count = async ({ where }) => { assert.equal(where.guildId, "guild"); return 2; };
 db.userScore.findMany = async ({ where, orderBy, take }) => { assert.equal(where.guildId, "guild"); assert.equal(take, 10); assert.equal(orderBy[0].points, "desc"); return [player]; };
 function interaction(sub, confirm = false, guildId = "guild") {
   const replies = [];
   const payloads = [];
-  return { guildId, locale: "en", user: { id: "1", displayName: "Testowy gracz", username: "test-player" }, options: { getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
+  return { commandName: "dilemma", guildId, locale: "en", user: { id: "1", displayName: "Testowy gracz", username: "test-player" }, options: { getSubcommandGroup: () => "score", getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
     deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); payloads.push(payload); }, replies, payloads };
 }
-const profile = interaction("profile"); await handleScore(profile);
+const profile = interaction("profile"); await routeCommand(profile);
 assert.equal(profile.replies[0], null, "No duplicate profile text above the card");
 assert.equal(profile.payloads[0].embeds.length, 1);
 const profileEmbed = profile.payloads[0].embeds[0].toJSON();
-assert.match(profileEmbed.title, /Testowy gracz/);
-assert.doesNotMatch(profileEmbed.title, /<@/);
-assert.match(profileEmbed.description, /\*\*3\*\*/);
-assert.doesNotMatch(profileEmbed.description, /Poprawna odpowiedź:|finalizacji|scoring was enabled/);
-assert.equal(profileEmbed.description.split("\n").length, 2, "Profile contains only points and accuracy, without a rules paragraph");
-assert.equal(profileEmbed.fields.length, 3, "Keep answer and streak statistics");
+assert.equal(profileEmbed.image.url, "attachment://quiz-profile.png");
+assert.equal(profileEmbed.fields, undefined, "Do not repeat the image statistics in embed fields");
+const profileAlt = profile.payloads[0].files[0].description;
+assert.match(profileAlt, /Testowy gracz/);
+assert.equal(profileAlt.split("\n")[0], "Testowy gracz", "No quiz-card title or bot-added decorations");
+assert.doesNotMatch(profileAlt, /<@/);
+assert.doesNotMatch(profileAlt, /Poprawna odpowiedź:|finalizacji|scoring was enabled/);
+assert.match(profileAlt, /Poziom 1/);
+assert.match(profileAlt, /#3 w rankingu serwera/);
+assert.doesNotMatch(profileAlt, /Następny: poziom/);
+assert.match(profileAlt, /30 \/ 100 EXP/);
+assert.match(profileAlt, /\(30%\)/);
+assert.match(profileAlt, /Poprawne: 1 \(100%\)/, "Show correct count and accuracy without repeating total answers");
 const nicknamedProfile = interaction("profile");
 nicknamedProfile.guild = { members: { cache: new Map([["1", { displayName: "Serwerowy nick" }]]) } };
 await handleScore(nicknamedProfile);
-assert.match(nicknamedProfile.payloads[0].embeds[0].toJSON().title, /Serwerowy nick/);
+assert.match(nicknamedProfile.payloads[0].files[0].description, /Serwerowy nick/);
 const otherProfile = interaction("profile");
 otherProfile.options.getUser = () => ({ id: "1", displayName: "Wybrany gracz" });
 await handleScore(otherProfile);
-assert.match(otherProfile.payloads[0].embeds[0].toJSON().title, /Wybrany gracz/);
-const leaderboard = interaction("leaderboard"); await handleScore(leaderboard);
+assert.match(otherProfile.payloads[0].files[0].description, /Wybrany gracz/);
+const leaderboard = interaction("leaderboard"); await routeCommand(leaderboard);
 assert.equal(leaderboard.replies[0], null, "No duplicate ranking text above the card");
 assert.equal(leaderboard.payloads[0].embeds.length, 1);
 assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /🥇 <@1>/);
+assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /Odpowiedzi: 1/);
+assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /Poprawne: 1 \(100%\)/);
 assert.equal(leaderboard.payloads[0].embeds[0].toJSON().footer, undefined, "Ranking has no rules footer");
 const findPlayers = db.userScore.findMany;
 db.userScore.findMany = async () => [];
@@ -98,8 +109,10 @@ const dm = interaction("profile", false, null); await handleScore(dm); assert.ma
 let deletions = 0;
 db.$transaction = async cb => cb({ quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
   userScore: { deleteMany: async () => { deletions++; } } });
-await handleScore(interaction("forget")); assert.equal(deletions, 0);
-const forgotten = interaction("forget", true); await handleScore(forgotten); assert.equal(deletions, 2); assert.match(forgotten.replies[0], /trwale usunięte/);
+const unconfirmed = interaction("forget");
+await routeCommand(unconfirmed); assert.equal(deletions, 0);
+assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
+const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 2); assert.match(forgotten.replies[0], /trwale usunięte/);
 assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "forget"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };

@@ -3,7 +3,8 @@ Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", Q
   AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { Prisma } = await import("@prisma/client");
 const { db } = await import("../dist/db.js");
-const { claimQuizRun, releaseQuizRun, runKey, quizDay, quizDayBounds, isTopicDue, validatePollDuration, DailyQuizLimitError } =
+const { claimQuizRun, refreshRandomQuizRun, releaseQuizRun, runKey, quizDay, quizDayBounds, isTopicDue,
+  validatePollDuration, DailyQuizLimitError, RandomQuizCooldownError, RANDOM_COOLDOWN_MS } =
   await import("../dist/services/quiz-limits.js");
 const RealDate = Date;
 let now = new RealDate("2026-10-08T08:00:00Z");
@@ -16,13 +17,22 @@ const topics = new Map();
 const randomPolls = [];
 const generatedPolls = [];
 const key = data => JSON.stringify([data.guildId, data.scope, data.day, data.slot]);
-db.dailyQuizRun.findMany = async ({ where }) => [...runs.values()].filter(run =>
-  run.guildId === where.guildId && run.scope === where.scope && run.day === where.day);
+db.dailyQuizRun.findMany = async ({ where, take }) => [...runs.values()].filter(run =>
+  run.guildId === where.guildId && run.scope === where.scope && (!where.day || run.day === where.day) &&
+  (!where.createdAt?.gt || run.createdAt > where.createdAt.gt)).sort((a, b) => b.createdAt - a.createdAt).slice(0, take);
+db.dailyQuizRun.findUnique = async ({ where }) => runs.get(key(where.guildId_scope_day_slot)) ?? null;
+db.dailyQuizRun.updateMany = async ({ where, data }) => {
+  const run = runs.get(key(where));
+  if (!run || (where.createdAt instanceof RealDate ? +run.createdAt !== +where.createdAt :
+    run.createdAt > where.createdAt.lte) || (where.messageId === null && run.messageId !== null)) return { count: 0 };
+  Object.assign(run, data);
+  return { count: 1 };
+};
 db.dailyQuizRun.create = async ({ data }) => {
   if (runs.has(key(data))) throw new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "test" });
-  const run = { ...data, createdAt: new Date(), messageId: null };
+  const run = { ...data, createdAt: data.createdAt ?? new Date(), messageId: null };
   runs.set(key(data), run);
-  return run;
+  return { ...run };
 };
 db.dailyQuizRun.update = async ({ where, data }) => {
   const run = runs.get(key(where.guildId_scope_day_slot));
@@ -32,13 +42,15 @@ db.dailyQuizRun.update = async ({ where, data }) => {
 };
 db.dailyQuizRun.deleteMany = async ({ where }) => {
   const run = runs.get(key(where));
-  if (run && run.messageId === null) { runs.delete(key(where)); return { count: 1 }; }
+  if (run && run.messageId === null && +run.createdAt === +where.createdAt) { runs.delete(key(where)); return { count: 1 }; }
   return { count: 0 };
 };
 const matches = (row, where) => row.guildId === where.guildId &&
   (!where.topicId || row.topicId === where.topicId) && row.createdAt >= where.createdAt.gte &&
   row.createdAt < where.createdAt.lt && !where.messageId?.notIn.includes(row.messageId);
 db.randomPoll.count = async ({ where }) => randomPolls.filter(row => matches(row, where)).length;
+db.randomPoll.findFirst = async ({ where }) => randomPolls.filter(row => row.guildId === where.guildId &&
+  row.createdAt > where.createdAt.gt).sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
 db.generatedPoll.count = async ({ where }) => generatedPolls.filter(row => matches(row, where)).length;
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? null;
 db.topic.findMany = async () => [...topics.values()].filter(topic => topic.enabled);
@@ -71,27 +83,54 @@ assert.equal(validatePollDuration(24), 24);
 for (const invalid of [0, 25, 1.5, NaN]) assert.throws(() => validatePollDuration(invalid));
 reset();
 const parallel = await Promise.allSettled(Array.from({ length: 10 }, () => claimQuizRun("guild")));
-assert.equal(parallel.filter(result => result.status === "fulfilled").length, 3);
-assert.ok(parallel.filter(result => result.status === "rejected").every(result => result.reason instanceof DailyQuizLimitError));
+assert.equal(parallel.filter(result => result.status === "fulfilled").length, 1);
+assert.ok(parallel.filter(result => result.status === "rejected").every(result => result.reason instanceof RandomQuizCooldownError));
 await claimQuizRun("other-guild");
 await claimQuizRun("guild", "first-topic");
 await claimQuizRun("guild", "second-topic");
 await assert.rejects(claimQuizRun("guild", "first-topic"), DailyQuizLimitError);
 await claimQuizRun("guild", "first-topic", new Date("2026-10-09T08:00:00Z"));
-// Persisted rows, not process-local counters, enforce restart-safe quota.
-await assert.rejects(claimQuizRun("guild"), DailyQuizLimitError);
+// Persisted rows, not process-local counters, enforce restart-safe cooldowns.
+await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError);
 reset();
 const reservation = await claimQuizRun("guild");
 await releaseQuizRun(reservation);
 assert.equal((await claimQuizRun("guild")).slot, 1);
 reset();
 randomPolls.push(...[1, 2].map(n => ({ guildId: "guild", messageId: "legacy-" + n, createdAt: new Date() })));
+await assert.rejects(claimQuizRun("guild"), error => error instanceof RandomQuizCooldownError &&
+  +error.retryAt === +now + RANDOM_COOLDOWN_MS);
+now = new Date(+now + RANDOM_COOLDOWN_MS);
 const migrated = await claimQuizRun("guild");
-assert.equal(migrated.slot, 3);
-await db.dailyQuizRun.update({ where: runKey(migrated), data: { messageId: "new" } });
-randomPolls.push({ guildId: "guild", messageId: "new", createdAt: new Date() });
-await assert.rejects(claimQuizRun("guild"), DailyQuizLimitError);
+assert.equal(migrated.day, "cooldown", "Old polls do not impose a daily quota");
 reset();
+const legacyRun = { guildId: "guild", scope: "random", day: quizDay(now), slot: 3, createdAt: now, messageId: null };
+runs.set(key(legacyRun), legacyRun);
+await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError);
+now = new Date(+now + RANDOM_COOLDOWN_MS);
+await claimQuizRun("guild");
+reset();
+now = new Date("2026-10-08T21:45:00Z");
+const oldLease = await claimQuizRun("guild");
+now = new Date(+now + RANDOM_COOLDOWN_MS - 1);
+await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError, "Midnight does not reset cooldown");
+now = new Date(+now + 1);
+const expiredParallel = await Promise.allSettled(Array.from({ length: 10 }, () => claimQuizRun("guild")));
+assert.equal(expiredParallel.filter(result => result.status === "fulfilled").length, 1, "Only one caller reclaims an expired row");
+await releaseQuizRun(oldLease);
+await assert.rejects(refreshRandomQuizRun(oldLease), RandomQuizCooldownError, "Old leases cannot refresh newer reservations");
+await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError, "Old leases cannot release newer reservations");
+for (const date of ["2026-03-29T00:30:00Z", "2026-10-25T00:30:00Z"]) {
+  reset();
+  now = new Date(date);
+  await claimQuizRun("guild");
+  now = new Date(+now + RANDOM_COOLDOWN_MS - 1);
+  await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError);
+  now = new Date(+now + 1);
+  await claimQuizRun("guild");
+}
+reset();
+now = new Date("2026-10-08T08:00:00Z");
 const legacyTopic = makeTopic();
 legacyTopic.lastGeneratedAt = new Date();
 await assert.rejects(claimQuizRun("guild", legacyTopic.id), DailyQuizLimitError);
@@ -99,11 +138,11 @@ legacyTopic.lastGeneratedAt = null;
 generatedPolls.push({ guildId: "guild", topicId: legacyTopic.id, messageId: "legacy", createdAt: new Date() });
 await assert.rejects(claimQuizRun("guild", legacyTopic.id), DailyQuizLimitError);
 
-let aiCalls = 0, sent = 0, failAi = false, failSend = false;
+let aiCalls = 0, sent = 0, failAi = false, failSend = false, wrongLanguage = false, sendDelay = 0;
 globalThis.fetch = async () => {
   aiCalls++;
   if (failAi) throw new Error("generation failure");
-  const question = { language: "pl", topic: "Test", question: `Question ${aiCalls}?`, options: ["A", "B"],
+  const question = { language: wrongLanguage ? "en" : "pl", topic: "Test", question: `Question ${aiCalls}?`, options: ["A", "B"],
     optionEmojis: ["", ""], topicEmoji: "", correctOption: 0, explanation: "Fact." };
   return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(question) } }] }),
     { headers: { "content-type": "application/json" } });
@@ -113,6 +152,7 @@ const { publishTopicQuestions, publishRandomQuestion } = await import("../dist/s
 const { runDueTopics } = await import("../dist/scheduler.js");
 const channel = { id: "channel", send: async payload => {
   if (failSend) throw new Error("uncertain send");
+  now = new Date(+now + sendDelay);
   sent++;
   durations.push(payload.poll.duration);
   return { id: "message-" + sent, channelId: "channel", poll: { allowMultiselect: false,
@@ -145,23 +185,44 @@ await publishTopicQuestions({ ...otherTopic, pollDurationHours: 1 }, channel);
 assert.equal(durations.at(-1), 1);
 assert.equal(otherTopic.pollDurationHours, 2, "A run override does not modify saved duration");
 reset();
-for (let i = 0; i < 3; i++) await publishRandomQuestion("guild", "pl", 2, channel, "easy", 4);
+now = new Date("2026-10-10T00:00:00Z");
+for (let i = 0; i < 5; i++) {
+  await publishRandomQuestion("guild", 2, channel, "easy", 4);
+  if (i < 4) now = new Date(+now + RANDOM_COOLDOWN_MS);
+}
+assert.equal(randomPolls.length, 5, "More than three random quizzes may be published in one day");
 assert.equal(durations.at(-1), 4);
 const beforeQuota = aiCalls;
-await assert.rejects(publishRandomQuestion("guild", "pl", 2, channel), DailyQuizLimitError);
+await assert.rejects(publishRandomQuestion("guild", 2, channel), RandomQuizCooldownError);
 assert.equal(aiCalls, beforeQuota);
 reset();
 failAi = true;
-await assert.rejects(publishRandomQuestion("guild", "pl", 2, channel));
+await assert.rejects(publishRandomQuestion("guild", 2, channel));
 assert.equal(runs.size, 0, "AI failures before send release quota");
 failAi = false;
 failSend = true;
-await assert.rejects(publishRandomQuestion("guild", "pl", 2, channel));
+await assert.rejects(publishRandomQuestion("guild", 2, channel));
 assert.equal(runs.size, 1, "Uncertain sends keep their reservation");
 failSend = false;
-await publishRandomQuestion("guild", "pl", 2, channel);
-await publishRandomQuestion("guild", "pl", 2, channel);
-await assert.rejects(publishRandomQuestion("guild", "pl", 2, channel), DailyQuizLimitError);
+await assert.rejects(publishRandomQuestion("guild", 2, channel), RandomQuizCooldownError);
+now = new Date(+now + RANDOM_COOLDOWN_MS);
+await publishRandomQuestion("guild", 2, channel);
+await assert.rejects(publishRandomQuestion("guild", 2, channel), RandomQuizCooldownError);
+reset();
+sendDelay = 30_000;
+await publishRandomQuestion("guild", 2, channel);
+sendDelay = 0;
+now = new Date(+now + RANDOM_COOLDOWN_MS - 1);
+await assert.rejects(publishRandomQuestion("guild", 2, channel), RandomQuizCooldownError,
+  "Cooldown starts after publication, not at the beginning of generation");
+now = new Date(+now + 1);
+await publishRandomQuestion("guild", 2, channel);
+reset();
+wrongLanguage = true;
+const sentBeforeLanguageFailure = sent;
+await assert.rejects(publishRandomQuestion("guild", 2, channel));
+assert.equal(sent, sentBeforeLanguageFailure, "A wrong-language response must not reach Discord");
+assert.equal(runs.size, 0, "Language validation failure releases the reservation");
 globalThis.Date = RealDate;
 await db.$disconnect();
-console.log("PASS: daily quotas, concurrency, migration-day history, calendar/DST, schedule replacement, durations and failure recovery");
+console.log("PASS: rolling random cooldown, no daily cap, atomic claims, stale leases, upgrade history, midnight/DST, topic quotas and failure recovery");

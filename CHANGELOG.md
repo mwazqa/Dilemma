@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v0.4.0-beta - 2026-10-12
+
+- Replace the three-per-day random quota with a persistent, concurrency-safe two-hour server cooldown, shared across channels and administrators. Preserve cooldowns from recent pre-upgrade polls and reservations; keep topic daily limits unchanged. Update help and cooldown feedback in all six languages.
+- Fetch the server language for every random publication and explicitly require it for all generated quiz text, regardless of the input topic or history language. Retry and reject AI responses declaring a different language; preserve custom answer options and saved topic names.
+- Add optional `generation_hours:HH:mm` to `/dilemma defaults` for new-topic publication times, in the configured quiz timezone. Allow updating a single default; preserve omitted settings and existing topic schedules and daily quotas. Add a nullable setting with aligned SQLite/PostgreSQL migrations.
+- Hide `/dilemma help` from the help guide's command lists in all six languages while keeping the help command available.
+- Consolidate all slash commands under `/dilemma`: add `language`, `defaults` and `ping`, and nest the `score` and `poll` groups. Remove standalone command registrations, preserve handler-level permissions and update the six-language help guide and confirmation messages.
+- Remove `/dilemma rename`, its autocomplete options and help references in all six languages. Existing topics remain unchanged.
+- Show only the player's name in profile headers and place a compact rank badge beside the avatar, aligned with the name. Highlight the top three places in gold, silver and bronze; keep other ranks subdued. Preserve localized accessible rank text and text fallback, leaderboard tie-breakers and unranked status for players without settled answers.
+- Show explicitly labeled total answers and correct-answer count with accuracy in leaderboard rows, without repeating the answer total as a fraction. Keep the next-level label off profile cards.
+- Show correct-answer count and accuracy without repeating the total answer count on profile cards and their text fallback.
+- Render `/dilemma score profile` as a navy/lavender/gold PNG card with a document icon, EXP bar, player avatar and grapheme-safe long-name fitting. Keep accessible attachment text and a textual fallback; do not store player images on disk.
+- Add server-specific levels and EXP derived from settled points, including existing scores.
+- Award 10/20/30 EXP for correct easy/medium/hard answers; advancing from level L requires 100 × L EXP.
+- Replace the accuracy progress bar with EXP progress; show correct-answer accuracy separately and levels in leaderboard rows without changing rank order.
+
 ## v0.3.0-beta - 2026-10-08
 
 - Add localized **End quiz** buttons to topic and random polls, with Manage Server permission checks, private feedback, duplicate-close protection and finalized-vote scoring. Keep `/poll end` as a fallback.

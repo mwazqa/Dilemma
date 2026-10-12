@@ -1,18 +1,16 @@
 import type { ChatInputCommandInteraction } from "discord.js";
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder } from "discord.js";
 import { message, type MessageKey } from "../messages.js";
 import { openFeedback } from "../feedback.js";
-
-export const helpCommand = new SlashCommandBuilder()
-  .setName("help")
-  .setDescription("Show Dilemma commands.");
 
 export function getHelpContent(language = "en"): string {
   const lines: [string, MessageKey][] = [
     ["/dilemma create", "helpCreate"], ["/dilemma configure", "helpConfigure"],
     ["/dilemma enable` / `/dilemma disable", "helpToggle"], ["/dilemma run", "helpRun"],
     ["/dilemma random", "helpRandom"], ["/dilemma list", "helpList"],
-    ["/dilemma rename` / `/dilemma delete", "helpManage"], ["/settings", "helpSettings"], ["/poll end", "helpPoll"], ["/score", "helpScore"]
+    ["/dilemma delete", "helpManage"], ["/dilemma language", "helpLanguage"], ["/dilemma defaults", "helpDefaults"],
+    ["/dilemma poll end", "helpPoll"], ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
+    ["/dilemma score forget", "helpForget"], ["/dilemma ping", "helpPing"]
   ];
   return [message(language, "helpIntro"), ...lines.map(([command, key]) => `\`${command}\` - ${message(language, key)}`)].join("\n");
 }
@@ -20,14 +18,16 @@ export function getHelpContent(language = "en"): string {
 export function getHelpEmbed(language = "en"): EmbedBuilder {
   const sections: { title: MessageKey; commands: [string, MessageKey][] }[] = [
     { title: "helpQuizzes", commands: [
-      ["/dilemma random", "helpRandom"], ["/dilemma run", "helpRun"], ["/poll end", "helpPoll"]
+      ["/dilemma random", "helpRandom"], ["/dilemma run", "helpRun"], ["/dilemma poll end", "helpPoll"]
     ] },
     { title: "helpTopics", commands: [
       ["/dilemma create", "helpCreate"], ["/dilemma configure", "helpConfigure"],
       ["/dilemma enable` / `/dilemma disable", "helpToggle"], ["/dilemma list", "helpList"],
-      ["/dilemma rename` / `/dilemma delete", "helpManage"]
+      ["/dilemma delete", "helpManage"]
     ] },
-    { title: "helpSettingsScores", commands: [["/settings", "helpSettings"], ["/score", "helpScore"]] }
+    { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma defaults", "helpDefaults"],
+      ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"], ["/dilemma score forget", "helpForget"],
+      ["/dilemma ping", "helpPing"]] }
   ];
   return new EmbedBuilder()
     .setColor(0x8b5cf6)

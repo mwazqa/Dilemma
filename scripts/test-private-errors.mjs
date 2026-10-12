@@ -38,9 +38,29 @@ const registration = spawnSync(process.execPath, ["--input-type=module", "-e",
 assert.equal(registration.status, 1);
 assert.ok(!`${registration.stdout}${registration.stderr}`.includes(marker), "Registration errors must not use raw error output");
 
+for (const global of [true, false]) {
+  const registered = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import assert from 'node:assert/strict';
+    Object.assign(process.env, { DISCORD_TOKEN: 'test', DISCORD_CLIENT_ID: 'test', DISCORD_GUILD_ID: 'test-guild', DISCORD_REGISTER_GLOBAL: '${global}' });
+    const { REST } = await import('discord.js');
+    const calls = [];
+    REST.prototype.put = async (route, { body }) => { calls.push({ route, body }); };
+    await import('./dist/register-commands.js');
+    assert.equal(calls.length, ${global ? 2 : 1});
+    assert.deepEqual(calls[0].body.map(command => command.name), ['dilemma']);
+    assert.equal(calls[0].body[0].default_member_permissions, undefined);
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'language' && option.type === 1));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'score' && option.type === 2));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'poll' && option.type === 2));
+    assert.equal(calls[0].route, ${global ? "'/applications/test/commands'" : "'/applications/test/guilds/test-guild/commands'"});
+    ${global ? "assert.deepEqual(calls[1].body, []); assert.equal(calls[1].route, '/applications/test/guilds/test-guild/commands');" : ""}
+  `], { encoding: "utf8" });
+  assert.equal(registered.status, 0, `Single-root ${global ? "global" : "guild"} registration failed`);
+}
+
 const testEnvironment = { DATABASE_URL: "postgresql://test:test@localhost/dilemma_test", EXPECTED_TEST_HOST: "localhost", EXPECTED_TEST_DATABASE: "dilemma_test", TEST_DATABASE_CONFIRMED: "true" };
 assert.equal(requireTestDatabase(testEnvironment).hostname, "localhost");
 for (const changes of [{ TEST_DATABASE_CONFIRMED: "false" }, { EXPECTED_TEST_HOST: "other.invalid" }, { EXPECTED_TEST_DATABASE: "other" }]) {
   assert.throws(() => requireTestDatabase({ ...testEnvironment, ...changes }));
 }
-console.log("PASS: private errors, scheduler, registration and explicit test-database guard");
+console.log("PASS: private errors, scheduler, single-root global/guild registration and explicit test-database guard");

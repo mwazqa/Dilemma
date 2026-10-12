@@ -1,7 +1,7 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandSubcommandBuilder, type ChatInputCommandInteraction } from "discord.js";
 import { openFeedback } from "../feedback.js";
 
-export const pingCommand = new SlashCommandBuilder()
+export const pingCommand = new SlashCommandSubcommandBuilder()
   .setName("ping")
   .setDescription("Check whether Dilemma is online.");
 

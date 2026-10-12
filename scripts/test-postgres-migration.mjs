@@ -14,19 +14,24 @@ try {
   if (result.status !== 0) throw new Error("Migration failed on test branch. Inspect migration diagnostics privately.");
   const after = await snapshot();
   for (const table of tables) {
-    const field = table === "GuildSettings" ? "defaultDifficulty" : "difficulty";
-    const alreadyPresent = before[table].some(row => Object.hasOwn(row, field));
-    if (!alreadyPresent) assert.ok(after[table].every(row => row[field] === "medium"));
-    assert.deepEqual(after[table].map(row => alreadyPresent ? row : Object.fromEntries(Object.entries(row).filter(([key]) => key !== field))), before[table], `Preserve ${table}`);
+    const addedDefaults = table === "GuildSettings"
+      ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null }
+      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24 } : { difficulty: "medium" };
+    for (const [field, value] of Object.entries(addedDefaults)) {
+      if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
+    }
+    const fields = new Set(before[table].flatMap(row => Object.keys(row)));
+    assert.deepEqual(after[table].map(row => Object.fromEntries(Object.entries(row).filter(([key]) => fields.has(key)))), before[table], `Preserve ${table}`);
   }
   const guildId = "migration-difficulty-test";
-  const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard" } });
+  const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard", defaultGenerationTime: "18:30" } });
+  assert.equal(settings.defaultGenerationTime, "18:30");
   const topic = await db.topic.create({ data: { guildId, name: "Difficulty migration test", options: "", difficulty: settings.defaultDifficulty } });
   assert.equal(topic.difficulty, "hard");
   for (const difficulty of ["easy", "medium", "hard"]) assert.equal((await db.topic.update({ where: { id: topic.id }, data: { difficulty } })).difficulty, difficulty);
   await db.topic.delete({ where: { id: topic.id } });
   await db.guildSettings.delete({ where: { guildId } });
-  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", allLevelsPersisted: true }));
+  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, allLevelsPersisted: true }));
 } catch (error) {
   console.error(`Migration verification failed (${error?.code ?? error?.name ?? "Error"}).`);
   process.exitCode = 1;

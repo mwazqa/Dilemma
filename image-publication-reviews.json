@@ -1,7 +1,8 @@
 {
-  "reviewDate": "2026-10-07",
-  "reviewMethod": "Local OCR/QR/metadata checks plus visual contact-sheet review of artwork. Re-review changed image bytes. Not a guarantee against steganography.",
+  "reviewDate": "2026-10-12",
+  "reviewMethod": "Local OCR/QR/metadata checks plus visual review of artwork and generic architecture diagrams. Re-review changed image bytes. Not a guarantee against steganography.",
   "reviewedSha256": [
+    "2c376b92b9181ee53dee611f727b17090361176ef0f0e657a8adda5b3207d8d6",
     "874746e8606ccd8b3b2e5414e622df209403c05629f315bc1bfbc658734d82a9",
     "cfaf23fd42b39e6bf8f67d892bb2cfc8638c7fa01a209966284ed8b81c9a7029",
     "b6aa7a30d865173d7b685aed33ad30e46cdac55e43b4465d4b53816508be6230",
