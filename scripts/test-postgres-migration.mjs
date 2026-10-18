@@ -5,8 +5,9 @@ import { PrismaClient } from "@prisma/client";
 import { requireTestDatabase } from './test-database-guard.mjs';
 requireTestDatabase(process.env);
 const db = new PrismaClient();
-const tables = ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll"];
-const snapshot = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table, await db.$queryRawUnsafe(`SELECT * FROM "${table}" ORDER BY "${table === "GuildSettings" ? "guildId" : "id"}"`)])));
+const tables = ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "UserScore"];
+const snapshot = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table,
+  await db.$queryRawUnsafe(`SELECT * FROM "${table}" ORDER BY ${table === "UserScore" ? '"guildId", "userId"' : `"${table === "GuildSettings" ? "guildId" : "id"}"`}`)])));
 try {
   const before = await snapshot();
   await db.$disconnect();
@@ -16,6 +17,7 @@ try {
   for (const table of tables) {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null }
+      : table === "UserScore" ? { selectedBadge: null }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24 } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
@@ -26,12 +28,21 @@ try {
   const guildId = "migration-difficulty-test";
   const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard", defaultGenerationTime: "18:30" } });
   assert.equal(settings.defaultGenerationTime, "18:30");
+  const player = await db.userScore.create({ data: { guildId, userId: "badge-migration-player", answered: 1 } });
+  assert.equal(player.selectedBadge, null);
+  const badged = await db.userScore.update({ where: { guildId_userId: { guildId, userId: player.userId } }, data: { selectedBadge: "first_answer" } });
+  assert.equal(badged.selectedBadge, "first_answer");
+  assert.equal(badged.answered, 1);
+  const selected = ["first_answer", "correct_10", "level_2"];
+  const threeBadges = await db.userScore.update({ where: { guildId_userId: { guildId, userId: player.userId } }, data: { selectedBadge: JSON.stringify(selected) } });
+  assert.deepEqual(JSON.parse(threeBadges.selectedBadge), selected, "The existing text field stores up to three badge IDs");
+  await db.userScore.delete({ where: { guildId_userId: { guildId, userId: player.userId } } });
   const topic = await db.topic.create({ data: { guildId, name: "Difficulty migration test", options: "", difficulty: settings.defaultDifficulty } });
   assert.equal(topic.difficulty, "hard");
   for (const difficulty of ["easy", "medium", "hard"]) assert.equal((await db.topic.update({ where: { id: topic.id }, data: { difficulty } })).difficulty, difficulty);
   await db.topic.delete({ where: { id: topic.id } });
   await db.guildSettings.delete({ where: { guildId } });
-  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, allLevelsPersisted: true }));
+  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true }));
 } catch (error) {
   console.error(`Migration verification failed (${error?.code ?? error?.name ?? "Error"}).`);
   process.exitCode = 1;

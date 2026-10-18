@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { isAchievementId, maxDisplayedBadges, type AchievementId } from "./achievements.js";
+import { achievementIcon } from "./achievement-icons.js";
 
 export interface ScoreCardData {
   title: string;
@@ -13,6 +15,7 @@ export interface ScoreCardData {
   correct: string;
   streakLabel: string;
   streak: string;
+  badges?: readonly { id: AchievementId; name: string }[];
 }
 
 export function escapeXml(value: string): string {
@@ -103,7 +106,9 @@ export async function loadAvatar(url?: string): Promise<Buffer | undefined> {
 export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promise<string> {
   const title = await fitText(data.title, 675);
   const level = await fitText(data.level, 340, 32, 24);
-  const points = await fitText(data.points, 650, 26, 20, false);
+  const badges = (data.badges ?? []).filter((badge, index, all) => isAchievementId(badge.id)
+    && all.findIndex(item => item.id === badge.id) === index).slice(0, maxDisplayedBadges);
+  const points = await fitText(data.points, badges.length ? 600 : 650, 26, 20, false);
   const ranked = Number.isSafeInteger(data.rank) && data.rank !== null && data.rank > 0;
   const podium = ranked && data.rank! <= 3;
   const rankStyle = podium ? [
@@ -136,6 +141,10 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
     <g font-family="${cardFont}, Noto Sans, sans-serif">
       ${text(56, 100, title.text, title.size, "#e1e2f7", true)}
       ${text(56, 163, level.text, level.size, "#e1e2f7", true)}
+      ${badges.length ? `<g id="achievement-badges">${badges.map((badge, index) =>
+        `<g id="achievement-badge-${index + 1}" data-achievement="${badge.id}" role="img" transform="translate(${880 - (badges.length - index) * 72 + 8} 132)">
+          <title>${escapeXml(badge.name)}</title>${achievementIcon(badge.id)}
+        </g>`).join("")}</g>` : ""}
       <g id="rank-badge" data-rank-tier="${rankStyle.tier}">
         ${podium ? `<rect x="756" y="56" width="134" height="64" rx="18" fill="none" stroke="${rankStyle.color}" stroke-opacity="0.18" stroke-width="5"/>` : ""}
         <rect x="760" y="60" width="126" height="56" rx="14" fill="url(#rank-fill)" stroke="${rankStyle.color}" stroke-opacity="${podium ? 0.9 : 0.3}" stroke-width="${podium ? 2.5 : 1}"/>

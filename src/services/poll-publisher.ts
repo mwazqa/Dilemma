@@ -9,13 +9,15 @@ import { message, normalizeLanguage } from "../messages.js";
 import { settlementData } from "./scoring.js";
 import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { pollControls } from "./poll-controls.js";
+import { scheduleEvents } from "./schedule-events.js";
+import { getGuildSettings } from "./guild-settings.js";
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
   let run = await claimQuizRun(topic.guildId, topic.id);
   let sendAttempted = false;
   try {
-    const settings = await db.guildSettings.findUnique({ where: { guildId: topic.guildId } });
+    const settings = await getGuildSettings(topic.guildId);
     const language = normalizeLanguage(settings?.language ?? "en");
     const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
     const previousQuestions = (await db.generatedPoll.findMany({
@@ -48,8 +50,8 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       }
     });
     const settlement = settlementData(sentPoll, topic.guildId, difficulty, question.options, question.correctOption);
-    await db.$transaction(async tx => {
-      await tx.topic.update({
+    const updatedTopic = await db.$transaction(async tx => {
+      const updated = await tx.topic.update({
         where: { id: topic.id },
         data: { questionsGenerated: { increment: 1 }, channelId: channel.id, lastGeneratedAt: new Date() }
       });
@@ -70,7 +72,10 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       });
       await tx.quizSettlement.create({ data: settlement });
       await tx.dailyQuizRun.update({ where: runKey(run), data: { messageId: sentPoll.id } });
+      return updated;
     });
+    scheduleEvents.emit("topicChanged", updatedTopic);
+    scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return 1;
   } finally {
     // Keep the reservation after a send attempt: a transport failure may still have published the poll.
@@ -89,7 +94,7 @@ export async function publishRandomQuestion(
   let run = await claimQuizRun(guildId);
   let sendAttempted = false;
   try {
-    const settings = await db.guildSettings.findUnique({ where: { guildId } });
+    const settings = await getGuildSettings(guildId);
     const language = normalizeLanguage(settings?.language ?? "en");
     const previousQuestions = (await db.randomPoll.findMany({
       where: { guildId },
@@ -141,6 +146,7 @@ export async function publishRandomQuestion(
       await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot, createdAt: run.createdAt },
         data: { messageId: sentPoll.id, createdAt: new Date() } });
     });
+    scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return question.topic;
   } finally {
     if (!sendAttempted) await releaseQuizRun(run);

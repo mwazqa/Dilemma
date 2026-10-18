@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.5.0-beta - 2026-10-19
+
+- Replace minutely topic/scoring database polls with local deadline queues, startup recovery and immediate post-commit schedule updates. Preserve daily reservations and finalized, idempotent scoring; back off pending/failed work without idle reconciliation queries. Cache guild settings on demand with immediate invalidation on bot updates. Add isolated idle-database regression tests to CI and direct deployment checks.
+- Add six localized, server-scoped cosmetic achievements based on existing settled results and up to three selected badge icons on profile cards, with all selected names in accessible attachment descriptions and text fallback. Add `/dilemma score achievements` and `/dilemma score badge` with three selection options, localized unlocked-badge autocomplete, duplicate prevention, server isolation and atomic eligibility checks; keep points and EXP unchanged. Preserve legacy single-badge selections in the same text field without another migration. Delete selection and achievement progress with score privacy deletion.
+- Add aligned SQLite/PostgreSQL migrations for nullable `UserScore.selectedBadge` and achievement regression tests to CI and direct deployment checks.
+- Save the remaining feature ideas in `ROADMAP.md`: periodic rankings, leaderboard navigation, topic statistics, question error reports and profile customization.
 ## v0.4.0-beta - 2026-10-12
 
 - Replace the three-per-day random quota with a persistent, concurrency-safe two-hour server cooldown, shared across channels and administrators. Preserve cooldowns from recent pre-upgrade polls and reservations; keep topic daily limits unchanged. Update help and cooldown feedback in all six languages.

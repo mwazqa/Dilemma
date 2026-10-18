@@ -27,7 +27,7 @@ for (const language of messageLanguages) {
   }
   assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma defaults") && commands.includes("/dilemma poll end") && commands.includes("/dilemma score"));
   assert.doesNotMatch(commands, /`\/(?:settings|help|score|poll|ping)(?: |`)/);
-  for (const sub of ["profile", "leaderboard", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
+  for (const sub of ["profile", "leaderboard", "achievements", "badge", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
 }
 assert.equal(normalizeLanguage("es-ES"), "es");
 assert.equal(normalizeLanguage("unknown"), "en");

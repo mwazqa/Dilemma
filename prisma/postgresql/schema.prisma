@@ -47,6 +47,7 @@ model UserScore {
   correct       Int      @default(0)
   currentStreak Int      @default(0)
   bestStreak    Int      @default(0)
+  selectedBadge String?
   updatedAt     DateTime @updatedAt
 
   @@id([guildId, userId])

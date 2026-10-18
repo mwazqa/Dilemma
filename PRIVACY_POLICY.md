@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 12, 2026
+Last updated: October 19, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -10,6 +10,10 @@ Dilemma stores Discord server IDs, channel IDs, topic configuration, generated
 questions, poll options, results, and timestamps. For quiz scoring, it stores
 Discord user IDs, final answer selections, points, accuracy and correct-answer
 streaks. Levels and EXP are calculated from settled points, without storing additional personal data.
+Cosmetic achievements are calculated from these existing results. If a player
+chooses up to three profile badges, Dilemma stores their identifiers with that player's score
+on the current server. Deleting the score also deletes this selection and the
+progress used for achievements.
 Server leaderboards and profiles can display these scores to other
 members of the same server. Usernames and avatars are not stored for scoring.
 

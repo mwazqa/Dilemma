@@ -113,7 +113,7 @@ const unconfirmed = interaction("forget");
 await routeCommand(unconfirmed); assert.equal(deletions, 0);
 assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
 const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 2); assert.match(forgotten.replies[0], /trwale usunięte/);
-assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "forget"]);
+assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "badge", "forget"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };
 db.quizSettlement.updateMany = async () => { checkUpdates++; };

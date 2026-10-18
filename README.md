@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.4.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.5.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
@@ -24,6 +24,7 @@ Latest release: `v0.4.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 - Easy, medium and hard question difficulty for random quizzes, saved topics and scheduled generation
 - Localized help and Dilemma-style command feedback in English, Polish, German, Spanish, French and Japanese
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
+- Server-specific cosmetic achievements and up to three selected profile badge icons, derived from settled scores
 
 ## Setup
 
@@ -74,6 +75,8 @@ Never commit .env or bot/API keys.
 - Profile headers show only the player's display name, without a title prefix or added decorations. A compact rank badge sits beside the avatar on the same line as the name. The top three places have prominent gold, silver and bronze styling; other places use a muted badge. Ranking matches `/dilemma score leaderboard`: points descending, correct answers descending, then user ID ascending to resolve ties. Players without settled answers show a dash, with a localized explanation in accessible text; incorrect settled answers still count as participation.
 - `/dilemma score profile` renders a navy/lavender/gold PNG card locally, with a Discord avatar (or placeholder), a document icon for answers and a measured EXP bar. Long names shrink and then truncate at grapheme boundaries. Attachment alt text preserves the player name and statistics; rendering failures fall back to a text embed. Cards and avatars stay in memory, never in application files or logs. Avatar downloads are restricted to Discord CDN image paths, with a three-second timeout and size limits. The Docker image includes fonts; no AI generation is used for cards.
 - `/dilemma score leaderboard` - show the server's top ten players, with level, points, total answers, correct answers, accuracy and best streak
+- `/dilemma score achievements user:optional` - show six achievements and progress from settled results on this server
+- `/dilemma score badge achievement:...` - select one unlocked badge or hide it with `none`
 - `/dilemma score forget confirm:true` - permanently delete your stored answers and score on the current server
 
 Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to replace the old command list. Help, ping and score commands remain available to ordinary players; language, defaults, topic management and poll closing require Manage Server permission, checked in their handlers rather than on the shared root command.
@@ -97,6 +100,16 @@ The v0.3.0-beta migration only adds duration fields and quota storage. Legacy qu
 Direct deployment normally rejects pending migrations. After creating a backup and testing the migration on an isolated copy, explicitly use `npm run deploy:prod -- -ApplyMigrations` to apply it through the direct database connection before switching containers. Migration logs remain private on the host.
 
 `/dilemma language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. The generator must use this language for the question, generated answers, explanation and generated topic title, irrespective of the input topic's or previous questions' language. Responses declaring another language are retried within the existing retry and timeout limits, then rejected rather than published. Previously published questions and explanations are not retroactively translated. Saved topic names and custom answer options remain as provided.
+
+## Database idle behavior
+
+The bot keeps one local timer per scheduler, not a periodic database polling loop. At startup it reads active topic schedules and unsettled poll deadlines. It then queries only when a known topic is due, a poll expires or closes early, a failed job needs a retry, or a command needs persisted data. Empty queues perform no database queries, including overnight. Long timer waits are re-armed locally without querying the database.
+
+Topic creation, configuration, enable/disable, deletion and successful manual publication update the local schedule after the database write commits. New polls register their settlement deadline after commit; early closure replaces the expiry timer. Restarting reloads persisted state and catches up overdue work. Existing daily reservations, finalized-vote checks and transactional, idempotent scoring remain authoritative. Pending finalization retries back off from one minute up to one hour; failed jobs and failed startup reads back off from five minutes up to one hour.
+
+Guild language and defaults use a bounded, process-local cache with a one-hour lifetime. Bot settings commands and onboarding update it immediately. Cache expiry is checked only on demand, never by a background refresh. Scores, votes and profile deletion are not cached. Run one active bot process; after editing schedules or settings directly outside the bot, restart it to reload the local state.
+
+`npm run test:idle-database` uses synthetic database, Discord and AI fixtures with a simulated clock. It checks zero additional SQL queries during 48 idle hours, scheduled publication, automatic and early settlement, early manual runs, startup recovery, DST, settings updates and retry backoff. It does not contact Neon or verify production CU-hour savings. Neon still controls its own suspension delay and cold-start behavior.
 
 ## Production notes
 
@@ -131,9 +144,19 @@ The beta marks the first release with working points, streaks and leaderboards. 
 
 ### Future releases
 
-1. More languages beyond the six currently supported
+See [ROADMAP.md](ROADMAP.md) for saved feature ideas, including periodic rankings, leaderboard navigation, topic statistics, question reports, profile customization and more languages.
 
 ## Scoring
+
+### Achievements and badges
+
+`/dilemma score achievements user:optional` shows six achievements and their progress on the current server: first settled answer, 10 correct answers, 100 answered quizzes, a best streak of 10, level 2 and level 5. Existing settled results count immediately. Achievements are cosmetic and do not grant extra points or EXP.
+
+Use `/dilemma score badge achievement:... achievement_2:optional achievement_3:optional` to choose up to three different unlocked badges for your card. Each invocation replaces the displayed selection; omit the second or third choice to display fewer badges. The card shows a row of navy/lavender/gold icons beside the avatar, without repeating badge names on the image. Autocomplete offers localized unlocked badges, excludes duplicates from the other choices and includes a "No badges" option (`none`). Choose `achievement:none` without other badges to hide all icons. With no selection, the profile layout stays unchanged. Selection is server-specific and cannot change another player's badges. The card's accessible description and text fallback include all displayed badge names.
+
+Achievements are calculated from the existing score rather than stored as separate user activity records. Only the selected badge identifiers are stored. The existing nullable `selectedBadge` text field stores one identifier or a JSON array of up to three identifiers; legacy single-badge selections remain readable without another migration. `/dilemma score forget` removes the score, achievement progress and selection on that server. New finalized answers may unlock achievements again.
+
+Before deploying this feature, test the additive `20261015120000_profile_badges` migration on an isolated PostgreSQL branch, apply it and re-register slash commands. It adds a nullable `UserScore.selectedBadge` field; existing scores, EXP, quiz history and schedules are unchanged. Local SQLite and mocked tests do not replace isolated PostgreSQL verification.
 
 ### Levels and EXP
 

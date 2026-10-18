@@ -12,7 +12,12 @@ try {
     INSERT INTO "GuildSettings" (guildId, language, updatedAt) VALUES ('test', 'pl', CURRENT_TIMESTAMP);
     INSERT INTO "GeneratedPoll" (id, guildId, topicId, messageId, channelId, question, options, correctOption, explanation) VALUES ('g', 'test', 'legacy', 'gmsg', 'channel', 'Question', 'A||B', 0, 'Fact');
     INSERT INTO "RandomPoll" (id, guildId, language, messageId, channelId, question, options, correctOption, explanation) VALUES ('r', 'test', 'pl', 'rmsg', 'channel', 'Question', 'A||B', 0, 'Fact');`);
-  for (const migration of migrations.slice(1)) database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+  for (const migration of migrations.slice(1)) {
+    if (migration === "20261015120000_profile_badges") {
+      database.exec(`INSERT INTO "UserScore" (guildId, userId, points, answered, correct, currentStreak, bestStreak, updatedAt) VALUES ('test', 'legacy-player', 10, 12, 10, 3, 4, CURRENT_TIMESTAMP)`);
+    }
+    database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+  }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
   for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "DailyQuizRun"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
@@ -35,6 +40,17 @@ try {
   assert.equal(database.prepare('SELECT defaultGenerationTime FROM "GuildSettings" WHERE guildId = ?').get("test").defaultGenerationTime, "18:30");
   assert.equal(database.prepare('SELECT generationTime FROM "Topic" WHERE id = ?').get("legacy").generationTime, "06:45");
   assert.equal(settings.defaultQuestionsPerRun, 3, "Preserve rollback compatibility");
+  const badgeMigration = "20261015120000_profile_badges/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${badgeMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${badgeMigration}`, "utf8"));
+  const legacyPlayer = database.prepare('SELECT * FROM "UserScore" WHERE userId = ?').get("legacy-player");
+  assert.equal(legacyPlayer.selectedBadge, null);
+  assert.deepEqual([legacyPlayer.points, legacyPlayer.answered, legacyPlayer.correct, legacyPlayer.currentStreak, legacyPlayer.bestStreak], [10, 12, 10, 3, 4]);
+  database.exec(`UPDATE "UserScore" SET selectedBadge = 'first_answer' WHERE guildId = 'test' AND userId = 'legacy-player'`);
+  assert.equal(database.prepare('SELECT selectedBadge FROM "UserScore" WHERE userId = ?').get("legacy-player").selectedBadge, "first_answer");
+  const badges = ["first_answer", "correct_10", "level_2"];
+  database.prepare('UPDATE "UserScore" SET selectedBadge = ? WHERE guildId = ? AND userId = ?')
+    .run(JSON.stringify(badges), "test", "legacy-player");
+  assert.deepEqual(JSON.parse(database.prepare('SELECT selectedBadge FROM "UserScore" WHERE userId = ?').get("legacy-player").selectedBadge), badges);
   database.exec(`INSERT INTO "DailyQuizRun" (guildId, scope, day, slot) VALUES ('test', 'random', '2026-10-08', 1)`);
   assert.throws(() => database.exec(`INSERT INTO "DailyQuizRun" (guildId, scope, day, slot) VALUES ('test', 'random', '2026-10-08', 1)`));
   database.exec(`INSERT INTO "DailyQuizRun" (guildId, scope, day, slot) VALUES ('test', 'random', '2026-10-09', 1)`);

@@ -2,41 +2,95 @@ import type { Client } from "discord.js";
 import { db } from "./db.js";
 import { publishTopicQuestions } from "./services/poll-publisher.js";
 import { privateErrorSummary } from "./private-errors.js";
-import { DailyQuizLimitError, isTopicDue } from "./services/quiz-limits.js";
+import { DailyQuizLimitError, isTopicDue, nextTopicRunAt } from "./services/quiz-limits.js";
+import { DeadlineQueue, retryDelay } from "./services/deadline-queue.js";
+import { scheduleEvents, type TopicSchedule } from "./services/schedule-events.js";
 
-const schedulerIntervalMs = 60_000;
+const scheduledWhere = { enabled: true, generationTime: { not: null }, channelId: { not: null } };
 
 export function startScheduler(client: Client) {
-  void runDueTopics(client);
-  const now = new Date();
-  const millisecondsToNextMinute = schedulerIntervalMs - (now.getSeconds() * 1_000 + now.getMilliseconds());
-  return setTimeout(() => {
-    void runDueTopics(client);
-    setInterval(() => void runDueTopics(client), schedulerIntervalMs);
-  }, millisecondsToNextMinute);
+  let loading = true;
+  const changedDuringLoad = new Set<string>();
+  const attempts = new Map<string, number>();
+  const queue = new DeadlineQueue(async (id, current) => {
+    try {
+      if (id === "bootstrap") {
+        const topics = await db.topic.findMany({ where: scheduledWhere,
+          select: { id: true, enabled: true, channelId: true, generationTime: true, lastGeneratedAt: true, intervalDays: true } });
+        for (const topic of topics) if (!changedDuringLoad.has(topic.id)) schedule(topic);
+        loading = false;
+        changedDuringLoad.clear();
+      } else {
+        // Re-read only the due topic, so deleted/disabled/changed topics are safe.
+        const topic = await db.topic.findUnique({ where: { id } });
+        if (!current()) return;
+        if (!topic || nextTopicRunAt(topic) === null) { attempts.delete(id); return; }
+        if (!isTopicDue(topic, new Date())) { schedule(topic); return; }
+        try { await publishDueTopic(client, topic, current); }
+        catch (error) {
+          if (!current()) return;
+          if (!(error instanceof DailyQuizLimitError)) throw error;
+          // A manual run or uncertain send already reserved today. Do not retry
+          // the same daily quota every minute. Recheck at tomorrow's slot.
+          schedule({ ...topic, lastGeneratedAt: new Date(), intervalDays: 1 });
+        }
+      }
+      attempts.delete(id);
+    } catch (error) {
+      if (!current()) return;
+      const attempt = attempts.get(id) ?? 0;
+      attempts.set(id, attempt + 1);
+      queue.schedule(id, Date.now() + retryDelay(attempt, 300_000));
+      console.error("Scheduled generation pending:", privateErrorSummary(error));
+    }
+  }, error => console.error("Scheduled generation failed:", privateErrorSummary(error)));
+
+  function schedule(topic: TopicSchedule) {
+    const at = nextTopicRunAt(topic);
+    if (at === null) queue.cancel(topic.id);
+    else queue.schedule(topic.id, at);
+  }
+  function changed(topic: TopicSchedule) {
+    if (loading) changedDuringLoad.add(topic.id);
+    attempts.delete(topic.id);
+    schedule(topic);
+  }
+  function removed(id: string) {
+    if (loading) changedDuringLoad.add(id);
+    attempts.delete(id);
+    queue.cancel(id);
+  }
+  scheduleEvents.on("topicChanged", changed);
+  scheduleEvents.on("topicDeleted", removed);
+  queue.schedule("bootstrap", Date.now());
+  return () => {
+    queue.stop();
+    scheduleEvents.off("topicChanged", changed);
+    scheduleEvents.off("topicDeleted", removed);
+  };
 }
 
+async function publishDueTopic(client: Client, topic: Parameters<typeof publishTopicQuestions>[0], current = () => true) {
+  const channel = await client.channels.fetch(topic.channelId!);
+  if (!current()) return;
+  if (!channel?.isSendable()) throw new Error("Scheduled channel unavailable");
+  await publishTopicQuestions(topic, channel);
+  console.log("Scheduled generation completed");
+}
+
+// Explicit catch-up helper for diagnostics/tests, never a periodic database poll.
 let running = false;
 export async function runDueTopics(client: Client) {
   if (running) return;
   running = true;
   try {
-    const now = new Date();
-    const topics = await db.topic.findMany({
-      where: { enabled: true, generationTime: { not: null }, channelId: { not: null } }
-    });
+    const topics = await db.topic.findMany({ where: scheduledWhere });
 
     for (const topic of topics) {
-      if (!isTopicDue(topic, now)) continue;
-
-      try {
-        const channel = await client.channels.fetch(topic.channelId!);
-        if (!channel?.isSendable()) continue;
-        await publishTopicQuestions(topic, channel);
-        console.log("Scheduled generation completed");
-      } catch (error) {
-        if (error instanceof DailyQuizLimitError) continue;
-        console.error("Scheduled generation failed:", privateErrorSummary(error));
+      if (!isTopicDue(topic, new Date())) continue;
+      try { await publishDueTopic(client, topic); }
+      catch (error) {
+        if (!(error instanceof DailyQuizLimitError)) console.error("Scheduled generation failed:", privateErrorSummary(error));
       }
     }
   } finally { running = false; }

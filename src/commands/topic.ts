@@ -9,6 +9,8 @@ import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { DailyQuizLimitError, RandomQuizCooldownError, isGenerationTime } from "../services/quiz-limits.js";
+import { ensureGuildSettings } from "../services/guild-settings.js";
+import { scheduleEvents } from "../services/schedule-events.js";
 
 export const topicCommand = new SlashCommandBuilder()
   .setName("dilemma")
@@ -94,11 +96,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       await reply(text("channel"));
       return;
     }
-    const settings = await db.guildSettings.upsert({
-      where: { guildId: interaction.guildId },
-      create: { guildId: interaction.guildId },
-      update: {}
-    });
+    const settings = await ensureGuildSettings(interaction.guildId);
     const optionCount = interaction.options.getInteger("option_count", true);
     const difficulty = parseDifficulty(interaction.options.getString("difficulty") ?? settings.defaultDifficulty);
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
@@ -127,11 +125,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   }
 
   const name = interaction.options.getString("name", true).trim();
-  const settings = await db.guildSettings.upsert({
-    where: { guildId: interaction.guildId },
-    create: { guildId: interaction.guildId },
-    update: {}
-  });
+  const settings = await ensureGuildSettings(interaction.guildId);
 
   if (subcommand === "create") {
     const requestedDifficulty = interaction.options.getString("difficulty");
@@ -168,6 +162,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       update: { language: settings.language, options: options?.join(", ") ?? "", optionCount, channelId: interaction.channelId, enabled: true,
         ...(requestedDifficulty === null ? {} : { difficulty: parseDifficulty(requestedDifficulty) }) }
     });
+    scheduleEvents.emit("topicChanged", topic);
     await reply(text("saved", { name: topic.name, count: optionCount, difficulty: text(parseDifficulty(topic.difficulty)) }));
     return;
   }
@@ -180,6 +175,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
 
   if (subcommand === "delete") {
     await db.topic.delete({ where: { id: topic.id } });
+    scheduleEvents.emit("topicDeleted", topic.id);
     await reply(text("deleted", { name }));
     return;
   }
@@ -237,12 +233,14 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         enabled: true
       }
     });
+    scheduleEvents.emit("topicChanged", updatedTopic);
     await reply(text("configured", { summary: topicSummary(updatedTopic, language) }));
     return;
   }
 
   const enabled = subcommand === "enable";
-  await db.topic.update({ where: { id: topic.id }, data: { enabled } });
+  const updatedTopic = await db.topic.update({ where: { id: topic.id }, data: { enabled } });
+  scheduleEvents.emit("topicChanged", updatedTopic);
   await reply(text("configured", { summary: topicSummary({ ...topic, enabled }, language) }));
 }
 

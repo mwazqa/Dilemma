@@ -9,6 +9,7 @@ import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
 import { env } from "../config.js";
 import { isGenerationTime } from "../services/quiz-limits.js";
+import { cacheGuildSettings } from "../services/guild-settings.js";
 
 export const supportedLanguages = [
   { name: "English", value: "en" },
@@ -49,11 +50,11 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
 
   if (interaction.options.getSubcommand() === "language") {
     const language = interaction.options.getString("value", true);
-    await db.guildSettings.upsert({
+    cacheGuildSettings(await db.guildSettings.upsert({
       where: { guildId: interaction.guildId },
       create: { guildId: interaction.guildId, language },
       update: { language }
-    });
+    }));
     await reply(message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)?.name ?? language }));
     return;
   }
@@ -70,7 +71,7 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
     await reply(text("timeInvalid"));
     return;
   }
-  const settings = await db.guildSettings.upsert({
+  const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays ?? 1, defaultPollDurationHours: durationHours ?? 24,
       defaultGenerationTime: generationTime,
@@ -79,7 +80,7 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
       ...(durationHours === null ? {} : { defaultPollDurationHours: durationHours }),
       ...(generationTime === null ? {} : { defaultGenerationTime: generationTime }),
       ...(requestedDifficulty === null ? {} : { defaultDifficulty: parseDifficulty(requestedDifficulty) }) }
-  });
+  }));
   await reply(text("defaultsSet", { days: settings.defaultIntervalDays, hours: settings.defaultPollDurationHours,
     time: settings.defaultGenerationTime ?? text("scheduleUnset"), timezone: env.QUIZ_TIMEZONE,
     difficulty: message(currentLanguage, parseDifficulty(settings.defaultDifficulty)) }));

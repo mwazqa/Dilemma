@@ -4,6 +4,7 @@ const { experienceProgress, levelThreshold } = await import("../dist/services/ex
 const { scoreHistory } = await import("../dist/services/scoring.js");
 const { handleScore } = await import("../dist/commands/score.js");
 const { db } = await import("../dist/db.js");
+const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
 
 assert.deepEqual(experienceProgress(0), { level: 1, totalExp: 0, earned: 0, required: 100, remaining: 100, percent: 0 });
@@ -57,6 +58,7 @@ function interaction() {
 }
 for (const locale of messageLanguages) {
   language = locale;
+  clearGuildSettingsCache("guild"); // Simulate a saved server-language change between fixtures.
   player = { points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1 };
   const command = interaction();
   await handleScore(command);

@@ -12,32 +12,32 @@ import {
 import { env } from "./config.js";
 import { db } from "./db.js";
 import { supportedLanguages } from "./commands/settings.js";
-import { handleTopicAutocomplete } from "./commands/topic.js";
 import { handleEndPollButton } from "./commands/poll.js";
-import { routeCommand } from "./commands/dilemma.js";
+import { routeAutocomplete, routeCommand } from "./commands/dilemma.js";
 import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
 import { message } from "./messages.js";
 import { startScoreScheduler } from "./services/scoring.js";
 import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
+import { cacheGuildSettings } from "./services/guild-settings.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const stopSchedulers: (() => void)[] = [];
 client.on(Events.Error, error => {
   console.error("Discord client error:", privateErrorSummary(error));
 });
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as Discord bot");
-  startScheduler(client);
-  startScoreScheduler(client);
+  stopSchedulers.push(startScheduler(client), startScoreScheduler(client));
 });
 
 client.on(Events.GuildCreate, async (guild) => {
-  await db.guildSettings.upsert({
+  cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: guild.id },
     create: { guildId: guild.id },
     update: {}
-  });
+  }));
 
   const channel = guild.systemChannel ?? guild.channels.cache.find((candidate) =>
     candidate.isTextBased() && guild.members.me && candidate.permissionsFor(guild.members.me)?.has("SendMessages")
@@ -62,7 +62,7 @@ client.on(Events.GuildCreate, async (guild) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isAutocomplete()) {
-      if (interaction.commandName === "dilemma") await handleTopicAutocomplete(interaction);
+      await routeAutocomplete(interaction);
       return;
     }
     if (interaction.isStringSelectMenu() && interaction.customId === "settings:language") {
@@ -102,18 +102,22 @@ async function handleLanguageSelection(interaction: StringSelectMenuInteraction)
   const language = interaction.values[0];
   if (!supportedLanguages.some(item => item.value === language)) throw new Error("Unsupported language selection");
   rememberLanguage(interaction, language);
-  await db.guildSettings.upsert({
+  cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, language },
     update: { language }
-  });
+  }));
   await interaction.editReply({
     content: message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)!.name }),
     components: []
   });
 }
 
-process.on("SIGINT", () => client.destroy());
-process.on("SIGTERM", () => client.destroy());
+function shutdown() {
+  for (const stop of stopSchedulers) stop();
+  client.destroy();
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 await client.login(env.DISCORD_TOKEN);

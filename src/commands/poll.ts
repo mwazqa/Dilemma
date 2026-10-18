@@ -2,7 +2,7 @@ import { PermissionFlagsBits, SlashCommandSubcommandGroupBuilder, type ButtonInt
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { openFeedback } from "../feedback.js";
-import { runDueSettlements } from "../services/scoring.js";
+import { scheduleEvents } from "../services/schedule-events.js";
 import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
 
 const closingPolls = new Set<string>();
@@ -74,7 +74,9 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
     closingPolls.add(messageId);
     try {
       if (!message.poll.expiresTimestamp || message.poll.expiresTimestamp > Date.now()) await message.poll.end();
-      await db.quizSettlement.updateMany({ where: { messageId, guildId: interaction.guildId, scoredAt: null }, data: { closedAt: new Date(), nextCheckAt: new Date() } });
+      const closedAt = new Date();
+      await db.quizSettlement.updateMany({ where: { messageId, guildId: interaction.guildId, scoredAt: null }, data: { closedAt, nextCheckAt: closedAt } });
+      scheduleEvents.emit("settlementClosed", messageId, closedAt);
       const options = poll.options.split("||");
       const correctAnswer = options[poll.correctOption] ?? "Unknown";
       const resultEmojis = poll.optionEmojis.split("||");
@@ -89,7 +91,6 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
       }
       await channel.send({ content: getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""), allowedMentions: { parse: [] } });
       await reply(text("pollDone"));
-      void runDueSettlements(interaction.client);
     } finally { closingPolls.delete(messageId); }
   } catch {
     await reply(text("pollFailed"));

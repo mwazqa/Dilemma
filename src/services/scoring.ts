@@ -3,6 +3,10 @@ import { Prisma, type QuizSettlement } from "@prisma/client";
 import { db } from "../db.js";
 import { parseDifficulty } from "../difficulty.js";
 import { disablePollControls } from "./poll-controls.js";
+import { privateErrorSummary } from "../private-errors.js";
+import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
+import { scheduleEvents, settlementDeadline, type SettlementSchedule } from "./schedule-events.js";
+import { getGuildSettings } from "./guild-settings.js";
 
 const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
@@ -95,6 +99,90 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
   return false;
 }
 
+const settlementAttempts = new Map<string, number>();
+
+async function settleQuiz(client: Client, quiz: QuizSettlement): Promise<number | null> {
+  const attempt = settlementAttempts.get(quiz.messageId) ?? 0;
+  let next = Date.now() + retryDelay(attempt);
+  try {
+    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
+    const final = await collectFinalVotes(client, quiz);
+    if (final) {
+      await applyFinalVotes(quiz, final.votes, final.finishedAt);
+      settlementAttempts.delete(quiz.messageId);
+      const settings = await getGuildSettings(quiz.guildId);
+      await disablePollControls(client, quiz.channelId, quiz.messageId, settings?.language ?? "en");
+      return null;
+    }
+    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } });
+  } catch (error) {
+    next = Date.now() + retryDelay(attempt, 300_000);
+    // Preserve the retry deadline across restarts when the database is available.
+    try { await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } }); }
+    catch { /* The local timer still retries after a database outage. */ }
+    console.error("Quiz scoring pending:", privateErrorSummary(error));
+  }
+  settlementAttempts.set(quiz.messageId, attempt + 1);
+  return next;
+}
+
+export function startScoreScheduler(client: Client) {
+  let loading = true;
+  const changedDuringLoad = new Set<string>();
+  const readAttempts = new Map<string, number>();
+  const queue = new DeadlineQueue(async (id, current) => {
+    try {
+      if (id === "bootstrap") {
+        const quizzes = await db.quizSettlement.findMany({ where: { scoredAt: null },
+          select: { messageId: true, expiresAt: true, closedAt: true, scoredAt: true, nextCheckAt: true } });
+        for (const quiz of quizzes) if (!changedDuringLoad.has(quiz.messageId)) schedule(quiz);
+        loading = false;
+        changedDuringLoad.clear();
+      } else {
+        const quiz = await db.quizSettlement.findUnique({ where: { messageId: id } });
+        if (!current()) return;
+        if (!quiz || quiz.scoredAt) { settlementAttempts.delete(id); readAttempts.delete(id); return; }
+        const at = settlementDeadline(quiz)!;
+        if (at > Date.now()) { queue.schedule(id, at); return; }
+        const next = await settleQuiz(client, quiz);
+        if (current() && next !== null) queue.schedule(id, next);
+      }
+      readAttempts.delete(id);
+    } catch (error) {
+      if (!current()) return;
+      const attempt = readAttempts.get(id) ?? 0;
+      readAttempts.set(id, attempt + 1);
+      queue.schedule(id, Date.now() + retryDelay(attempt, 300_000));
+      console.error("Quiz scoring check pending:", privateErrorSummary(error));
+    }
+  }, error => console.error("Quiz scoring check failed:", privateErrorSummary(error)));
+
+  function schedule(quiz: SettlementSchedule) {
+    const at = settlementDeadline(quiz);
+    if (at === null) queue.cancel(quiz.messageId);
+    else queue.schedule(quiz.messageId, at);
+  }
+  function changed(quiz: SettlementSchedule) {
+    if (loading) changedDuringLoad.add(quiz.messageId);
+    schedule(quiz);
+  }
+  function closed(id: string, at: Date) {
+    if (loading) changedDuringLoad.add(id);
+    settlementAttempts.delete(id);
+    readAttempts.delete(id);
+    queue.schedule(id, at);
+  }
+  scheduleEvents.on("settlementChanged", changed);
+  scheduleEvents.on("settlementClosed", closed);
+  queue.schedule("bootstrap", Date.now());
+  return () => {
+    queue.stop();
+    scheduleEvents.off("settlementChanged", changed);
+    scheduleEvents.off("settlementClosed", closed);
+  };
+}
+
+// Explicit catch-up helper, not an idle polling loop.
 let running = false;
 export async function runDueSettlements(client: Client) {
   if (running) return;
@@ -103,23 +191,9 @@ export async function runDueSettlements(client: Client) {
     const quizzes = await db.quizSettlement.findMany({ where: { scoredAt: null, nextCheckAt: { lte: new Date() }, OR: [{ expiresAt: { lte: new Date() } }, { closedAt: { not: null } }] },
       orderBy: [{ nextCheckAt: "asc" }, { messageId: "asc" }], take: 25 });
     for (const quiz of quizzes) {
-      try {
-        await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
-        const final = await collectFinalVotes(client, quiz);
-        if (final) {
-          await applyFinalVotes(quiz, final.votes, final.finishedAt);
-          const settings = await db.guildSettings.findUnique({ where: { guildId: quiz.guildId } });
-          await disablePollControls(client, quiz.channelId, quiz.messageId, settings?.language ?? "en");
-        }
-        else await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 60_000) } });
-      } catch (error) { console.error("Quiz scoring pending:", privateErrorSummary(error)); }
+      const next = await settleQuiz(client, quiz);
+      scheduleEvents.emit("settlementChanged", { ...quiz, scoredAt: next === null ? new Date() : null, nextCheckAt: new Date(next ?? Date.now()) });
     }
   } catch (error) { console.error("Quiz scoring check failed:", privateErrorSummary(error)); }
   finally { running = false; }
 }
-
-export function startScoreScheduler(client: Client) {
-  void runDueSettlements(client);
-  return setInterval(() => void runDueSettlements(client), 60_000);
-}
-import { privateErrorSummary } from "../private-errors.js";

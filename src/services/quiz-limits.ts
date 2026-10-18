@@ -92,6 +92,27 @@ export function isTopicDue(topic: {
   return days >= topic.intervalDays;
 }
 
+export function nextTopicRunAt(topic: {
+  enabled: boolean; channelId: string | null; generationTime: string | null;
+  lastGeneratedAt: Date | null; intervalDays: number
+}, now = new Date()): number | null {
+  if (!topic.enabled || !topic.channelId || !topic.generationTime || !isGenerationTime(topic.generationTime)) return null;
+  if (isTopicDue(topic, now)) return +now;
+  const today = quizDay(now);
+  const eligible = topic.lastGeneratedAt
+    ? new Date(Date.parse(quizDay(topic.lastGeneratedAt)) + topic.intervalDays * 86_400_000).toISOString().slice(0, 10)
+    : today;
+  const day = eligible > today ? eligible : today;
+  const nextDay = new Date(Date.parse(day) + 86_400_000).toISOString().slice(0, 10);
+  const end = +dayStart(nextDay);
+  // Walk local minutes, not fixed 24-hour days: gaps and repeated DST hours
+  // must match isTopicDue, including the first occurrence of an ambiguous time.
+  for (let at = +dayStart(day); at < end; at += 60_000) {
+    if (at >= +now && timeFormatter.format(new Date(at)) >= topic.generationTime) return at;
+  }
+  return +dayStart(nextDay);
+}
+
 export function validatePollDuration(hours: number): number {
   if (!Number.isInteger(hours) || hours < 1 || hours > 24) throw new Error("Invalid poll duration");
   return hours;
