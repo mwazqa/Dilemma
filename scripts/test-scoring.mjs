@@ -5,6 +5,7 @@ const { db } = await import("../dist/db.js");
 const { handleScore, scoreCommand } = await import("../dist/commands/score.js");
 const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { questionSchema } = await import("../dist/types/question.js");
+const { message } = await import("../dist/messages.js");
 
 assert.deepEqual(scoreHistory([{ correct: true, points: 1 }, { correct: true, points: 3 }, { correct: false, points: 0 }, { correct: true, points: 2 }]),
   { points: 6, answered: 4, correct: 3, currentStreak: 1, bestStreak: 2 });
@@ -105,7 +106,7 @@ const emptyLeaderboard = interaction("leaderboard"); await handleScore(emptyLead
 assert.equal(emptyLeaderboard.replies[0], null);
 assert.match(emptyLeaderboard.payloads[0].embeds[0].toJSON().description, /Jeszcze nie ma wyników/);
 db.userScore.findMany = findPlayers;
-const dm = interaction("profile", false, null); await handleScore(dm); assert.match(dm.replies[0], /inside a server/);
+const dm = interaction("profile", false, null); await handleScore(dm); assert.equal(dm.replies[0], message("en", "serverOnly"));
 let deletions = 0;
 db.$transaction = async cb => cb({ quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
   userScore: { deleteMany: async () => { deletions++; } } });

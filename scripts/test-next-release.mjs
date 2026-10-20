@@ -12,6 +12,37 @@ for (const [key, translations] of Object.entries(messages)) {
     assert.ok(!text.includes("—"), key);
   }
 }
+// Full replies share Dilemma's warm voice. Short labels and irreversible-data
+// warnings deliberately stay plain; style must not hide limits or next steps.
+const friendlyFeedbackKeys = [
+  "achievementFirstAnswerGoal", "achievementCorrect10Goal", "achievementAnswers100Goal", "achievementStreak10Goal",
+  "achievementLevel2Goal", "achievementLevel5Goal", "achievementsSummary", "badgeSet", "badgeCleared", "badgeLocked",
+  "badgeUnknown", "badgeSelectionInvalid", "pollClosing", "topicDailyLimit", "randomCooldown", "serverOnly",
+  "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
+  "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
+  "timeInvalid", "configured", "languageSet", "defaultsSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
+  "helpIntro", "scoreEmpty", "partial"
+];
+const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];
+for (const [index, language] of messageLanguages.entries()) {
+  for (const key of friendlyFeedbackKeys) {
+    assert.ok(message(language, key).includes("~"), `${key} keeps the shared feedback voice in ${language}`);
+    assert.ok(message(language, key).length <= 2000);
+  }
+  for (const key of ["forgetConfirm", "scoreForgotten"]) {
+    assert.doesNotMatch(message(language, key), /[~♡✧]/, "Permanent-deletion warnings are not decorated");
+    assert.match(message(language, key), permanentDeletionWords[index]);
+  }
+  assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
+  for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scorePoints", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
+    assert.doesNotMatch(message(language, key), /[~♡✧]/, "Short labels remain readable");
+  }
+  assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
+  assert.ok(message(language, "optionsMissing").includes("options") && message(language, "optionsMissing").includes("option_count"));
+  assert.ok(message(language, "timeInvalid").includes("HH:mm") && message(language, "timeInvalid").includes("18:30"));
+  assert.ok(message(language, "randomCooldown").includes("2") && message(language, "randomCooldown").includes("{minutes}"));
+  assert.ok(message(language, "badgeSelectionInvalid").includes("3"));
+}
 for (const language of messageLanguages) {
   assert.doesNotMatch(getHelpContent(language), /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
   assert.match(message(language, "randomDone", { name: "Test", count: 4 }), /Test/);
@@ -73,6 +104,11 @@ globalThis.fetch = async (_, options) => {
 };
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
 const { dilemmaCommand, routeCommand } = await import("../dist/commands/dilemma.js");
+function checkNativeDescriptions(option) {
+  if (option.description) assert.doesNotMatch(option.description, /[~♡✧]/, "Discord menu descriptions stay neutral");
+  for (const child of option.options ?? []) checkNativeDescriptions(child);
+}
+checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
   ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "defaults", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));

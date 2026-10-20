@@ -131,7 +131,7 @@ while (!ends) await new Promise(resolve => setImmediate(resolve));
 const second = interaction();
 await handlePoll(second);
 assert.equal(ends, 1);
-assert.match(second.replies.at(-1), /właśnie zamykany/);
+assert.equal(second.replies.at(-1), message("pl", "pollClosing"));
 release();
 await first;
 assert.equal(results.length, 1);

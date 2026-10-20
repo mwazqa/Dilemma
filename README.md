@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.5.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.5.1-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
@@ -25,6 +25,8 @@ Latest release: `v0.5.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 - Localized help and Dilemma-style command feedback in English, Polish, German, Spanish, French and Japanese
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 - Server-specific cosmetic achievements and up to three selected profile badge icons, derived from settled scores
+
+Command replies use the same warm voice across all six languages, including badge selection, cooldowns and validation. Short statistic labels stay concise; permanent-deletion warnings stay explicit and undecorated. Native Discord command and option descriptions intentionally remain neutral English text.
 
 ## Setup
 

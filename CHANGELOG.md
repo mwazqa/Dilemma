@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.5.1-beta - 2026-10-21
+
+- Unify command replies, achievement guidance, validation, cooldowns and failure messages in all six languages with Dilemma's warm voice. Keep Discord command/option menu descriptions unchanged, statistic labels concise and permanent-deletion warnings explicit and undecorated. Preserve placeholders, limits and recovery instructions; add feedback-copy regression checks.
+
 ## v0.5.0-beta - 2026-10-19
 
 - Replace minutely topic/scoring database polls with local deadline queues, startup recovery and immediate post-commit schedule updates. Preserve daily reservations and finalized, idempotent scoring; back off pending/failed work without idle reconciliation queries. Cache guild settings on demand with immediate invalidation on bot updates. Add isolated idle-database regression tests to CI and direct deployment checks.
