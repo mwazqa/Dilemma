@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "0.5.1-beta",
+  "version": "0.5.2-beta",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",

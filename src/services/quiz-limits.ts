@@ -27,7 +27,6 @@ export class RandomQuizCooldownError extends Error {
 
 async function claimRandomQuiz(guildId: string, now: Date): Promise<DailyQuizRun> {
   const cutoff = new Date(now.getTime() - RANDOM_COOLDOWN_MS);
-  // Reuse quota storage with one rolling row. Include pre-upgrade polls and reservations.
   const [poll, reservations] = await Promise.all([
     db.randomPoll.findFirst({ where: { guildId, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" } }),
     db.dailyQuizRun.findMany({ where: { guildId, scope: "random", createdAt: { gt: cutoff } },
@@ -105,8 +104,6 @@ export function nextTopicRunAt(topic: {
   const day = eligible > today ? eligible : today;
   const nextDay = new Date(Date.parse(day) + 86_400_000).toISOString().slice(0, 10);
   const end = +dayStart(nextDay);
-  // Walk local minutes, not fixed 24-hour days: gaps and repeated DST hours
-  // must match isTopicDue, including the first occurrence of an ambiguous time.
   for (let at = +dayStart(day); at < end; at += 60_000) {
     if (at >= +now && timeFormatter.format(new Date(at)) >= topic.generationTime) return at;
   }
@@ -128,7 +125,6 @@ export async function claimQuizRun(guildId: string, topicId?: string, now = new 
   const recordedMessages = runs.flatMap(run => run.messageId ? [run.messageId] : []);
   const where = { guildId, createdAt: { gte: start, lt: end },
     ...(recordedMessages.length ? { messageId: { notIn: recordedMessages } } : {}) };
-  // Existing polls also consume quota after migration. Completed reservations are not counted twice.
   const legacyCount = await db.generatedPoll.count({ where: { ...where, topicId } });
   if (topicId) {
     const topic = await db.topic.findUnique({ where: { id: topicId } });

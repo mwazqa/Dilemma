@@ -30,19 +30,15 @@ rollback() {
 trap rollback EXIT
 mkdir "$package_dir/code"
 tar -xzf "$package_dir/code.tar.gz" -C "$package_dir/code"
-# Parent deployment directory stays private. Image source files must be readable
-# by the non-root runtime user after Docker COPY preserves their permissions.
 find "$package_dir/code" -type d -exec chmod 755 {} +
 find "$package_dir/code" -type f -exec chmod 644 {} +
 sudo -n docker build -t "$image" "$package_dir/code"
-# Opt in only after a backup and isolated migration validation. Keep the old container running during additive migration.
 if [[ "$migration_mode" == migrate ]]; then
   if ! sudo -n docker run --rm --env-file "$production_dir/.env.docker" "$image" node scripts/migrate-postgres.mjs >"$package_dir/migration-apply.log" 2>&1; then
     echo 'Database migration failed. Previous production container remains running.'
     exit 1
   fi
 fi
-# Default deployments still refuse pending migrations.
 if ! sudo -n docker run --rm --env-file "$production_dir/.env.docker" "$image" node node_modules/prisma/build/index.js migrate status --schema prisma/postgresql/schema.prisma >"$package_dir/migration-status.log" 2>&1; then
   echo 'Database schema is not ready. Production remains running. Review migrations and back up before applying them.'
   exit 1

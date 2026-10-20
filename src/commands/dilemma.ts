@@ -6,7 +6,6 @@ import { handleScore, handleScoreAutocomplete, scoreCommand } from "./score.js";
 import { defaultsCommand, handleSettings, languageCommand } from "./settings.js";
 import { handleTopic, handleTopicAutocomplete, topicCommand } from "./topic.js";
 
-// Keep the root available to all players. Administrative handlers check Manage Server.
 export const dilemmaCommand = topicCommand
   .setDescription("Dilemma quizzes, profile, leaderboard and server settings.")
   .addSubcommand(languageCommand)

@@ -89,7 +89,7 @@ assert.ok(badgeOptions.every(option => option.autocomplete && option.max_length 
 assert.ok(badgeOptions.slice(1).every(option => !option.required));
 for (const language of messageLanguages) {
   locale = language;
-  clearGuildSettingsCache("guild"); // Each fixture simulates a newly saved server language.
+  clearGuildSettingsCache("guild");
   const command = interaction("achievements");
   await routeCommand(command);
   const embed = command.replies[0].embeds[0].toJSON();
@@ -213,7 +213,6 @@ const hide = interaction("badge", { achievement: "none" }); await routeCommand(h
 assert.equal(players.get(key("guild", "player")).selectedBadge, null);
 assert.equal(achievementProgress(players.get(key("guild", "player"))).filter(item => item.unlocked).length, 5);
 
-// A future finalized vote recalculates statistics without overwriting a selected badge.
 players.get(key("guild", "player")).selectedBadge = encodeSelectedBadges(threeIds);
 db.quizSettlement.updateMany = async () => ({ count: 1 });
 db.quizAnswer.create = async ({ data }) => data;

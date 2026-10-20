@@ -53,7 +53,6 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     }
     if (!ids.length || !ids.every(isAchievementId)) { await reply(text("badgeUnknown")); return; }
     const requirements = ids.map(id => achievementRequirement(id)!);
-    // Validate eligibility in the same write. Never recreate a profile deleted by a concurrent forget command.
     const saved = await db.userScore.updateMany({ where: { guildId, userId: interaction.user.id, AND: requirements },
       data: { selectedBadge: encodeSelectedBadges(ids) } });
     if (!saved.count) { await reply(text("badgeLocked")); return; }
@@ -128,7 +127,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   };
   let card: Buffer | undefined;
   try { card = await renderScoreCard(cardData, avatar); }
-  catch { /* Keep the textual fallback; never log players' data or native image errors. */ }
+  catch { }
   if (card) {
     const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.points}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
     const attachment = new AttachmentBuilder(card, { name: "quiz-profile.png", description: boundedText(alt, 1000) });

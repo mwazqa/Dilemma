@@ -90,7 +90,6 @@ await claimQuizRun("guild", "first-topic");
 await claimQuizRun("guild", "second-topic");
 await assert.rejects(claimQuizRun("guild", "first-topic"), DailyQuizLimitError);
 await claimQuizRun("guild", "first-topic", new Date("2026-10-09T08:00:00Z"));
-// Persisted rows, not process-local counters, enforce restart-safe cooldowns.
 await assert.rejects(claimQuizRun("guild"), RandomQuizCooldownError);
 reset();
 const reservation = await claimQuizRun("guild");

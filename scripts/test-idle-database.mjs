@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 
-// All database/Discord/AI methods below are fixtures. Never contact production.
 Object.assign(process.env, { DATABASE_URL: "file::memory:", DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test",
   QUIZ_TIMEZONE: "Europe/Warsaw", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test",
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });

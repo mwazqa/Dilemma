@@ -8,7 +8,6 @@ try {
   if (process.argv.length !== 3) throw new Error("Supply one local image");
   const source = readFileSync(process.argv[2]);
   worker = await makeWorker();
-  // New flattened PNG drops metadata and alpha-hidden pixel data. Original stays untouched.
   const data = await sharp(source, { limitInputPixels: 40_000_000 }).rotate().flatten({ background: "#ffffff" }).png().toBuffer();
   const findings = await inspectImage(data, worker);
   if (findings.hiddenMetadata || findings.qr || findings.sensitive) throw new Error("Unsafe image");

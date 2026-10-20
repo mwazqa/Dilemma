@@ -127,7 +127,6 @@ const beforeUnranked = rankCalls;
 assert.equal(await serverRank("test", "new", null), null);
 assert.equal(await serverRank("test", "new", { points: 0, correct: 0, answered: 0 }), null);
 assert.equal(rankCalls, beforeUnranked);
-// Test a rank outside the top ten without fetching all players.
 db.userScore.count = async ({ where }) => { assert.equal(where.guildId, "test"); return 12; };
 assert.equal(await serverRank("test", "1", { points: 3, correct: 1, answered: 1 }), 13);
 db.userScore.findUnique = async () => ({ points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1 });
@@ -151,7 +150,6 @@ await db.$disconnect();
 if (process.argv.includes("--preview")) {
   const directory = new URL("../.tools/score-card-preview/", import.meta.url);
   await mkdir(directory, { recursive: true });
-  // Optional local design reference, used only in this opt-in preview, never in tests or production.
   let previewAvatar;
   const avatarOption = process.argv.indexOf("--avatar-path");
   if (avatarOption >= 0 && process.argv[avatarOption + 1]) {

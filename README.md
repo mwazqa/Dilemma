@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.5.1-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.5.2-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`

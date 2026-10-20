@@ -8,7 +8,6 @@ $deploymentConfig = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
 if ($deploymentConfig.host -notmatch '^[a-zA-Z0-9.-]+$' -or $deploymentConfig.user -notmatch '^[a-zA-Z0-9_-]+$' -or $deploymentConfig.path -notmatch '^/[a-zA-Z0-9/_-]+$') { throw 'Invalid SSH host, user or deployment path.' }
 if (-not (Test-Path -LiteralPath $deploymentConfig.key -PathType Leaf)) { throw 'SSH key file is missing.' }
 function Invoke-Checked([string]$Executable, [string[]]$Arguments) {
-  # Keep raw external output local: SSH errors and application logs can contain secrets.
   $previousErrorPreference = $ErrorActionPreference
   try {
     $ErrorActionPreference = 'Continue'

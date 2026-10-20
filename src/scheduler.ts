@@ -21,7 +21,6 @@ export function startScheduler(client: Client) {
         loading = false;
         changedDuringLoad.clear();
       } else {
-        // Re-read only the due topic, so deleted/disabled/changed topics are safe.
         const topic = await db.topic.findUnique({ where: { id } });
         if (!current()) return;
         if (!topic || nextTopicRunAt(topic) === null) { attempts.delete(id); return; }
@@ -30,8 +29,6 @@ export function startScheduler(client: Client) {
         catch (error) {
           if (!current()) return;
           if (!(error instanceof DailyQuizLimitError)) throw error;
-          // A manual run or uncertain send already reserved today. Do not retry
-          // the same daily quota every minute. Recheck at tomorrow's slot.
           schedule({ ...topic, lastGeneratedAt: new Date(), intervalDays: 1 });
         }
       }
@@ -78,7 +75,6 @@ async function publishDueTopic(client: Client, topic: Parameters<typeof publishT
   console.log("Scheduled generation completed");
 }
 
-// Explicit catch-up helper for diagnostics/tests, never a periodic database poll.
 let running = false;
 export async function runDueTopics(client: Client) {
   if (running) return;

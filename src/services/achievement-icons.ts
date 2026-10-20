@@ -22,7 +22,6 @@ const symbols: Record<AchievementId, string> = {
     <path d="M 42 22 L 35 35 L 29 29 Z" fill="${gold}" stroke="${gold}"/>`
 };
 
-/** Trusted, self-contained artwork in a 64 by 64 view box. No user SVG is accepted. */
 export function achievementIcon(id: AchievementId): string {
   if (!isAchievementId(id)) return "";
   return `<rect x="1" y="1" width="62" height="62" rx="17" fill="#222340" stroke="${lavender}" stroke-opacity="0.5"/>

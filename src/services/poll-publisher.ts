@@ -78,7 +78,6 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return 1;
   } finally {
-    // Keep the reservation after a send attempt: a transport failure may still have published the poll.
     if (!sendAttempted) await releaseQuizRun(run);
   }
 }

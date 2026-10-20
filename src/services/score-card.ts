@@ -49,7 +49,6 @@ async function textWidth(value: string, size: number, bold: boolean): Promise<nu
 export async function fitText(value: string, width: number, initial = 40, minimum = 26, bold = true) {
   const clean = value.replace(/[\r\n\t]+/g, " ");
   const segments = graphemes(clean);
-  // Bound work even if a malformed name contains thousands of characters.
   const candidate = segments.length > 256 ? `${segments.slice(0, 256).join("")}…` : clean;
   for (let size = initial; size >= minimum; size -= 2) {
     if (await textWidth(candidate, size, bold) <= width) return { text: candidate, size };
@@ -94,11 +93,9 @@ export async function loadAvatar(url?: string): Promise<Buffer | undefined> {
     const input = Buffer.concat(chunks);
     const image = sharp(input, { limitInputPixels: 1024 * 1024 });
     const metadata = await image.metadata();
-    // Reject SVG and other active/unexpected input; re-encode to strip metadata.
     if (!["png", "jpeg", "webp"].includes(metadata.format ?? "")) return undefined;
     return await image.resize(144, 144, { fit: "cover" }).png().toBuffer();
   } catch {
-    // No URLs, response bodies or user data in logs. A local placeholder is enough.
     return undefined;
   }
 }
@@ -177,6 +174,5 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
 export async function renderScoreCard(data: ScoreCardData, avatarUrl?: string): Promise<Buffer> {
   const avatar = await loadAvatar(avatarUrl);
   const svg = await scoreCardSvg(data, avatar);
-  // Buffers only: do not persist players' avatars, nicknames or scores on disk.
   return sharp(Buffer.from(svg)).png().toBuffer();
 }

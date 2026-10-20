@@ -37,7 +37,6 @@ export function encodeSelectedBadges(ids: readonly AchievementId[]): string | nu
   if (ids.length > maxDisplayedBadges || new Set(ids).size !== ids.length || !ids.every(isAchievementId)) {
     throw new RangeError("Invalid badge selection");
   }
-  // Keep legacy single-ID values readable; multiple choices share the existing TEXT column.
   return ids.length === 0 ? null : ids.length === 1 ? ids[0] : JSON.stringify(ids);
 }
 

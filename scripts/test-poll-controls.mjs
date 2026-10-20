@@ -64,7 +64,6 @@ db.quizSettlement.updateMany = async ({ where, data }) => {
   return { count: 1 };
 };
 db.quizSettlement.findMany = async () => [];
-// Daily quota is untouched by any closing path.
 db.dailyQuizRun.deleteMany = async () => { throw new Error("Closing must not reset quota"); };
 function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID } = {}) {
   const replies = [];
@@ -153,7 +152,6 @@ await handleEndPollButton(interaction());
 assert.equal(ends, 0, "Already expired Discord polls do not need another end request");
 assert.equal(results.length, 1);
 
-// Finalized automatic expiry disables the button and retains the existing scoring gate.
 reset();
 let finalized = false, scored = false;
 const quiz = { messageId: "poll", guildId: "guild", channelId: "channel", answerIds: "1,2", correctAnswerId: 1, difficulty: "easy" };

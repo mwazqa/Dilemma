@@ -4,7 +4,6 @@ import type { QuizSettlement, Topic } from "@prisma/client";
 export type TopicSchedule = Pick<Topic, "id" | "enabled" | "channelId" | "generationTime" | "lastGeneratedAt" | "intervalDays">;
 export type SettlementSchedule = Pick<QuizSettlement, "messageId" | "expiresAt" | "closedAt" | "scoredAt" | "nextCheckAt">;
 
-// Emit only after a successful database write/transaction. No database access here.
 export const scheduleEvents = new EventEmitter<{
   topicChanged: [topic: TopicSchedule];
   topicDeleted: [id: string];

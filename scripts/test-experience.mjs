@@ -58,7 +58,7 @@ function interaction() {
 }
 for (const locale of messageLanguages) {
   language = locale;
-  clearGuildSettingsCache("guild"); // Simulate a saved server-language change between fixtures.
+  clearGuildSettingsCache("guild");
   player = { points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1 };
   const command = interaction();
   await handleScore(command);

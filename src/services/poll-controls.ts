@@ -20,7 +20,6 @@ export async function disablePollControls(client: Client, channelId: string, mes
       body: { components: pollControls(language, true).map(row => row.toJSON()), allowed_mentions: { parse: [] } }
     });
   } catch (error) {
-    // A failed UI update must not prevent result publication or finalized-vote scoring.
     console.warn("Quiz button update failed:", privateErrorSummary(error));
   }
 }

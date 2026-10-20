@@ -1,4 +1,3 @@
-"""Read-only production audit. Emit counts and allowlisted fields, never raw data."""
 import collections
 import glob
 import grp

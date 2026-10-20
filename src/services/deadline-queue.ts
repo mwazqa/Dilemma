@@ -1,4 +1,3 @@
-// One local timer for known work. An empty queue never wakes the database.
 export class DeadlineQueue {
   private readonly deadlines = new Map<string, number>();
   private timer?: NodeJS.Timeout;
@@ -35,7 +34,6 @@ export class DeadlineQueue {
     let next = Infinity;
     for (const at of this.deadlines.values()) next = Math.min(next, at);
     if (!Number.isFinite(next)) return;
-    // Node timers overflow above ~24.8 days. Long waits are re-armed locally.
     this.timer = setTimeout(() => void this.drain(), Math.max(0, Math.min(next - Date.now(), 2_147_483_647)));
     this.timer.unref();
   }

@@ -42,9 +42,7 @@ export async function inspectImage(data, worker) {
   const hiddenMetadata = Boolean(metadata.exif || metadata.xmp || metadata.iptc || metadata.icc || (metadata.comments?.length) || hasPngText(data));
   const opaque = sharp(data).flatten({ background: "#ffffff" });
   const { data: pixels, info } = await opaque.clone().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  // Reject any detected QR. Never print, open or follow its payload.
   const qr = Boolean(jsQR(new Uint8ClampedArray(pixels), info.width, info.height, { inversionAttempts: "attemptBoth" }));
-  // Analyze both backgrounds so alpha cannot trivially hide visible text.
   const light = await opaque.clone().png().toBuffer();
   const dark = await sharp(data).flatten({ background: "#000000" }).png().toBuffer();
   const lightText = (await worker.recognize(light)).data.text;

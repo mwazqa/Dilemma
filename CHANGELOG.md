@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v0.5.2-beta - 2026-10-21
+
+- Remove nonessential comments from application code, scripts, tests and ignore configuration without changing executable behavior. Preserve required shebangs and already-applied migration files to keep their recorded checksums stable.
+- Use a Unicode escape in the long-dash regression test instead of a literal typographic dash. Keep README and tracked source text free of unnecessary en dashes and em dashes.
+
 ## v0.5.1-beta - 2026-10-21
 
 - Unify command replies, achievement guidance, validation, cooldowns and failure messages in all six languages with Dilemma's warm voice. Keep Discord command/option menu descriptions unchanged, statistic labels concise and permanent-deletion warnings explicit and undecorated. Preserve placeholders, limits and recovery instructions; add feedback-copy regression checks.

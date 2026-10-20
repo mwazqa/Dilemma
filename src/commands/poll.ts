@@ -80,7 +80,6 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
       const options = poll.options.split("||");
       const correctAnswer = options[poll.correctOption] ?? "Unknown";
       const resultEmojis = poll.optionEmojis.split("||");
-      // Only one process may publish a result, including concurrent button/command requests.
       const claim = generatedPoll
         ? await db.generatedPoll.updateMany({ where: { messageId, guildId: interaction.guildId, endedAt: null }, data: { endedAt: new Date() } })
         : await db.randomPoll.updateMany({ where: { messageId, guildId: interaction.guildId, endedAt: null }, data: { endedAt: new Date() } });

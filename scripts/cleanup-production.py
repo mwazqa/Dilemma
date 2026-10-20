@@ -1,4 +1,3 @@
-"""Remove only obsolete stopped bot rollback containers after a healthy deploy."""
 import json
 import re
 import subprocess
@@ -26,7 +25,6 @@ try:
         raise RuntimeError("Unexpected rollback state")
     removed = 0
     for item in targets[1:]:
-        # Exact Docker IDs verified above; no force, volumes, images or broad prune.
         run(["docker", "rm", item["Id"]])
         removed += 1
     deployment = Path(sys.argv[1])

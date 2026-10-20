@@ -32,7 +32,6 @@ try {
   console.error("Secret scan blocked the operation. Check scanner installation, private file types and secret findings locally; raw output withheld.");
   process.exitCode = 1;
 } finally {
-  // Delete only the exact temporary directory created by this invocation.
   if (snapshot && resolve(dirname(snapshot)) === resolve(tmpdir()) && basename(snapshot).startsWith("dilemma-secret-scan-")) {
     try { rmSync(snapshot, { recursive: true, force: true }); }
     catch { console.error("Temporary scan cleanup failed. Raw output withheld."); process.exitCode = 1; }

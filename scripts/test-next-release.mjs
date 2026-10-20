@@ -9,11 +9,9 @@ for (const [key, translations] of Object.entries(messages)) {
   for (const text of translations) {
     assert.ok(text.length > 0, key);
     assert.deepEqual(placeholders(text), placeholders(translations[0]), key);
-    assert.ok(!text.includes("—"), key);
+    assert.ok(!text.includes("\u2014"), key);
   }
 }
-// Full replies share Dilemma's warm voice. Short labels and irreversible-data
-// warnings deliberately stay plain; style must not hide limits or next steps.
 const friendlyFeedbackKeys = [
   "achievementFirstAnswerGoal", "achievementCorrect10Goal", "achievementAnswers100Goal", "achievementStreak10Goal",
   "achievementLevel2Goal", "achievementLevel5Goal", "achievementsSummary", "badgeSet", "badgeCleared", "badgeLocked",
@@ -116,7 +114,7 @@ for (const language of messageLanguages) {
   const content = getHelpContent(language);
   const fields = getHelpEmbed(language).toJSON().fields.map(field => field.value).join("\n");
   for (const sub of dilemmaCommand.toJSON().options) {
-    if (sub.name === "help") continue; // Keep the command, but do not advertise help inside itself.
+    if (sub.name === "help") continue;
     const paths = sub.type === 2 ? sub.options.map(child => `/dilemma ${sub.name} ${child.name}`) : [`/dilemma ${sub.name}`];
     for (const path of paths) {
       assert.ok(content.includes(`\`${path}\``), `Text help covers ${path} in ${language}`);

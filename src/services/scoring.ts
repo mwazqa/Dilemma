@@ -117,9 +117,8 @@ async function settleQuiz(client: Client, quiz: QuizSettlement): Promise<number 
     await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } });
   } catch (error) {
     next = Date.now() + retryDelay(attempt, 300_000);
-    // Preserve the retry deadline across restarts when the database is available.
     try { await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } }); }
-    catch { /* The local timer still retries after a database outage. */ }
+    catch { }
     console.error("Quiz scoring pending:", privateErrorSummary(error));
   }
   settlementAttempts.set(quiz.messageId, attempt + 1);
@@ -182,7 +181,6 @@ export function startScoreScheduler(client: Client) {
   };
 }
 
-// Explicit catch-up helper, not an idle polling loop.
 let running = false;
 export async function runDueSettlements(client: Client) {
   if (running) return;
