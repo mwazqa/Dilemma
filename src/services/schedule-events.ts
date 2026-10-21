@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { QuizSettlement, Topic } from "@prisma/client";
 
-export type TopicSchedule = Pick<Topic, "id" | "enabled" | "channelId" | "generationTime" | "lastGeneratedAt" | "intervalDays">;
+export type TopicSchedule = Pick<Topic, "id" | "enabled" | "channelId" | "generationTime" | "startDate" | "lastGeneratedAt" | "intervalDays">;
 export type SettlementSchedule = Pick<QuizSettlement, "messageId" | "expiresAt" | "closedAt" | "scoredAt" | "nextCheckAt">;
 
 export const scheduleEvents = new EventEmitter<{

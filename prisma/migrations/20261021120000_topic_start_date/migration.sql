@@ -1,0 +1,1 @@
+ALTER TABLE "Topic" ADD COLUMN "startDate" TEXT;

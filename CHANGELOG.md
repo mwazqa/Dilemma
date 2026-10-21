@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add optional `start_date` scheduling for topic creation and configuration, alongside publication time and a 1-30 day repeat interval. Anchor recurrence to that calendar date instead of late execution; preserve existing rolling schedules when no date is set. Keep daily and cycle reservations for dated topics, reject manual runs before the first day or after a consumed cycle, and retain restart recovery without idle database polling.
+- Add aligned, nullable `Topic.startDate` migrations for SQLite and PostgreSQL without rewriting existing schedules or scores. Update all six languages of help, confirmations and validation, README scheduling examples, migration verification and calendar regressions in CI and direct deployment checks. Apply the migration and re-register commands only when deploying this feature.
 ## v0.6.0-beta - 2026-10-21
 
 - Allow all server members to request `/dilemma random`; preserve Manage Server checks for topic schedules and manual runs, settings, and closing both random and scheduled quizzes through the button or fallback command.

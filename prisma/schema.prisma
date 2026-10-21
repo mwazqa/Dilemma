@@ -81,6 +81,7 @@ model Topic {
   enabled        Boolean  @default(true)
   nextGenerationAt DateTime?
   generationTime String?
+  startDate      String?
   lastGeneratedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

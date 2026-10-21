@@ -16,10 +16,14 @@ export class DailyQuizLimitError extends Error {
   }
 }
 
+export class TopicScheduleNotReadyError extends Error {
+  constructor() { super("Topic schedule has no unconsumed publication slot"); this.name = "TopicScheduleNotReadyError"; }
+}
+
 export const RANDOM_COOLDOWN_MS = 8 * 60 * 60 * 1000;
 export const RANDOM_DAILY_LIMIT = 2;
 const randomDailyScope = "random-daily";
-export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun };
+export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun };
 
 export class RandomQuizCooldownError extends Error {
   constructor(public readonly retryAt: Date) {
@@ -127,9 +131,47 @@ export function isGenerationTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
-export function isTopicDue(topic: {
-  generationTime: string | null; lastGeneratedAt: Date | null; intervalDays: number
-}, now: Date): boolean {
+export function isScheduleDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const timestamp = Date.parse(value + "T00:00:00Z");
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
+}
+
+type TopicCalendar = {
+  generationTime: string | null; lastGeneratedAt: Date | null; intervalDays: number; startDate?: string | null
+};
+
+function calendarDay(day: string, offset: number): string {
+  return new Date(Date.parse(day + "T00:00:00Z") + offset * 86_400_000).toISOString().slice(0, 10);
+}
+
+function publicationAt(day: string, time: string): number {
+  const end = +dayStart(calendarDay(day, 1));
+  for (let at = +dayStart(day); at < end; at += 60_000) {
+    if (timeFormatter.format(new Date(at)) >= time) return at;
+  }
+  return end;
+}
+
+function latestPublicationDay(topic: TopicCalendar, now: Date, early: boolean): string | null {
+  const start = topic.startDate!;
+  const days = (Date.parse(quizDay(now)) - Date.parse(start)) / 86_400_000;
+  let cycle = Math.floor(days / topic.intervalDays);
+  if (cycle < 0) return null;
+  let day = calendarDay(start, cycle * topic.intervalDays);
+  if (!early && +now < publicationAt(day, topic.generationTime!)) {
+    if (--cycle < 0) return null;
+    day = calendarDay(start, cycle * topic.intervalDays);
+  }
+  return day;
+}
+
+export function isTopicDue(topic: TopicCalendar, now: Date, early = false): boolean {
+  if (topic.startDate) {
+    if (!isScheduleDate(topic.startDate) || !topic.generationTime || !isGenerationTime(topic.generationTime)) return false;
+    const day = latestPublicationDay(topic, now, early);
+    return day !== null && (!topic.lastGeneratedAt || quizDay(topic.lastGeneratedAt) < day);
+  }
   if (!topic.generationTime || timeFormatter.format(now) < topic.generationTime) return false;
   if (!topic.lastGeneratedAt) return true;
   const days = (Date.parse(quizDay(now)) - Date.parse(quizDay(topic.lastGeneratedAt))) / 86_400_000;
@@ -138,10 +180,18 @@ export function isTopicDue(topic: {
 
 export function nextTopicRunAt(topic: {
   enabled: boolean; channelId: string | null; generationTime: string | null;
-  lastGeneratedAt: Date | null; intervalDays: number
+  lastGeneratedAt: Date | null; intervalDays: number; startDate?: string | null
 }, now = new Date()): number | null {
   if (!topic.enabled || !topic.channelId || !topic.generationTime || !isGenerationTime(topic.generationTime)) return null;
+  if (topic.startDate && !isScheduleDate(topic.startDate)) return null;
   if (isTopicDue(topic, now)) return +now;
+  if (topic.startDate) {
+    const today = quizDay(now);
+    const afterLast = topic.lastGeneratedAt ? calendarDay(quizDay(topic.lastGeneratedAt), 1) : topic.startDate;
+    const earliest = today > afterLast ? today : afterLast;
+    const cycle = Math.max(0, Math.ceil((Date.parse(earliest) - Date.parse(topic.startDate)) / (86_400_000 * topic.intervalDays)));
+    return publicationAt(calendarDay(topic.startDate, cycle * topic.intervalDays), topic.generationTime);
+  }
   const today = quizDay(now);
   const eligible = topic.lastGeneratedAt
     ? new Date(Date.parse(quizDay(topic.lastGeneratedAt)) + topic.intervalDays * 86_400_000).toISOString().slice(0, 10)
@@ -160,7 +210,7 @@ export function validatePollDuration(hours: number): number {
   return hours;
 }
 
-export async function claimQuizRun(guildId: string, topicId?: string, now = new Date()): Promise<QuizRun> {
+export async function claimQuizRun(guildId: string, topicId?: string, now = new Date(), early = true): Promise<QuizRun> {
   if (!topicId) return claimRandomQuiz(guildId, now);
   const { day, start, end } = quizDayBounds(now);
   const scope = topicId ? `topic:${topicId}` : "random";
@@ -171,9 +221,22 @@ export async function claimQuizRun(guildId: string, topicId?: string, now = new 
   const where = { guildId, createdAt: { gte: start, lt: end },
     ...(recordedMessages.length ? { messageId: { notIn: recordedMessages } } : {}) };
   const legacyCount = await db.generatedPoll.count({ where: { ...where, topicId } });
-  if (topicId) {
-    const topic = await db.topic.findUnique({ where: { id: topicId } });
-    if (topic?.lastGeneratedAt && quizDay(topic.lastGeneratedAt) === day) throw new DailyQuizLimitError(kind);
+  const topic = await db.topic.findUnique({ where: { id: topicId } });
+  if (topic?.lastGeneratedAt && quizDay(topic.lastGeneratedAt) === day) throw new DailyQuizLimitError(kind);
+  if (topic?.startDate) {
+    if (!isTopicDue(topic, now, early)) throw new TopicScheduleNotReadyError();
+    if (runs.length || legacyCount) throw new DailyQuizLimitError(kind);
+    const cycleDay = latestPublicationDay(topic, now, early)!;
+    try {
+      return await db.$transaction(async tx => {
+        const run = await tx.dailyQuizRun.create({ data: { guildId, scope, day, slot: 1 } });
+        const cycleRun = await tx.dailyQuizRun.create({ data: { guildId, scope: `topic-cycle:${topicId}`, day: cycleDay, slot: 1 } });
+        return { ...run, cycleRun };
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+      throw new TopicScheduleNotReadyError();
+    }
   }
   for (let slot = legacyCount + 1; slot <= limit; slot++) {
     try { return await db.dailyQuizRun.create({ data: { guildId, scope, day, slot } }); }
@@ -190,11 +253,11 @@ export function runKey(run: DailyQuizRun) {
 
 export async function releaseQuizRun(run: QuizRun) {
   const where = { ...runKey(run).guildId_scope_day_slot, createdAt: run.createdAt, messageId: null };
-  if (!run.dailyRun) { await db.dailyQuizRun.deleteMany({ where }); return; }
-  const dailyRun = run.dailyRun;
+  const pairedRun = run.dailyRun ?? run.cycleRun;
+  if (!pairedRun) { await db.dailyQuizRun.deleteMany({ where }); return; }
   await db.$transaction(async tx => {
     const removed = await tx.dailyQuizRun.deleteMany({ where });
-    if (removed.count) await tx.dailyQuizRun.deleteMany({ where: { ...runKey(dailyRun).guildId_scope_day_slot,
-      createdAt: dailyRun.createdAt, messageId: null } });
+    if (removed.count) await tx.dailyQuizRun.deleteMany({ where: { ...runKey(pairedRun).guildId_scope_day_slot,
+      createdAt: pairedRun.createdAt, messageId: null } });
   });
 }

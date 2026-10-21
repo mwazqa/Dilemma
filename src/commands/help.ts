@@ -13,7 +13,7 @@ export function getHelpContent(language = "en"): string {
     ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
     ["/dilemma score forget", "helpForget"], ["/dilemma ping", "helpPing"]
   ];
-  return [message(language, "helpIntro"), ...lines.map(([command, key]) => `\`${command}\` - ${message(language, key)}`)].join("\n");
+  return [message(language, "helpIntro"), message(language, "helpSchedule"), ...lines.map(([command, key]) => `\`${command}\` - ${message(language, key)}`)].join("\n");
 }
 
 export function getHelpEmbed(language = "en"): EmbedBuilder {
@@ -34,6 +34,7 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x8b5cf6)
     .setTitle(message(language, "helpIntro"))
+    .setDescription(message(language, "helpSchedule"))
     .addFields(sections.map(section => ({
       name: message(language, section.title),
       value: section.commands.map(([command, key]) => `\`${command}\` - ${message(language, key)}`).join("\n"),

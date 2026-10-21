@@ -10,12 +10,14 @@ Current MVP:
 
 Latest release: `v0.6.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
+Unreleased development changes add fixed-date topic schedules with `start_date`. They require the new database migration and command registration before use; they are not part of the deployed v0.6.0-beta release.
+
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
 - OpenRouter support with configurable model
 - Custom answer options or AI-generated options
-- Topic intervals, one question per run, configurable poll duration and fixed generation time
+- Topic intervals, one question per run, configurable poll duration and fixed generation time; optional first publication date in Unreleased
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
 - SQLite + Prisma persistence for local development
@@ -62,9 +64,9 @@ Never commit .env or bot/API keys.
 
 ## Commands
 
-- `/dilemma create` - create a topic with optional `difficulty:easy|medium|hard`
-- `/dilemma configure` - configure interval, `duration_hours:1-24`, generation time or difficulty
-- `/dilemma run` - publish one question early instead of today's scheduled run; optional `duration_hours:1-24` overrides this poll only
+- `/dilemma create name:... option_count:2-4` - create a topic; optional `start_date:YYYY-MM-DD`, `generation_time:HH:mm`, `interval_days:1-30` and `difficulty:easy|medium|hard`; supply `options` instead of `option_count` for fixed answers
+- `/dilemma configure name:...` - change `start_date`, `interval_days:1-30`, `duration_hours:1-24`, `generation_time:HH:mm` or difficulty; `start_date:none` restores rolling scheduling
+- `/dilemma run name:...` - publish an available quiz early without moving fixed repeat dates; optional `duration_hours:1-24` overrides this poll only
 - `/dilemma random option_count:2-4 difficulty:easy|medium|hard` - generate one random dilemma without a saved topic or topic counter; difficulty is optional
 - `/dilemma list` - list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
@@ -87,7 +89,33 @@ Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/p
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
-Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Each defaults option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Existing topics keep their schedule, enabled state, last run and daily quota, including when updated through `create`; use `/dilemma configure generation_time:HH:mm` to change one topic. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
+Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Each defaults option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Changing defaults never changes existing topics. Reusing `create` preserves omitted date, time, interval, difficulty, last run and quota settings, but updates the answer configuration and channel and enables the topic. Use `configure` to change a saved schedule directly. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
+
+### Plan topics ahead by date (Unreleased)
+
+Create all your topics now and give each one its own first publication date. `start_date` uses `YYYY-MM-DD` in `QUIZ_TIMEZONE`; choose today or a later valid date. Supply `generation_time` or set a server default first. `interval_days` accepts 1-30 calendar days and can be set during creation or changed later without losing the start date.
+
+For a different topic every weekday, create these seven topics on their destination channel before the first date. Dates below are examples; replace them with your intended future dates:
+
+```text
+/dilemma create name:Monday option_count:4 start_date:2026-10-26 generation_time:18:30 interval_days:7
+/dilemma create name:Tuesday option_count:4 start_date:2026-10-27 generation_time:18:30 interval_days:7
+/dilemma create name:Wednesday option_count:4 start_date:2026-10-28 generation_time:18:30 interval_days:7
+/dilemma create name:Thursday option_count:4 start_date:2026-10-29 generation_time:18:30 interval_days:7
+/dilemma create name:Friday option_count:4 start_date:2026-10-30 generation_time:18:30 interval_days:7
+/dilemma create name:Saturday option_count:4 start_date:2026-10-31 generation_time:18:30 interval_days:7
+/dilemma create name:Sunday option_count:4 start_date:2026-11-01 generation_time:18:30 interval_days:7
+```
+
+The Monday topic starts on October 26, then repeats on November 2, November 9 and so on. The other topics keep their own dates. Use real subject names rather than weekday names if you want AI to generate questions about a particular subject. Creation saves topic configuration, not a batch of ready questions; AI generates a new question at each publication.
+
+To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. Help explains the same options in all six supported languages, without restoring parameter examples to the help card.
+
+Repeats are anchored to the first date, not the actual time of a late run. After downtime, the bot publishes at most the latest overdue slot rather than replaying every missed quiz; the next planned date stays unchanged. Calendar-day intervals retain the local hour across daylight-saving changes. A missing local hour runs at the first later local minute; a repeated hour uses its first occurrence. Choosing today with an already-passed publication time makes the quiz due immediately.
+
+For dated topics, `/dilemma run` may bring the current slot forward to earlier on its publication day, or recover an overdue slot. It cannot publish before the first day or repeat a consumed/reserved cycle. Daily and cycle reservations are atomic, persist across restarts and retain an uncertain send's slot even after midnight. An AI failure before any send attempt releases both reservations. Existing undated topics keep their previous rolling interval behavior and one-quiz-per-day manual limit. `start_date:none` removes the fixed anchor without resetting history or daily quota.
+
+Before deploying fixed-date schedules, test `20261021120000_topic_start_date` on an isolated PostgreSQL copy, then apply it to the target database and re-register commands. This additive migration introduces nullable `Topic.startDate`; existing topics receive no start date, and schedules, scores, EXP and achievements are preserved. Do not start the new code against an unmigrated database. Run `npm run test:topic-calendar`, `npm run test:idle-database` and the migration tests before release. `npm run test:topic-calendar:postgres` verifies concurrent cycle claims, cross-day rollback and paired reservation release against an already-migrated isolated PostgreSQL database; it requires the test-only environment guards described above and deletes only its own synthetic records.
 
 Before deploying these defaults changes, test and apply the additive `20261012120000_default_generation_time` migration, then re-register commands. The migration adds a nullable setting without rewriting topic schedules or player scores. Local in-memory SQLite migration tests do not replace verification on an isolated PostgreSQL branch before production.
 
@@ -109,7 +137,7 @@ Direct deployment normally rejects pending migrations. After creating a backup a
 
 The bot keeps one local timer per scheduler, not a periodic database polling loop. At startup it reads active topic schedules and unsettled poll deadlines. It then queries only when a known topic is due, a poll expires or closes early, a failed job needs a retry, or a command needs persisted data. Empty queues perform no database queries, including overnight. Long timer waits are re-armed locally without querying the database.
 
-Topic creation, configuration, enable/disable, deletion and successful manual publication update the local schedule after the database write commits. New polls register their settlement deadline after commit; early closure replaces the expiry timer. Restarting reloads persisted state and catches up overdue work. Existing daily reservations, finalized-vote checks and transactional, idempotent scoring remain authoritative. Pending finalization retries back off from one minute up to one hour; failed jobs and failed startup reads back off from five minutes up to one hour.
+Topic creation, configuration, enable/disable, deletion and successful manual publication update the local schedule after the database write commits, including fixed-date schedules. New polls register their settlement deadline after commit; early closure replaces the expiry timer. Restarting reloads persisted state and catches up overdue work. Daily/cycle reservations, finalized-vote checks and transactional, idempotent scoring remain authoritative. Pending finalization retries back off from one minute up to one hour; failed jobs and failed startup reads back off from five minutes up to one hour.
 
 Guild language and defaults use a bounded, process-local cache with a one-hour lifetime. Bot settings commands and onboarding update it immediately. Cache expiry is checked only on demand, never by a background refresh. Scores, votes and profile deletion are not cached. Run one active bot process; after editing schedules or settings directly outside the bot, restart it to reload the local state.
 

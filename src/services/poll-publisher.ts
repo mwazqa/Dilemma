@@ -12,9 +12,9 @@ import { pollControls } from "./poll-controls.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 
-export async function publishTopicQuestions(topic: Topic, channel: SendableChannels): Promise<number> {
+export async function publishTopicQuestions(topic: Topic, channel: SendableChannels, early = true): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
-  let run = await claimQuizRun(topic.guildId, topic.id);
+  let run = await claimQuizRun(topic.guildId, topic.id, new Date(), early);
   let sendAttempted = false;
   try {
     const settings = await getGuildSettings(topic.guildId);
@@ -31,7 +31,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     previousQuestions.push(question.question);
     if (run.day !== quizDay(new Date())) {
       await releaseQuizRun(run);
-      run = await claimQuizRun(topic.guildId, topic.id);
+      run = await claimQuizRun(topic.guildId, topic.id, new Date(), early);
     }
     const questionNumber = topic.questionsGenerated + 1;
     sendAttempted = true;
@@ -72,6 +72,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       });
       await tx.quizSettlement.create({ data: settlement });
       await tx.dailyQuizRun.update({ where: runKey(run), data: { messageId: sentPoll.id } });
+      if (run.cycleRun) await tx.dailyQuizRun.update({ where: runKey(run.cycleRun), data: { messageId: sentPoll.id } });
       return updated;
     });
     scheduleEvents.emit("topicChanged", updatedTopic);

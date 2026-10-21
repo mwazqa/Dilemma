@@ -27,6 +27,11 @@ try {
   assert.equal(topic.intervalDays, 7);
   assert.equal(topic.name, "Legacy");
   assert.equal(topic.generationTime, "06:45", "Do not replace existing topic schedules");
+  assert.equal(topic.startDate, null, "Do not change legacy schedules when adding fixed start dates");
+  const startDateMigration = "20261021120000_topic_start_date/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${startDateMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${startDateMigration}`, "utf8"));
+  database.exec(`UPDATE "Topic" SET "startDate" = '2026-10-26' WHERE id = 'legacy'`);
+  assert.equal(database.prepare('SELECT startDate FROM "Topic" WHERE id = ?').get("legacy").startDate, "2026-10-26");
   assert.equal(topic.pollDurationHours, 24);
   assert.equal(topic.questionsPerRun, 3, "Legacy column remains usable by the rollback version");
   const settings = database.prepare('SELECT * FROM "GuildSettings" WHERE guildId = ?').get("test");

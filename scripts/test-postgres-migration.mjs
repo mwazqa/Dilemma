@@ -18,7 +18,7 @@ try {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null }
       : table === "UserScore" ? { selectedBadge: null }
-      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24 } : { difficulty: "medium" };
+      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }
@@ -39,10 +39,14 @@ try {
   await db.userScore.delete({ where: { guildId_userId: { guildId, userId: player.userId } } });
   const topic = await db.topic.create({ data: { guildId, name: "Difficulty migration test", options: "", difficulty: settings.defaultDifficulty } });
   assert.equal(topic.difficulty, "hard");
+  assert.equal(topic.startDate, null);
+  const scheduled = await db.topic.update({ where: { id: topic.id }, data: { startDate: "2026-10-26", generationTime: "18:00", intervalDays: 7 } });
+  assert.equal(scheduled.startDate, "2026-10-26");
+  assert.equal(scheduled.intervalDays, 7);
   for (const difficulty of ["easy", "medium", "hard"]) assert.equal((await db.topic.update({ where: { id: topic.id }, data: { difficulty } })).difficulty, difficulty);
   await db.topic.delete({ where: { id: topic.id } });
   await db.guildSettings.delete({ where: { guildId } });
-  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true }));
+  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, startDatePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true }));
 } catch (error) {
   console.error(`Migration verification failed (${error?.code ?? error?.name ?? "Error"}).`);
   process.exitCode = 1;

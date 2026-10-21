@@ -2,7 +2,7 @@ import type { Client } from "discord.js";
 import { db } from "./db.js";
 import { publishTopicQuestions } from "./services/poll-publisher.js";
 import { privateErrorSummary } from "./private-errors.js";
-import { DailyQuizLimitError, isTopicDue, nextTopicRunAt } from "./services/quiz-limits.js";
+import { DailyQuizLimitError, TopicScheduleNotReadyError, isTopicDue, nextTopicRunAt } from "./services/quiz-limits.js";
 import { DeadlineQueue, retryDelay } from "./services/deadline-queue.js";
 import { scheduleEvents, type TopicSchedule } from "./services/schedule-events.js";
 
@@ -16,7 +16,7 @@ export function startScheduler(client: Client) {
     try {
       if (id === "bootstrap") {
         const topics = await db.topic.findMany({ where: scheduledWhere,
-          select: { id: true, enabled: true, channelId: true, generationTime: true, lastGeneratedAt: true, intervalDays: true } });
+          select: { id: true, enabled: true, channelId: true, generationTime: true, startDate: true, lastGeneratedAt: true, intervalDays: true } });
         for (const topic of topics) if (!changedDuringLoad.has(topic.id)) schedule(topic);
         loading = false;
         changedDuringLoad.clear();
@@ -28,8 +28,8 @@ export function startScheduler(client: Client) {
         try { await publishDueTopic(client, topic, current); }
         catch (error) {
           if (!current()) return;
-          if (!(error instanceof DailyQuizLimitError)) throw error;
-          schedule({ ...topic, lastGeneratedAt: new Date(), intervalDays: 1 });
+          if (!(error instanceof DailyQuizLimitError) && !(error instanceof TopicScheduleNotReadyError)) throw error;
+          schedule({ ...topic, lastGeneratedAt: new Date(), intervalDays: topic.startDate ? topic.intervalDays : 1 });
         }
       }
       attempts.delete(id);
@@ -71,7 +71,7 @@ async function publishDueTopic(client: Client, topic: Parameters<typeof publishT
   const channel = await client.channels.fetch(topic.channelId!);
   if (!current()) return;
   if (!channel?.isSendable()) throw new Error("Scheduled channel unavailable");
-  await publishTopicQuestions(topic, channel);
+  await publishTopicQuestions(topic, channel, false);
   console.log("Scheduled generation completed");
 }
 
@@ -86,7 +86,7 @@ export async function runDueTopics(client: Client) {
       if (!isTopicDue(topic, new Date())) continue;
       try { await publishDueTopic(client, topic); }
       catch (error) {
-        if (!(error instanceof DailyQuizLimitError)) console.error("Scheduled generation failed:", privateErrorSummary(error));
+        if (!(error instanceof DailyQuizLimitError) && !(error instanceof TopicScheduleNotReadyError)) console.error("Scheduled generation failed:", privateErrorSummary(error));
       }
     }
   } finally { running = false; }
