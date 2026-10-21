@@ -122,6 +122,18 @@ const deniedCommand = interaction({ permitted: false });
 await routeCommand(deniedCommand);
 assert.equal(ends, 0, "Nested poll command preserves the administrative permission check");
 assert.match(deniedCommand.replies.at(-1), /Zarządzanie serwerem/);
+for (const useRandom of [false, true]) {
+  for (const handler of [handleEndPollButton, routeCommand]) {
+    reset(); random = useRandom;
+    const request = interaction({ permitted: false });
+    await handler(request);
+    assert.equal(ends, 0);
+    assert.equal(results.length, 0);
+    assert.equal(settlementUpdates, 0);
+    assert.equal(patches, 0);
+    assert.equal(request.replies.at(-1), message("pl", "permission"));
+  }
+}
 reset();
 let release;
 gate = new Promise(resolve => { release = resolve; });

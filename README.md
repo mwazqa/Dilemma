@@ -8,7 +8,7 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.5.2-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.6.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
@@ -33,6 +33,8 @@ Command replies use the same warm voice across all six languages, including badg
 Before pushing code, run `npm run security:setup` once to install the checksum-verified Gitleaks scanner and local pre-push hook. Use `npm run security:scan` to scan history and current publication candidates. The scanner blocks pushes when unavailable or when a scan fails; it does not print secret values. Hooks can be bypassed, so keep GitHub push protection enabled.
 
 PostgreSQL tests require `TEST_DATABASE_CONFIRMED=true`, `EXPECTED_TEST_HOST` and `EXPECTED_TEST_DATABASE` matching a separately provisioned test database. Never use production credentials for these tests.
+
+Run `npm run test:random:postgres` on an isolated, migrated PostgreSQL test database before releasing random quota changes. It tests concurrent claims, daily capacity, server/topic isolation, transaction rollback, failure release and upgrade history, and deletes only its own uniquely named test records. It neither migrates the database nor contacts Discord or an AI provider.
 
 Requirements: Node.js 22+ and a Discord application/bot.
 
@@ -81,7 +83,7 @@ Never commit .env or bot/API keys.
 - `/dilemma score badge achievement:...` - select one unlocked badge or hide it with `none`
 - `/dilemma score forget confirm:true` - permanently delete your stored answers and score on the current server
 
-Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to replace the old command list. Help, ping and score commands remain available to ordinary players; language, defaults, topic management and poll closing require Manage Server permission, checked in their handlers rather than on the shared root command.
+Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to refresh command descriptions. Help, ping, score and random quizzes are available to ordinary players, subject to Discord's own application-command and channel permissions. Language, defaults, topic management, scheduled-topic runs and closing any quiz require Manage Server permission, checked in their handlers rather than on the shared root command. Creating a random quiz does not grant permission to close it: both the End quiz button and `/dilemma poll end` stay administrative for random and scheduled quizzes.
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
@@ -91,11 +93,11 @@ Before deploying these defaults changes, test and apply the additive `2026101212
 
 Each topic can publish at most one quiz per calendar day, shared by manual and scheduled runs. An early manual run replaces that day's scheduled run. Different topics have independent limits. Changing a schedule, enabling a topic or restarting the bot does not reset quota. Deleting and recreating a topic creates a new topic with a new quota.
 
-Random quizzes have no daily use quota, only a rolling two-hour cooldown per server, shared across channels and administrators. The cooldown persists across restarts and midnight; it uses elapsed time, independent of timezone or daylight-saving changes. Existing random polls and in-progress reservations from the previous version also count if less than two hours old. Topic days and scheduled times still use `QUIZ_TIMEZONE` (default `Europe/Warsaw`).
+Random quizzes allow at most two publications per calendar day on each server, with at least eight hours between publications. All members and channels share these limits. Days use `QUIZ_TIMEZONE` (default `Europe/Warsaw`); the rolling eight-hour cooldown uses elapsed time and does not reset at midnight, on a restart or during a daylight-saving change. Existing same-day random polls and uncertain reservations count during upgrades. Scheduled topics retain their independent one-quiz-per-topic daily limit.
 
 Polls last 24 hours by default. Set `duration_hours:1-24` in topic configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset a topic's daily quota or the random cooldown.
 
-Reservations persist in the database and prevent concurrent commands from exceeding limits. AI failures before a Discord send attempt release their reservation. A failed or uncertain send, or a process crash, conservatively keeps the reservation until the topic's day ends or the random cooldown expires. A successful random publication starts a full two-hour cooldown. The rolling random reservation reuses existing quota storage without a new migration.
+Reservations persist in the database and prevent concurrent commands from exceeding limits. Random daily slots and the rolling cooldown are claimed and refreshed transactionally in the existing quota table. AI failures before a Discord send attempt release both reservations. A failed or uncertain send conservatively keeps its daily slot and eight-hour cooldown. Successful publication starts a full eight-hour cooldown, while the daily slot remains consumed for that calendar day. Changing days frees daily capacity but does not bypass a remaining cooldown. No schema migration is needed for these limits. Before release, verify the transaction and concurrency paths on isolated PostgreSQL; mocked and SQLite tests alone do not verify PostgreSQL locking.
 
 The v0.3.0-beta migration only adds duration fields and quota storage. Legacy question-count columns remain unused for compatibility with the previous container during rollback. Apply the migration before starting this version, then re-register slash commands to replace `questions_per_run` with `duration_hours`.
 

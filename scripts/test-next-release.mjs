@@ -15,7 +15,7 @@ for (const [key, translations] of Object.entries(messages)) {
 const friendlyFeedbackKeys = [
   "achievementFirstAnswerGoal", "achievementCorrect10Goal", "achievementAnswers100Goal", "achievementStreak10Goal",
   "achievementLevel2Goal", "achievementLevel5Goal", "achievementsSummary", "badgeSet", "badgeCleared", "badgeLocked",
-  "badgeUnknown", "badgeSelectionInvalid", "pollClosing", "topicDailyLimit", "randomCooldown", "serverOnly",
+  "badgeUnknown", "badgeSelectionInvalid", "pollClosing", "topicDailyLimit", "randomCooldown", "randomDailyLimit", "serverOnly",
   "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
   "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
   "timeInvalid", "configured", "languageSet", "defaultsSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
@@ -38,7 +38,9 @@ for (const [index, language] of messageLanguages.entries()) {
   assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
   assert.ok(message(language, "optionsMissing").includes("options") && message(language, "optionsMissing").includes("option_count"));
   assert.ok(message(language, "timeInvalid").includes("HH:mm") && message(language, "timeInvalid").includes("18:30"));
-  assert.ok(message(language, "randomCooldown").includes("2") && message(language, "randomCooldown").includes("{minutes}"));
+  assert.ok(message(language, "randomCooldown").includes("8") && message(language, "randomCooldown").includes("{minutes}"));
+  assert.ok(message(language, "randomDailyLimit").includes("2") && message(language, "randomDailyLimit").includes("8"));
+  assert.ok(message(language, "helpRandom").includes("2") && message(language, "helpRandom").includes("8"));
   assert.ok(message(language, "badgeSelectionInvalid").includes("3"));
 }
 for (const language of messageLanguages) {
@@ -190,11 +192,23 @@ assert.equal(generatedPoll.difficulty, "easy");
 resetTopicDay();
 await handleTopic(interaction("run", { name: "Test" }));
 assert.equal(generatedPoll.difficulty, "easy");
-const denied = interaction("random", { option_count: 4 }, false);
+const denied = interaction("run", { name: "Test" }, false);
 const requestsBefore = counter;
 await handleTopic(denied);
 assert.equal(counter, requestsBefore);
 assert.match(denied.replies[0], /Zarządzanie serwerem/);
+const publicRandom = interaction("random", { option_count: 4 }, false);
+await routeCommand(publicRandom);
+assert.equal(counter, requestsBefore + 1);
+assert.equal(publicRandom.replies.at(-1), message("pl", "randomDone", { name: "Test", count: 4 }));
+const noPermissionObject = interaction("random", { option_count: 4 }, false);
+noPermissionObject.memberPermissions = null;
+await routeCommand(noPermissionObject);
+assert.equal(noPermissionObject.replies.at(-1), message("pl", "randomDone", { name: "Test", count: 4 }));
+const privateRandom = interaction("random", { option_count: 4 }, false);
+privateRandom.guildId = null;
+await routeCommand(privateRandom);
+assert.equal(privateRandom.replies[0], message("en", "serverOnly"));
 const invalid = interaction("create", { name: "Test", options: "A,A" });
 await handleTopic(invalid);
 assert.match(invalid.replies[0], /różne odpowiedzi/);
@@ -268,12 +282,18 @@ assert.equal(topic.pollDurationHours, savedDuration);
 assert.equal(topic.difficulty, savedDifficulty);
 const createRun = db.dailyQuizRun.create;
 const updateRuns = db.dailyQuizRun.updateMany;
-db.dailyQuizRun.updateMany = async () => { throw new RandomQuizCooldownError(new Date(Date.now() + 120 * 60_000)); };
+db.dailyQuizRun.updateMany = async () => { throw new RandomQuizCooldownError(new Date(Date.now() + 480 * 60_000)); };
 const randomLimited = interaction("random", { option_count: 4 });
 const callsAtLimit = counter;
 await handleTopic(randomLimited);
-assert.match(randomLimited.replies.at(-1), /120/);
+assert.match(randomLimited.replies.at(-1), /480/);
 db.dailyQuizRun.updateMany = updateRuns;
+db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("random"); };
+const randomDailyLimited = interaction("random", { option_count: 4 }, false);
+await routeCommand(randomDailyLimited);
+assert.equal(randomDailyLimited.replies.at(-1), message("ja", "randomDailyLimit"));
+assert.equal(counter, callsAtLimit);
+db.dailyQuizRun.create = createRun;
 resetTopicDay();
 db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("topic"); };
 const topicLimited = interaction("run", { name: "Test" });
@@ -310,7 +330,7 @@ assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("ja").to
 const routedPing = interaction("ping", {}, false);
 await routeCommand(routedPing);
 assert.equal(routedPing.replies[0], message("ja", "ping"));
-for (const sub of ["language", "defaults", "create", "configure", "enable", "disable", "delete", "run", "random", "list"]) {
+for (const sub of ["language", "defaults", "create", "configure", "enable", "disable", "delete", "run", "list"]) {
   const deniedRoute = interaction(sub, { value: "en", name: "Test" }, false);
   const topicBefore = { ...topic };
   const settingsBefore = { ...settings };

@@ -209,6 +209,7 @@ try {
   db.generatedPoll.updateMany = async ({ where, data }) => { const poll = polls.get(where.messageId); if (poll.endedAt) return { count: 0 }; Object.assign(poll, data); return { count: 1 }; };
   db.generatedPoll.create = async ({ data }) => { polls.set(data.messageId, { ...data, endedAt: null }); return data; };
   db.randomPoll.findFirst = async () => null;
+  db.randomPoll.count = async () => 0;
   db.randomPoll.findMany = async () => [];
   db.randomPoll.create = async ({ data }) => data;
   db.$transaction = async work => work(db);

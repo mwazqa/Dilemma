@@ -142,8 +142,12 @@ export async function publishRandomQuestion(
         }
       });
       await tx.quizSettlement.create({ data: settlement });
-      await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot, createdAt: run.createdAt },
-        data: { messageId: sentPoll.id, createdAt: new Date() } });
+      const createdAt = new Date();
+      for (const reservation of [run, run.dailyRun!]) {
+        const saved = await tx.dailyQuizRun.updateMany({ where: { ...runKey(reservation).guildId_scope_day_slot,
+          createdAt: reservation.createdAt, messageId: null }, data: { messageId: sentPoll.id, createdAt } });
+        if (!saved.count) throw new Error("Random quiz reservation changed before persistence");
+      }
     });
     scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return question.topic;

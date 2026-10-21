@@ -50,7 +50,7 @@ export const topicCommand = new SlashCommandBuilder()
     .setDescription("Show Dilemma commands."))
   .addSubcommand((subcommand) => subcommand
     .setName("random")
-    .setDescription("Generate one random quiz now, with a two-hour server cooldown.")
+    .setDescription("Generate a random quiz: two per server day, at least eight hours apart.")
     .addIntegerOption((option) => option
       .setName("option_count")
       .setDescription("Number of AI-generated answers.")
@@ -78,7 +78,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     await reply({ content: null, embeds: [getHelpEmbed(language)] });
     return;
   }
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (subcommand !== "random" && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     await reply(text("permission"));
     return;
   }
@@ -106,6 +106,10 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         interaction.options.getInteger("duration_hours") ?? settings.defaultPollDurationHours);
       await reply(text("randomDone", { name: generatedTopic, count: optionCount }));
     } catch (error) {
+      if (error instanceof DailyQuizLimitError) {
+        await reply(text("randomDailyLimit"));
+        return;
+      }
       if (error instanceof RandomQuizCooldownError) {
         await reply(text("randomCooldown", { minutes: Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000)) }));
         return;

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v0.6.0-beta - 2026-10-21
+
+- Allow all server members to request `/dilemma random`; preserve Manage Server checks for topic schedules and manual runs, settings, and closing both random and scheduled quizzes through the button or fallback command.
+- Limit random quizzes to two per server calendar day with an eight-hour rolling cooldown shared across all members and channels. Reuse existing quota records with transactional daily/cooldown reservations, stale-lease fencing and upgrade-history accounting; preserve topic limits and idle-database behavior. Update all six language versions of help and feedback, plus permission and quota regression tests. Verify concurrent claims, daily capacity, rollback, failure release and upgrade history on isolated PostgreSQL. No schema migration is required.
+
 ## v0.5.2-beta - 2026-10-21
 
 - Remove nonessential comments from application code, scripts, tests and ignore configuration without changing executable behavior. Preserve required shebangs and already-applied migration files to keep their recorded checksums stable.
