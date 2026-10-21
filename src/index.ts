@@ -33,7 +33,7 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.on(Events.GuildCreate, async (guild) => {
-  cacheGuildSettings(await db.guildSettings.upsert({
+  const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: guild.id },
     create: { guildId: guild.id },
     update: {}
@@ -46,14 +46,14 @@ client.on(Events.GuildCreate, async (guild) => {
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("settings:language")
-    .setPlaceholder("Choose question language")
+    .setPlaceholder(message(settings.language, "languagePlaceholder"))
     .addOptions(supportedLanguages.map((language) => ({
       label: language.name,
       value: language.value
     })));
 
   await channel.send({
-    content: "Your little quiz companion is ready~ Choose your server's language! (≧◡≦) ♡",
+    content: message(settings.language, "welcome"),
     allowedMentions: { parse: [] },
     components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)]
   });

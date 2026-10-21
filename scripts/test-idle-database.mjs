@@ -177,10 +177,8 @@ try {
     Object.assign(topic, { ...data, questionsGenerated: topic.questionsGenerated + (data.questionsGenerated?.increment ?? 0) });
     return { ...topic };
   };
-  db.topic.upsert = async ({ create, update }) => {
-    const topic = [...topics.values()].find(topic => topic.name === create.name);
-    if (topic) { Object.assign(topic, update); return { ...topic }; }
-    const created = { id: "created", enabled: true, questionsGenerated: 0, lastGeneratedAt: null, ...create };
+  db.topic.create = async ({ data }) => {
+    const created = { id: "created", enabled: true, questionsGenerated: 0, lastGeneratedAt: null, ...data };
     topics.set(created.id, created);
     return { ...created };
   };
@@ -291,6 +289,8 @@ try {
   assert.equal(topicReads, beforeDisabled, "Disabling cancels the next run");
   assert.equal(sent, 1);
   await handleTopic(interaction("configure", { name: topic.name, generation_time: "16:00" }));
+  assert.equal(topic.enabled, false, "Configuring a disabled topic must not enable it");
+  await handleTopic(interaction("enable", { name: topic.name }));
   await advance(2 * 3_600_000);
   assert.equal(sent, 2, "Changing a schedule immediately replaces its timer");
   await handleEndPollButton(interaction("end", { messageId: "poll-2" }));

@@ -32,9 +32,9 @@ export const languageCommand = new SlashCommandSubcommandBuilder()
 export const defaultsCommand = new SlashCommandSubcommandBuilder()
   .setName("defaults")
   .setDescription("Set default AI generation settings for new topics and random quizzes.")
-  .addIntegerOption((option) => option.setName("interval_days").setDescription("Days between generations.").setRequired(false).setMinValue(1).setMaxValue(30))
-  .addIntegerOption((option) => option.setName("duration_hours").setDescription("Default poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24))
   .addStringOption((option) => option.setName("generation_hours").setDescription("Default publication time HH:mm in the bot quiz timezone; new topics only.").setRequired(false).setMinLength(5).setMaxLength(5))
+  .addIntegerOption((option) => option.setName("interval_days").setDescription("Days between generations for new topics only.").setRequired(false).setMinValue(1).setMaxValue(30))
+  .addIntegerOption((option) => option.setName("duration_hours").setDescription("Default poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24))
   .addStringOption(difficultyOption);
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {
@@ -64,12 +64,18 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
   const requestedDifficulty = interaction.options.getString("difficulty");
   const generationTime = interaction.options.getString("generation_hours")?.trim() ?? null;
   if (intervalDays === null && durationHours === null && requestedDifficulty === null && generationTime === null) {
-    await reply(text("settingsMissing"));
+    await reply(text("defaultsMissing"));
     return;
   }
   if (generationTime !== null && !isGenerationTime(generationTime)) {
     await reply(text("timeInvalid"));
     return;
+  }
+  if (intervalDays !== null && (!Number.isInteger(intervalDays) || intervalDays < 1 || intervalDays > 30)) {
+    await reply(text("intervalInvalid")); return;
+  }
+  if (durationHours !== null && (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 24)) {
+    await reply(text("durationInvalid")); return;
   }
   const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },

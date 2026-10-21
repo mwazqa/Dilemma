@@ -8,6 +8,7 @@ Object.assign(process.env, {
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "1"
 });
 const question = { language: "pl", topic: "geografia", question: "Stolica Polski?", options: ["🏙️ Warszawa", "Krakow"], topicEmoji: "", optionEmojis: ["", ""], correctOption: 0, explanation: "Warszawa jest stolica Polski." };
+let answerOptions = question.options;
 let calls = 0;
 let mode = "success";
 let expectedLanguage = "pl";
@@ -34,12 +35,12 @@ globalThis.fetch = async (url, options) => {
   }
   const language = mode === "wrong-once" ? "pl" : responseLanguage;
   if (mode === "wrong-once") mode = "success";
-  const text = JSON.stringify({ ...question, language });
+  const text = JSON.stringify({ ...question, language, options: answerOptions, optionEmojis: answerOptions.map(() => "") });
   const payload = isOpenAI ? { object: "response", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] }] }
     : { choices: [{ message: { content: text } }] };
   return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
 };
-const { generateQuestion, AiGenerationTimeoutError, AiLanguageMismatchError } = await import("../dist/services/question-generator.js");
+const { generateQuestion, AiGenerationTimeoutError, AiLanguageMismatchError, AiAnswerOptionsMismatchError } = await import("../dist/services/question-generator.js");
 assert.equal((await generateQuestion("geography", "pl", [], 2)).options[0], "Warszawa");
 mode = "hang";
 expectedLanguage = "en";
@@ -50,7 +51,8 @@ assert.ok(Date.now() - started < 2000, "Queue must honor overall deadline");
 assert.equal(calls, 2, "No hidden SDK retries or request after queue deadline");
 mode = "success";
 responseLanguage = "en";
-await generateQuestion("after timeout");
+await generateQuestion("after timeout", "en", [], 2);
+answerOptions = ["Yes", "No"];
 for (const language of ["en", "pl", "de", "es", "fr", "ja"]) {
   expectedLanguage = responseLanguage = language;
   const result = await generateQuestion("Historia Polski", language, ["Yes", "No"], 2, ["Stolica Polski?"]);
@@ -61,10 +63,17 @@ for (const language of ["en", "pl", "de", "es", "fr", "ja"]) {
 expectedLanguage = responseLanguage = "ja";
 mode = "wrong-once";
 const beforeRetry = calls;
-assert.equal((await generateQuestion("Polish topic", "ja")).language, "ja");
+assert.equal((await generateQuestion("Polish topic", "ja", [], 2)).language, "ja");
 assert.equal(calls, beforeRetry + 2, "Wrong response language is retried");
 responseLanguage = "pl";
 const beforeFailure = calls;
-await assert.rejects(generateQuestion("Polish topic", "ja"), AiLanguageMismatchError);
+await assert.rejects(generateQuestion("Polish topic", "ja", [], 2), AiLanguageMismatchError);
 assert.equal(calls, beforeFailure + 2, "Repeated wrong language fails within retry budget");
+responseLanguage = "ja";
+const beforeCountFailure = calls;
+await assert.rejects(generateQuestion("Topic", "ja", [], 4), AiAnswerOptionsMismatchError);
+assert.equal(calls, beforeCountFailure + 2);
+await assert.rejects(generateQuestion("Topic", "ja", ["No", "Yes"], 2), AiAnswerOptionsMismatchError);
+answerOptions = ["🍎 Apple", "Pear"];
+assert.deepEqual((await generateQuestion("Fruit", "ja", answerOptions, 2)).options, answerOptions);
 console.log(`PASS: ${isOpenAI ? "OpenAI" : "OpenRouter"} server language instructions in six locales, language mismatch retry/rejection, JSON normalization, timeout and queue recovery`);

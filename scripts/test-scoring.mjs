@@ -113,7 +113,7 @@ db.$transaction = async cb => cb({ quizAnswer: { deleteMany: async ({ where }) =
 const unconfirmed = interaction("forget");
 await routeCommand(unconfirmed); assert.equal(deletions, 0);
 assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
-const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 2); assert.match(forgotten.replies[0], /trwale usunięte/);
+const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 2); assert.equal(forgotten.replies[0], message("pl", "scoreForgotten"));
 assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "badge", "forget"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };

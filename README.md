@@ -8,15 +8,15 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.7.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.8.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
-Version v0.7.0-beta adds fixed-date topic schedules with `start_date`. Upgrades require the database migration and refreshed command registration described below.
+Version v0.8.0-beta unifies topic setup, adds custom answers to random quizzes and refreshes Dilemma's localized feedback. Upgrades from v0.7.0-beta require refreshed slash-command registration, but no additional database migration. Older deployments must first apply the migrations described below.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
 - OpenRouter support with configurable model
-- Custom answer options or AI-generated options
+- AI-generated topic answers and optional custom answers for on-demand random quizzes
 - Topic intervals, one question per run, configurable poll duration, fixed generation time and optional first publication date
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
@@ -28,7 +28,7 @@ Version v0.7.0-beta adds fixed-date topic schedules with `start_date`. Upgrades 
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 - Server-specific cosmetic achievements and up to three selected profile badge icons, derived from settled scores
 
-Command replies use the same warm voice across all six languages, including badge selection, cooldowns and validation. Short statistic labels stay concise; permanent-deletion warnings stay explicit and undecorated. Native Discord command and option descriptions intentionally remain neutral English text.
+Command replies, onboarding, language selection, help and quiz controls use the same warm voice across all six languages, including badge selection, cooldowns and validation. Short statistic labels stay concise; permanent-deletion warnings speak in Dilemma's voice but stay explicit and undecorated. Profile names have no added decorations. Native Discord command and option descriptions intentionally remain neutral English text.
 
 ## Setup
 
@@ -64,10 +64,10 @@ Never commit .env or bot/API keys.
 
 ## Commands
 
-- `/dilemma create name:... option_count:2-4` - create a topic; optional `start_date:YYYY-MM-DD`, `generation_time:HH:mm`, `interval_days:1-30` and `difficulty:easy|medium|hard`; supply `options` instead of `option_count` for fixed answers
-- `/dilemma configure name:...` - change `start_date`, `interval_days:1-30`, `duration_hours:1-24`, `generation_time:HH:mm` or difficulty; `start_date:none` restores rolling scheduling
+- `/dilemma create name:...` - create a new topic only; optional settings in order: `start_date`, `generation_time`, `interval_days:1-30`, `duration_hours:1-24`, `difficulty:easy|medium|hard`, `option_count:2-4`. Answers are AI-generated, with 4 by default. Existing names direct you to `configure` rather than overwriting a topic.
+- `/dilemma configure name:...` - update an existing topic using the same fields and order as `create`; provide at least one change. Omitted fields, channel, enabled state, history and quota remain unchanged. `start_date:none` removes the fixed anchor; `generation_time:none` removes automatic publication time only if there is no active start date.
 - `/dilemma run name:...` - publish an available quiz early without moving fixed repeat dates; optional `duration_hours:1-24` overrides this poll only
-- `/dilemma random option_count:2-4 difficulty:easy|medium|hard` - generate one random dilemma without a saved topic or topic counter; difficulty is optional
+- `/dilemma random` - generate one quiz without a saved topic. Optional fields in order: `options`, `option_count`, `difficulty`, `duration_hours`. Use 2-4 unique comma-separated `options`, each at most 55 characters; their count is inferred. Without custom answers, AI generates `option_count` answers, or 4 when omitted. When both fields are set, the count must match the custom answers. All members share the same daily quota and cooldown.
 - `/dilemma list` - list topics
 - `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
 - `/dilemma help` - show the grouped command guide without parameter examples or a self-referential help entry
@@ -75,7 +75,7 @@ Never commit .env or bot/API keys.
 - `/dilemma defaults` - set generation defaults; optional `generation_hours:HH:mm` sets the publication time inherited by new topics
 - `/dilemma ping` - check whether the bot is online
 - `/dilemma poll end` - end a poll and publish its result
-- Each new quiz also has an **End quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
+- Each new quiz also has a localized **Let's end this quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
 - `/dilemma score profile user:optional` - show points, accuracy, current and best correct-answer streak
 - Score cards also show the player's level and EXP progress, separately from answer accuracy.
 - Profile headers show only the player's display name, without a title prefix or added decorations. A compact rank badge sits beside the avatar on the same line as the name. The top three places have prominent gold, silver and bronze styling; other places use a muted badge. Ranking matches `/dilemma score leaderboard`: points descending, correct answers descending, then user ID ascending to resolve ties. Players without settled answers show a dash, with a localized explanation in accessible text; incorrect settled answers still count as participation.
@@ -85,11 +85,15 @@ Never commit .env or bot/API keys.
 - `/dilemma score badge achievement:...` - select one unlocked badge or hide it with `none`
 - `/dilemma score forget confirm:true` - permanently delete your stored answers and score on the current server
 
-Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to refresh command descriptions. Help, ping, score and random quizzes are available to ordinary players, subject to Discord's own application-command and channel permissions. Language, defaults, topic management, scheduled-topic runs and closing any quiz require Manage Server permission, checked in their handlers rather than on the shared root command. Creating a random quiz does not grant permission to close it: both the End quiz button and `/dilemma poll end` stay administrative for random and scheduled quizzes.
+Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to refresh command descriptions. Registration groups frequent player actions first, then topic setup and operation, server settings, poll controls and help; topic deletion is last. Discord clients may apply their own display sorting. Help, ping, score and random quizzes are available to ordinary players, subject to Discord's own application-command and channel permissions. Language, defaults, topic management, scheduled-topic runs and closing any quiz require Manage Server permission, checked in their handlers rather than on the shared root command. Creating a random quiz does not grant permission to close it: both the localized close button and `/dilemma poll end` stay administrative for random and scheduled quizzes.
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 
-Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Each defaults option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Changing defaults never changes existing topics. Reusing `create` preserves omitted date, time, interval, difficulty, last run and quota settings, but updates the answer configuration and channel and enables the topic. Use `configure` to change a saved schedule directly. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
+Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Defaults appear in scheduling-first order: publication time, repeat interval, voting duration, difficulty. Each option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Changing defaults never changes existing topics. Use `configure` to change a saved topic; `create` no longer updates existing topics or moves their channel. Configuring a disabled topic leaves it disabled; use `enable` separately. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
+
+Topic forms follow the planning sequence: name, first date, publication time, repeat interval, voting duration, difficulty and answer count. Date-based scheduling requires a time: a new topic can inherit the server default, while an existing topic keeps its saved time unless explicitly changed. You can clear date and time together. A date without a time is rejected before writing. Duration is independent of repeat interval and uses whole hours (1-24), so it cannot exceed the shortest one-day interval. Random duration can outlast its eight-hour cooldown; active polls can overlap.
+
+Discord does not support conditionally hidden or conditionally required slash-command options. The bot validates dependent fields before changing a topic, reserving random quota or calling AI; it explains missing or conflicting values privately. Custom answers cannot be empty, duplicated ignoring case, longer than 55 characters or outside the 2-4 answer range. AI output must match the requested answer count and preserve custom text and order; mismatches retry within the existing timeout and retry budget, then fail without publishing. Existing topics with legacy fixed answers keep them until `configure option_count` explicitly switches them to generated answers. `npm run test:command-ux` covers the forms, dependencies, permissions, preserved settings and random answer flow with local fixtures, not live Discord or AI calls.
 
 ### Plan topics ahead by date
 
@@ -98,13 +102,13 @@ Create all your topics now and give each one its own first publication date. `st
 For a different topic every weekday, create these seven topics on their destination channel before the first date. Dates below are examples; replace them with your intended future dates:
 
 ```text
-/dilemma create name:Monday option_count:4 start_date:2026-10-26 generation_time:18:30 interval_days:7
-/dilemma create name:Tuesday option_count:4 start_date:2026-10-27 generation_time:18:30 interval_days:7
-/dilemma create name:Wednesday option_count:4 start_date:2026-10-28 generation_time:18:30 interval_days:7
-/dilemma create name:Thursday option_count:4 start_date:2026-10-29 generation_time:18:30 interval_days:7
-/dilemma create name:Friday option_count:4 start_date:2026-10-30 generation_time:18:30 interval_days:7
-/dilemma create name:Saturday option_count:4 start_date:2026-10-31 generation_time:18:30 interval_days:7
-/dilemma create name:Sunday option_count:4 start_date:2026-11-01 generation_time:18:30 interval_days:7
+/dilemma create name:Monday start_date:2026-10-26 generation_time:18:30 interval_days:7
+/dilemma create name:Tuesday start_date:2026-10-27 generation_time:18:30 interval_days:7
+/dilemma create name:Wednesday start_date:2026-10-28 generation_time:18:30 interval_days:7
+/dilemma create name:Thursday start_date:2026-10-29 generation_time:18:30 interval_days:7
+/dilemma create name:Friday start_date:2026-10-30 generation_time:18:30 interval_days:7
+/dilemma create name:Saturday start_date:2026-10-31 generation_time:18:30 interval_days:7
+/dilemma create name:Sunday start_date:2026-11-01 generation_time:18:30 interval_days:7
 ```
 
 The Monday topic starts on October 26, then repeats on November 2, November 9 and so on. The other topics keep their own dates. Use real subject names rather than weekday names if you want AI to generate questions about a particular subject. Creation saves topic configuration, not a batch of ready questions; AI generates a new question at each publication.
@@ -123,7 +127,7 @@ Each topic can publish at most one quiz per calendar day, shared by manual and s
 
 Random quizzes allow at most two publications per calendar day on each server, with at least eight hours between publications. All members and channels share these limits. Days use `QUIZ_TIMEZONE` (default `Europe/Warsaw`); the rolling eight-hour cooldown uses elapsed time and does not reset at midnight, on a restart or during a daylight-saving change. Existing same-day random polls and uncertain reservations count during upgrades. Scheduled topics retain their independent one-quiz-per-topic daily limit.
 
-Polls last 24 hours by default. Set `duration_hours:1-24` in topic configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset a topic's daily quota or the random cooldown.
+Polls last 24 hours by default. Set `duration_hours:1-24` in topic creation, configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset a topic's daily quota or the random cooldown.
 
 Reservations persist in the database and prevent concurrent commands from exceeding limits. Random daily slots and the rolling cooldown are claimed and refreshed transactionally in the existing quota table. AI failures before a Discord send attempt release both reservations. A failed or uncertain send conservatively keeps its daily slot and eight-hour cooldown. Successful publication starts a full eight-hour cooldown, while the daily slot remains consumed for that calendar day. Changing days frees daily capacity but does not bypass a remaining cooldown. No schema migration is needed for these limits. Before release, verify the transaction and concurrency paths on isolated PostgreSQL; mocked and SQLite tests alone do not verify PostgreSQL locking.
 

@@ -14,6 +14,9 @@ export const dilemmaCommand = topicCommand
   .addSubcommandGroup(scoreCommand)
   .addSubcommandGroup(pollCommand);
 
+const commandOrder = ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "defaults", "poll", "help", "ping", "delete"];
+dilemmaCommand.options.sort((first, second) => commandOrder.indexOf(first.toJSON().name) - commandOrder.indexOf(second.toJSON().name));
+
 export async function routeCommand(interaction: ChatInputCommandInteraction) {
   if (interaction.commandName !== "dilemma") return;
   const group = interaction.options.getSubcommandGroup(false);

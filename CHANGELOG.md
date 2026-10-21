@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.8.0-beta - 2026-10-22
+
+- Unify new-topic creation and existing-topic configuration around the same scheduling-first fields, including voting duration and AI answer count. Stop overwriting existing topics through `create`; preserve omitted settings, enabled state, channel and history through `configure`. Validate dates, dependent publication times, counts and ranges before writing; allow clearing a date/time pair without resetting quota. Keep legacy fixed topic answers unless answer count is explicitly changed.
+- Move custom answer entry to `random`, infer the answer count and reject conflicting counts before reserving quota or calling AI. Default omitted AI answer counts to four and validate generated answer counts and exact custom-answer text/order before publication. Preserve server-wide two-per-day and eight-hour limits.
+- Extend Dilemma's localized voice to onboarding, language selection, help, closing controls and privacy feedback. Keep native menu descriptions neutral, profile headers undecorated and permanent-deletion warnings explicit. Reorder command options for planning and common use, update help and README, and add UX/dependency regressions to CI and direct deployment. Requires command registration refresh, not another schema migration.
+
 ## v0.7.0-beta - 2026-10-21
 
 - Add optional `start_date` scheduling for topic creation and configuration, alongside publication time and a 1-30 day repeat interval. Anchor recurrence to that calendar date instead of late execution; preserve existing rolling schedules when no date is set. Keep daily and cycle reservations for dated topics, reject manual runs before the first day or after a consumed cycle, and retain restart recovery without idle database polling.

@@ -88,7 +88,8 @@ export async function publishRandomQuestion(
   optionCount: number,
   channel: SendableChannels,
   difficulty: Difficulty = defaultDifficulty,
-  durationHours = 24
+  durationHours = 24,
+  options: string[] = []
 ): Promise<string> {
   const duration = validatePollDuration(durationHours);
   let run = await claimQuizRun(guildId);
@@ -105,7 +106,7 @@ export async function publishRandomQuestion(
     const question = await generateUniqueQuestion(
       "a random, surprising and family-friendly general-knowledge topic",
       language,
-      [],
+      options,
       optionCount,
       previousQuestions,
       difficulty

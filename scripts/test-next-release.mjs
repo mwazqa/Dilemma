@@ -19,7 +19,8 @@ const friendlyFeedbackKeys = [
   "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
   "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
   "timeInvalid", "configured", "languageSet", "defaultsSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
-  "helpIntro", "scoreEmpty", "partial"
+  "helpIntro", "helpSchedule", "helpAnswers", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
+  "optionCountInvalid", "intervalInvalid", "durationInvalid", "defaultsMissing", "manualPublication", "scoreEmpty", "partial"
 ];
 const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];
 for (const [index, language] of messageLanguages.entries()) {
@@ -46,7 +47,7 @@ for (const [index, language] of messageLanguages.entries()) {
 for (const language of messageLanguages) {
   assert.doesNotMatch(getHelpContent(language), /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
   assert.match(message(language, "randomDone", { name: "Test", count: 4 }), /Test/);
-  assert.ok(getHelpContent(language).length < 2000);
+  assert.ok(getHelpContent(language).length < 4000);
   const card = getHelpEmbed(language).toJSON();
   assert.equal(card.title, message(language, "helpIntro"));
   assert.equal(card.fields.length, 3);
@@ -79,7 +80,7 @@ db.guildSettings.findUnique = async () => settings;
 db.guildSettings.upsert = async ({ create, update }) => settings = { ...settings, ...(settings ? update : create) };
 db.topic.findUnique = async () => topic ?? null;
 db.topic.findMany = async () => topic ? [topic] : [];
-db.topic.upsert = async ({ create, update }) => topic = topic ? { ...topic, ...update } : { id: "topic", enabled: true, generationTime: null, questionsGenerated: 0, ...create };
+db.topic.create = async ({ data }) => topic = { id: "topic", enabled: true, generationTime: null, questionsGenerated: 0, ...data };
 db.topic.update = async ({ data }) => {
   topic = { ...topic, ...data, questionsGenerated: data.questionsGenerated?.increment ? topic.questionsGenerated + data.questionsGenerated.increment : topic.questionsGenerated };
   return topic;
@@ -209,7 +210,7 @@ const privateRandom = interaction("random", { option_count: 4 }, false);
 privateRandom.guildId = null;
 await routeCommand(privateRandom);
 assert.equal(privateRandom.replies[0], message("en", "serverOnly"));
-const invalid = interaction("create", { name: "Test", options: "A,A" });
+const invalid = interaction("random", { options: "A,A" });
 await handleTopic(invalid);
 assert.match(invalid.replies[0], /różne odpowiedzi/);
 await handleSettings(interaction("defaults", { interval_days: 3, duration_hours: 2, difficulty: "medium" }));
@@ -238,7 +239,7 @@ for (const time of ["", " ", "9:00", "24:00", "18:60", "-1:00", "18.30", "18:30:
 const beforeEmpty = { ...settings };
 const emptyDefaults = interaction("defaults");
 await routeCommand(emptyDefaults);
-assert.equal(emptyDefaults.replies[0], message("pl", "settingsMissing"));
+assert.equal(emptyDefaults.replies[0], message("pl", "defaultsMissing"));
 assert.deepEqual(settings, beforeEmpty);
 const beforeSchedule = { ...topic };
 const setTime = interaction("defaults", { generation_hours: "18:30" });

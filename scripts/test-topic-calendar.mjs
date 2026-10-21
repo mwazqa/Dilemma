@@ -25,10 +25,8 @@ const key = row => [row.guildId, row.scope, row.day, row.slot].join("|");
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? [...topics.values()].find(topic =>
   topic.guildId === where.guildId_name?.guildId && topic.name === where.guildId_name?.name) ?? null;
 db.topic.findMany = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId);
-db.topic.upsert = async ({ create, update }) => {
-  const old = [...topics.values()].find(topic => topic.name === create.name && topic.guildId === create.guildId);
-  if (old) { Object.assign(old, update); return { ...old }; }
-  const topic = { id: `topic-${topics.size}`, enabled: true, lastGeneratedAt: null, questionsGenerated: 0, ...create };
+db.topic.create = async ({ data }) => {
+  const topic = { id: `topic-${topics.size}`, enabled: true, lastGeneratedAt: null, questionsGenerated: 0, ...data };
   topics.set(topic.id, topic); return { ...topic };
 };
 db.topic.update = async ({ where, data }) => { const topic = topics.get(where.id); Object.assign(topic, data); return { ...topic }; };
@@ -100,7 +98,9 @@ try {
   const first = [...topics.values()][0];
   await handleTopic(request("configure", { name: first.name, interval_days: 3 }));
   assert.equal(first.startDate, "2026-10-22"); assert.equal(first.intervalDays, 3);
-  await handleTopic(request("create", { name: first.name, option_count: 2 }));
+  const duplicate = request("create", { name: first.name, option_count: 2 });
+  await handleTopic(duplicate);
+  assert.equal(duplicate.replies.at(-1), message("pl", "topicExists", { name: first.name }));
   assert.equal(first.startDate, "2026-10-22"); assert.equal(first.intervalDays, 3); assert.equal(first.generationTime, "18:00");
   const before = { ...first };
   await handleTopic(request("configure", { name: first.name, start_date: "2026-02-30" }));

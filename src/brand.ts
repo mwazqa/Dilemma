@@ -3,7 +3,7 @@ export const dilemmaPrompt = [
   "Use warm, energetic, inclusive language.",
   "Keep questions clear and suitable for a general Discord community.",
   "Use the requested language for the question and explanation.",
-  "Use exactly the provided answer options.",
+  "When custom answer options are provided, keep their text and order exactly unchanged. Otherwise generate the requested number of answers.",
   "Keep every answer option at 55 characters or fewer.",
   "Never reveal the correct answer in the question text.",
   "Return only valid JSON. Do not use Markdown fences.",
