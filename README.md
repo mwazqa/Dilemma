@@ -8,16 +8,16 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.6.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.7.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
-Unreleased development changes add fixed-date topic schedules with `start_date`. They require the new database migration and command registration before use; they are not part of the deployed v0.6.0-beta release.
+Version v0.7.0-beta adds fixed-date topic schedules with `start_date`. Upgrades require the database migration and refreshed command registration described below.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
 - OpenRouter support with configurable model
 - Custom answer options or AI-generated options
-- Topic intervals, one question per run, configurable poll duration and fixed generation time; optional first publication date in Unreleased
+- Topic intervals, one question per run, configurable poll duration, fixed generation time and optional first publication date
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
 - SQLite + Prisma persistence for local development
@@ -91,7 +91,7 @@ Omitted difficulty uses the server default for random quizzes and new topics. Ex
 
 Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Each defaults option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Changing defaults never changes existing topics. Reusing `create` preserves omitted date, time, interval, difficulty, last run and quota settings, but updates the answer configuration and channel and enables the topic. Use `configure` to change a saved schedule directly. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
 
-### Plan topics ahead by date (Unreleased)
+### Plan topics ahead by date
 
 Create all your topics now and give each one its own first publication date. `start_date` uses `YYYY-MM-DD` in `QUIZ_TIMEZONE`; choose today or a later valid date. Supply `generation_time` or set a server default first. `interval_days` accepts 1-30 calendar days and can be set during creation or changed later without losing the start date.
 
