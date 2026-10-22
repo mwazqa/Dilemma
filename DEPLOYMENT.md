@@ -1,6 +1,6 @@
 # Dilemma deployment
 
-Recommended free setup:
+Recommended infrastructure setup (AI inference is paid separately):
 
 - Oracle Cloud Always Free VM for the always-on Discord process
 - Neon Free for PostgreSQL
@@ -70,10 +70,13 @@ Polish local time; change it if your server uses another timezone.
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
 DISCORD_REGISTER_GLOBAL=true
-AI_PROVIDER=openrouter
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=openrouter/free
-AI_MAX_RETRIES=3
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-6-luna
+OPENAI_REASONING_EFFORT=low
+AI_MAX_OUTPUT_TOKENS=2048
+AI_REQUEST_TIMEOUT_MS=20000
+AI_GENERATION_TIMEOUT_MS=60000
+AI_MAX_RETRIES=1
 AI_MIN_INTERVAL_MS=1000
 DATABASE_URL=postgresql://...
 ```

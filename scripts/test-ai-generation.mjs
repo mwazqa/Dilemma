@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 
-const isOpenAI = process.argv.includes("--openai");
 Object.assign(process.env, {
-  DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: isOpenAI ? "openai" : "openrouter",
-  OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test", OPENAI_MODEL: "test-model", AI_GENERATION_TIMEOUT_MS: "1000",
-  OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", OPENROUTER_FALLBACK_MODELS: "", OPENROUTER_DYNAMIC_FALLBACK: "false",
+  DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test",
+  OPENAI_API_KEY: "test", OPENAI_MODEL: "gpt-6-luna", OPENAI_REASONING_EFFORT: "low", AI_GENERATION_TIMEOUT_MS: "1000",
+  AI_MAX_OUTPUT_TOKENS: "2048",
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "1"
 });
 const question = { language: "pl", topic: "geografia", question: "Stolica Polski?", options: ["🏙️ Warszawa", "Krakow"], topicEmoji: "", optionEmojis: ["", ""], correctOption: 0, explanation: "Warszawa jest stolica Polski." };
@@ -16,16 +15,20 @@ let responseLanguage = "pl";
 let lastInstructions;
 globalThis.fetch = async (url, options) => {
   calls++;
-  assert.match(String(url), isOpenAI ? /\/responses/ : /chat\/completions/);
+  assert.equal(String(url), "https://api.openai.com/v1/responses");
   const body = JSON.parse(options.body);
-  if (!isOpenAI) assert.equal(body.messages[0].role, "system");
-  lastInstructions = isOpenAI ? body.instructions : body.messages[0].content;
+  lastInstructions = body.instructions;
   assert.ok(lastInstructions.includes(`(${expectedLanguage})`));
-  assert.equal(body.model, isOpenAI ? "test-model" : "nvidia/nemotron-3-super-120b-a12b:free");
-  if (!isOpenAI) {
-    assert.equal(body.reasoning.enabled, false);
-    assert.equal(body.response_format.type, "json_object");
-  }
+  assert.equal(body.model, "gpt-6-luna");
+  assert.equal(body.store, false);
+  assert.equal(body.reasoning.effort, "low");
+  assert.equal(body.max_output_tokens, 2048);
+  assert.equal(body.text.format.type, "json_schema");
+  assert.equal(body.text.format.strict, true);
+  assert.equal(body.text.format.schema.additionalProperties, false);
+  assert.deepEqual(body.text.format.schema.properties.language.enum, [expectedLanguage]);
+  assert.ok(body.text.format.schema.required.includes("correctOption"));
+  assert.equal(body.text.format.schema.properties.options.minItems, body.text.format.schema.properties.options.maxItems);
   if (mode === "hang") {
     return await new Promise((resolve, reject) => {
       const fail = () => reject(new DOMException("Aborted", "AbortError"));
@@ -36,8 +39,7 @@ globalThis.fetch = async (url, options) => {
   const language = mode === "wrong-once" ? "pl" : responseLanguage;
   if (mode === "wrong-once") mode = "success";
   const text = JSON.stringify({ ...question, language, options: answerOptions, optionEmojis: answerOptions.map(() => "") });
-  const payload = isOpenAI ? { object: "response", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] }] }
-    : { choices: [{ message: { content: text } }] };
+  const payload = { object: "response", status: "completed", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] }] };
   return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
 };
 const { generateQuestion, AiGenerationTimeoutError, AiLanguageMismatchError, AiAnswerOptionsMismatchError } = await import("../dist/services/question-generator.js");
@@ -76,4 +78,4 @@ assert.equal(calls, beforeCountFailure + 2);
 await assert.rejects(generateQuestion("Topic", "ja", ["No", "Yes"], 2), AiAnswerOptionsMismatchError);
 answerOptions = ["🍎 Apple", "Pear"];
 assert.deepEqual((await generateQuestion("Fruit", "ja", answerOptions, 2)).options, answerOptions);
-console.log(`PASS: ${isOpenAI ? "OpenAI" : "OpenRouter"} server language instructions in six locales, language mismatch retry/rejection, JSON normalization, timeout and queue recovery`);
+console.log("PASS: OpenAI strict schema, six locales, language and answer validation, JSON normalization, timeout and queue recovery");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 Object.assign(process.env, { DATABASE_URL: "file::memory:", DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test",
-  QUIZ_TIMEZONE: "Europe/Warsaw", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test",
+  QUIZ_TIMEZONE: "Europe/Warsaw", OPENAI_API_KEY: "test",
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in test"); };
@@ -215,7 +215,7 @@ try {
     aiCalls++;
     const question = { language: settings.language, topic: "Test", question: `Question ${aiCalls}?`, options: ["A", "B"],
       optionEmojis: ["", ""], topicEmoji: "", correctOption: 0, explanation: "Fact." };
-    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(question) } }] }), { headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(question) }] }] }), { headers: { "content-type": "application/json" } });
   };
   const channel = { id: "channel", isSendable: () => true, isTextBased: () => true,
     messages: { fetch: async id => ({ id, author: { id: "bot" }, poll: {

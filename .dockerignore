@@ -5,6 +5,7 @@ dist
 !.env.example
 .deploy.production.json
 .tools
+.codex-remote-attachments
 *.key
 *.pem
 *.ppk

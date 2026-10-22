@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 19, 2026
+Last updated: October 22, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -29,10 +29,12 @@ options, or commands.
 
 ## AI provider
 
-To generate content, Dilemma sends the configured topic, language, and related
-generation context to the AI provider configured by the operator. The bot
-operator may use OpenRouter or OpenAI. Provider data handling is governed by
-that provider's own privacy policy and terms.
+To generate content, Dilemma sends the configured topic, language, custom answer
+options when supplied, and a bounded selection of previous questions to OpenAI.
+Quiz requests disable response storage with `store: false`; this does not remove
+any retention required by OpenAI's own policies. OpenAI's privacy policy and
+terms govern provider-side processing. Discord user IDs and votes are not part
+of quiz generation requests.
 
 ## Use and retention
 

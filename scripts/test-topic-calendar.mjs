@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
-  DISCORD_CLIENT_ID: "test", QUIZ_TIMEZONE: "Europe/Warsaw", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test" });
+  DISCORD_CLIENT_ID: "test", QUIZ_TIMEZONE: "Europe/Warsaw", OPENAI_API_KEY: "test" });
 const realFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error("Unexpected network request in calendar test"); };
 const RealDate = Date;

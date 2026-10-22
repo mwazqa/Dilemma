@@ -19,7 +19,7 @@ for (const statement of ["throw error", "Promise.reject(error)"]) {
   assert.ok(result.stderr.includes("Error"));
   assert.ok(!`${result.stdout}${result.stderr}`.includes(marker), "Fatal output must omit secret-bearing error properties");
 }
-Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENROUTER_API_KEY: "test" });
+Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
 const { db } = await import("../dist/db.js");
 const { runDueTopics } = await import("../dist/scheduler.js");
 db.topic.findMany = async () => [{ name: marker, channelId: "test", generationTime: "00:00", lastGeneratedAt: null, intervalDays: 1 }];

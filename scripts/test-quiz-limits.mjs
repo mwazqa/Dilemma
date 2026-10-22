@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", QUIZ_TIMEZONE: "Europe/Warsaw",
-  AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_DYNAMIC_FALLBACK: "false" });
+  OPENAI_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { Prisma } = await import("@prisma/client");
 const { db } = await import("../dist/db.js");
 const { claimQuizRun, refreshRandomQuizRun, releaseQuizRun, runKey, quizDay, quizDayBounds, isTopicDue,
@@ -205,7 +205,7 @@ globalThis.fetch = async () => {
   if (failAi) throw new Error("generation failure");
   const question = { language: wrongLanguage ? "en" : "pl", topic: "Test", question: `Question ${aiCalls}?`, options: ["A", "B"],
     optionEmojis: ["", ""], topicEmoji: "", correctOption: 0, explanation: "Fact." };
-  return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(question) } }] }),
+  return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(question) }] }] }),
     { headers: { "content-type": "application/json" } });
 };
 const durations = [];

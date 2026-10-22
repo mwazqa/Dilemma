@@ -53,6 +53,7 @@ web_modules/
 /SECURITY_REVIEW.md
 /AGENTS.md
 .tools/
+.codex-remote-attachments/
 /output/
 *.key
 *.pem

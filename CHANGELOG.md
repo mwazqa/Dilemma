@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v2.0.0 - 2026-10-22
+
+- Replace the free-model provider pool and discovery with direct OpenAI Responses API generation using `gpt-6-luna` by default. Remove obsolete provider configuration and model-selection helpers. Keep historical release notes unchanged.
+- Require strict JSON output, disable response storage, bound output to 2048 tokens by default, use low reasoning effort and one additional attempt by default. Respect retry delays and shared deadlines; never retry insufficient account quota, refusals or incomplete output automatically. Preserve six-language validation, custom answers, duplicate detection, quiz quotas and publication safety.
+- Update setup, deployment and privacy documentation and replace provider-specific tests with OpenAI contract and failure regressions. No database migration or command registration change is required. Deployment requires a fresh private API key; exposed keys must be revoked.
+
 ## v1.0.1 - 2026-10-22
 
 - Treat raw `AbortError` and `TimeoutError` failures during response-body reads as recoverable model timeouts. Advance to the next preferred or discovered free model while the overall deadline permits, instead of stopping with misleading model-unavailable feedback. Report exhausted model timeouts as timeouts; never retry after the shared overall deadline.

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { Prisma } from "@prisma/client";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
-  DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test",
-  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODELS: "", OPENROUTER_DYNAMIC_FALLBACK: "false", QUIZ_TIMEZONE: "Europe/Warsaw" });
+  DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test",
+  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", QUIZ_TIMEZONE: "Europe/Warsaw" });
 const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in UX test"); };
 globalThis.fetch = (...args) => fetchFixture(...args);
@@ -54,10 +54,10 @@ db.$transaction = async work => work(db);
 fetchFixture = async (_, options) => {
   requests++;
   const body = JSON.parse(options.body);
-  prompt = body.messages[1].content;
+  prompt = body.input;
   const question = { language: "pl", topic: "Test", question: `Pytanie ${requests}?`, options: generatedAnswers,
     topicEmoji: "", optionEmojis: generatedAnswers.map(() => ""), correctOption: generatedAnswers.length - 1, explanation: "Krótki fakt." };
-  return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(question) } }] }), { headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(question) }] }] }), { headers: { "content-type": "application/json" } });
 };
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
   deliveries++; sent = payload;

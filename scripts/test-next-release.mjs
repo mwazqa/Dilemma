@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
+Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test", OPENAI_REASONING_EFFORT: "low", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { messages, messageLanguages, message, normalizeLanguage, feedbackKaomoji } = await import("../dist/messages.js");
 const { getHelpContent, getHelpEmbed, handleHelp } = await import("../dist/commands/help.js");
 const { difficultySchema } = await import("../dist/difficulty.js");
@@ -126,13 +126,12 @@ let counter = 0;
 let questionTexts = [];
 globalThis.fetch = async (_, options) => {
   const body = JSON.parse(options.body);
-  assert.equal(body.messages[0].role, "system");
-  assert.ok(body.messages[0].content.includes(`(${settings.language})`));
-  lastPrompt = body.messages[1].content;
-  assert.equal(body.reasoning.enabled, false);
+  assert.ok(body.instructions.includes(`(${settings.language})`));
+  lastPrompt = body.input;
+  assert.equal(body.reasoning.effort, "low");
   counter++;
   const q = { language: settings.language, topic: "Test", question: questionTexts.shift() ?? `Pytanie ${counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
-  return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(q) } }] }), { headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(q) }] }] }), { headers: { "content-type": "application/json" } });
 };
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
 const { dilemmaCommand, routeCommand } = await import("../dist/commands/dilemma.js");
