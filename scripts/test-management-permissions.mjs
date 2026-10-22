@@ -99,12 +99,13 @@ try {
   }
   await invoke("language", { ...delegated, group: null, values: { value: "pl" } });
   assert.equal(settings.get("guild").language, "pl");
-  const beforeDefaults = writes;
-  await invoke("defaults", { ...delegated, group: null, values: { duration_hours: 2 } });
-  assert.equal(writes, beforeDefaults + 1);
-  assert.equal(settings.get("guild").defaultPollDurationHours, 2);
+  const beforeTimezone = writes;
+  await invoke("timezone", { ...delegated, group: null, values: { value: "Europe/London" } });
+  assert.equal(writes, beforeTimezone + 1);
+  assert.equal(settings.get("guild").timezone, "Europe/London");
+  assert.equal(settings.get("guild").defaultPollDurationHours, original.defaultPollDurationHours);
   assert.equal(settings.get("guild").managerRoleId, roleId);
-  for (const action of ["create", "configure", "list", "run", "enable", "disable", "delete", "language", "defaults"]) {
+  for (const action of ["create", "configure", "list", "run", "enable", "disable", "delete", "language", "timezone"]) {
     const before = { writes, topicReads, topicWrites };
     assert.equal(content(await invoke(action, { group: null, values: { name: "New" } })), message("pl", "permission"));
     assert.deepEqual({ writes, topicReads, topicWrites }, before);

@@ -11,6 +11,7 @@ import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, va
 import { pollControls } from "./poll-controls.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
+import { guildTimezone } from "./timezone.js";
 
 const questionHistoryLimit = 365;
 
@@ -25,10 +26,11 @@ export class QuizPublicationError extends Error {
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels, early = true): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
-  let run = await claimQuizRun(topic.guildId, topic.id, new Date(), early);
+  const settings = await getGuildSettings(topic.guildId);
+  let timezone = guildTimezone(settings);
+  let run = await claimQuizRun(topic.guildId, topic.id, new Date(), early, timezone);
   let sendAttempted = false;
   try {
-    const settings = await getGuildSettings(topic.guildId);
     const language = normalizeLanguage(settings?.language ?? "en");
     const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
     const previousQuestions = (await db.generatedPoll.findMany({
@@ -40,9 +42,11 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     const difficulty = parseDifficulty(topic.difficulty);
     const question = await generateUniqueQuestion(topic.name, language, options, topic.optionCount, previousQuestions, difficulty);
     previousQuestions.push(question.question);
-    if (run.day !== quizDay(new Date())) {
+    const currentTimezone = guildTimezone(await getGuildSettings(topic.guildId));
+    if (run.day !== quizDay(new Date(), currentTimezone) || timezone !== currentTimezone) {
       await releaseQuizRun(run);
-      run = await claimQuizRun(topic.guildId, topic.id, new Date(), early);
+      timezone = currentTimezone;
+      run = await claimQuizRun(topic.guildId, topic.id, new Date(), early, timezone);
     }
     const questionNumber = topic.questionsGenerated + 1;
     sendAttempted = true;
@@ -86,7 +90,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       if (run.cycleRun) await tx.dailyQuizRun.update({ where: runKey(run.cycleRun), data: { messageId: sentPoll.id } });
       return updated;
     });
-    scheduleEvents.emit("topicChanged", updatedTopic);
+    scheduleEvents.emit("topicChanged", { ...updatedTopic, timezone: guildTimezone(await getGuildSettings(topic.guildId)) });
     scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return 1;
   } finally {
@@ -103,10 +107,10 @@ export async function publishRandomQuestion(
   options: string[] = []
 ): Promise<string> {
   const duration = validatePollDuration(durationHours);
-  let run = await claimQuizRun(guildId);
+  const settings = await getGuildSettings(guildId);
+  let run = await claimQuizRun(guildId, undefined, new Date(), true, guildTimezone(settings));
   let sendAttempted = false;
   try {
-    const settings = await getGuildSettings(guildId);
     const language = normalizeLanguage(settings?.language ?? "en");
     const previousQuestions = (await db.randomPoll.findMany({
       where: { guildId },
@@ -122,7 +126,7 @@ export async function publishRandomQuestion(
       previousQuestions,
       difficulty
     );
-    run = await refreshRandomQuizRun(run);
+    run = await refreshRandomQuizRun(run, guildTimezone(await getGuildSettings(guildId)));
     sendAttempted = true;
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,

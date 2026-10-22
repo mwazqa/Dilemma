@@ -16,7 +16,7 @@ try {
   const after = await snapshot();
   for (const table of tables) {
     const addedDefaults = table === "GuildSettings"
-      ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null }
+      ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, timezone: null }
       : table === "UserScore" ? { selectedBadge: null }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
@@ -28,6 +28,8 @@ try {
   const guildId = "migration-difficulty-test";
   const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard", defaultGenerationTime: "18:30" } });
   assert.equal(settings.defaultGenerationTime, "18:30");
+  assert.equal(settings.timezone, null);
+  assert.equal((await db.guildSettings.update({ where: { guildId }, data: { timezone: "America/New_York" } })).timezone, "America/New_York");
   const player = await db.userScore.create({ data: { guildId, userId: "badge-migration-player", answered: 1 } });
   assert.equal(player.selectedBadge, null);
   const badged = await db.userScore.update({ where: { guildId_userId: { guildId, userId: player.userId } }, data: { selectedBadge: "first_answer" } });

@@ -6,9 +6,9 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 ## Current status
 
-Release preparation:
+Code version: `v3.0.0`. See [CHANGELOG.md](CHANGELOG.md).
 
-Code version: `v2.0.0`. See [CHANGELOG.md](CHANGELOG.md).
+Version v3.0.0 replaces `/dilemma defaults` with `/dilemma timezone`. Set topic options in `create` or `configure`; use `timezone` to select this server's IANA timezone for publication dates, schedules and daily limits. Apply the additive `20261022190000_guild_timezone` migration before starting this code, then re-register commands. Existing data and saved clock times remain unchanged; the optional `QUIZ_TIMEZONE` deployment value remains a fallback until a server selects its own zone.
 
 Version v2.0.0 also adds delegated management roles. Apply the additive `20261022160000_manager_role` migration and re-register commands before using this feature. Existing servers keep administrator-only management until a role is explicitly selected.
 
@@ -89,7 +89,7 @@ See the current [OpenAI model documentation](https://developers.openai.com/api/d
 - `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
 - `/dilemma help` - show the grouped command guide without parameter examples or a self-referential help entry
 - `/dilemma language value:en|pl|de|es|fr|ja` - set the server language
-- `/dilemma defaults` - set generation defaults; optional `generation_hours:HH:mm` sets the publication time inherited by new topics
+- `/dilemma timezone` - show the server timezone; optional `value` selects an IANA timezone, with autocomplete
 - `/dilemma ping` - check whether the bot is online
 - `/dilemma poll end` - end a poll and publish its result
 - Each new quiz also has a localized **Let's end this quiz** button. Members with Manage Server permission or the configured Dilemma management role can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
@@ -110,13 +110,15 @@ Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/p
 2. A member with Manage Server runs `/dilemma permissions set role:@Quiz Keeper` once on that server.
 3. Assign that role to the members who should manage Dilemma. The bot does not create roles, assign roles or change Discord permissions.
 
-Role members can manage topics, schedules, language/defaults and quiz closing, but cannot change the delegated role. `/dilemma permissions show` displays the configured role to managers. Only a member with Manage Server, including administrators, can use `/dilemma permissions set` or `/dilemma permissions clear`. Clearing the setting restores administrator-only management immediately. Removing the role from a member removes their access on their next interaction. Role IDs, not names, determine access, and each server has its own setting. `@everyone`, integration-managed, deleted and foreign-server roles cannot be selected. Existing servers have no delegated role by default.
+Role members can manage topics, schedules, language/timezone and quiz closing, but cannot change the delegated role. `/dilemma permissions show` displays the configured role to managers. Only a member with Manage Server, including administrators, can use `/dilemma permissions set` or `/dilemma permissions clear`. Clearing the setting restores administrator-only management immediately. Removing the role from a member removes their access on their next interaction. Role IDs, not names, determine access, and each server has its own setting. `@everyone`, integration-managed, deleted and foreign-server roles cannot be selected. Existing servers have no delegated role by default.
 
 Delegation grants access to Dilemma only; any unrelated Discord permissions already attached to that role still apply. Members also need the normal Discord permissions to view the channel and use application commands. Discord integration/channel restrictions remain in force. Settings are cached and updated after role changes made through these commands, without new background queries. Before enabling this feature, apply `20261022160000_manager_role` on an isolated test database and then production with a backup, and re-register commands. `npm run test:permissions` verifies authorization with synthetic fixtures and no external API or production database calls.
 
-Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
+Set topic difficulty, duration, publication time and repeat interval with `create` or `configure`; random quizzes have their own optional difficulty and duration. Existing saved defaults remain available for compatibility, but `/dilemma defaults` has been removed. New servers use medium difficulty, a 24-hour poll duration and a one-day interval unless supplied.
 
-Use `/dilemma defaults generation_hours:18:30` to choose the publication time for newly created topics. Defaults appear in scheduling-first order: publication time, repeat interval, voting duration, difficulty. Each option is optional; provide at least one. Omitted settings keep their saved values. The time uses `QUIZ_TIMEZONE` (default `Europe/Warsaw`), not an interval in hours, and is shown with its timezone in the confirmation. Changing defaults never changes existing topics. Use `configure` to change a saved topic; `create` no longer updates existing topics or moves their channel. Configuring a disabled topic leaves it disabled; use `enable` separately. Random quizzes remain on demand and do not inherit a scheduled publication time. Existing servers start with no default publication time, so the migration does not activate schedules.
+Use `/dilemma timezone value:Europe/London` to select this server's timezone, or `/dilemma timezone` to show the effective zone. This command requires Manage Server or the configured Dilemma manager role. Timezones use IANA names such as `Europe/Warsaw`, `America/New_York` and `Asia/Tokyo`; `UTC` is also accepted. Autocomplete helps find a timezone. Language and timezone are independent. Configure the timezone before the first scheduled quiz. Changing it preserves stored dates and clock times but immediately recalculates active schedules and daily-limit boundaries in the selected zone, including daylight-saving changes. It does not delete quota records or reset the rolling eight-hour random cooldown.
+
+For a server without an explicit timezone, the optional deployment variable `QUIZ_TIMEZONE` is the fallback. Removing that variable uses `Europe/Warsaw`; it does not detect the server's country. Existing servers keep this fallback until a manager selects a timezone. Apply the additive `20261022190000_guild_timezone` migration before running the new code, first on an isolated PostgreSQL copy, then on production with a backup. Re-register commands to replace `defaults` with `timezone`. Settings are cached, and schedule changes reschedule in-memory timers without background polling.
 
 Topic forms follow the planning sequence: name, first date, publication time, repeat interval, voting duration, difficulty and answer count. Date-based scheduling requires a time: a new topic can inherit the server default, while an existing topic keeps its saved time unless explicitly changed. You can clear date and time together. A date without a time is rejected before writing. Duration is independent of repeat interval and uses whole hours (1-24), so it cannot exceed the shortest one-day interval. Random duration can outlast its eight-hour cooldown; active polls can overlap.
 
@@ -128,7 +130,7 @@ Duplicate-question checks compare against the latest 365 published questions wit
 
 ### Plan topics ahead by date
 
-Create all your topics now and give each one its own first publication date. `start_date` uses `YYYY-MM-DD` in `QUIZ_TIMEZONE`; choose today or a later valid date. Supply `generation_time` or set a server default first. `interval_days` accepts 1-30 calendar days and can be set during creation or changed later without losing the start date.
+Create all your topics now and give each one its own first publication date. `start_date` uses `YYYY-MM-DD` in the server's configured timezone; choose today or a later valid date. Supply `generation_time` when creating a dated topic. `interval_days` accepts 1-30 calendar days and can be set during creation or changed later without losing the start date.
 
 For a different topic every weekday, create these seven topics on their destination channel before the first date. Dates below are examples; replace them with your intended future dates:
 
@@ -152,11 +154,11 @@ For dated topics, `/dilemma run` may bring the current slot forward to earlier o
 
 Before deploying fixed-date schedules, test `20261021120000_topic_start_date` on an isolated PostgreSQL copy, then apply it to the target database and re-register commands. This additive migration introduces nullable `Topic.startDate`; existing topics receive no start date, and schedules, scores, EXP and achievements are preserved. Do not start the new code against an unmigrated database. Run `npm run test:topic-calendar`, `npm run test:idle-database` and the migration tests before release. `npm run test:topic-calendar:postgres` verifies concurrent cycle claims, cross-day rollback and paired reservation release against an already-migrated isolated PostgreSQL database; it requires the test-only environment guards described above and deletes only its own synthetic records.
 
-Before deploying these defaults changes, test and apply the additive `20261012120000_default_generation_time` migration, then re-register commands. The migration adds a nullable setting without rewriting topic schedules or player scores. Local in-memory SQLite migration tests do not replace verification on an isolated PostgreSQL branch before production.
+The historical default-setting columns and their migrations remain intact for stored data and rollback compatibility. Removing the defaults command does not rewrite existing topics, saved preferences or player scores.
 
 Each topic can publish at most one quiz per calendar day, shared by manual and scheduled runs. An early manual run replaces that day's scheduled run. Different topics have independent limits. Changing a schedule, enabling a topic or restarting the bot does not reset quota. Deleting and recreating a topic creates a new topic with a new quota.
 
-Random quizzes allow at most two publications per calendar day on each server, with at least eight hours between publications. All members and channels share these limits. Days use `QUIZ_TIMEZONE` (default `Europe/Warsaw`); the rolling eight-hour cooldown uses elapsed time and does not reset at midnight, on a restart or during a daylight-saving change. Existing same-day random polls and uncertain reservations count during upgrades. Scheduled topics retain their independent one-quiz-per-topic daily limit.
+Random quizzes allow at most two publications per calendar day on each server, with at least eight hours between publications. All members and channels share these limits. Days use the server's configured timezone, falling back to `QUIZ_TIMEZONE` (default `Europe/Warsaw`); the rolling eight-hour cooldown uses elapsed time and does not reset at midnight, on a restart or during a daylight-saving change. Existing same-day random polls and uncertain reservations count during upgrades. Scheduled topics retain their independent one-quiz-per-topic daily limit.
 
 Polls last 24 hours by default. Set `duration_hours:1-24` in topic creation, configuration, server defaults, a manual run or a random command. Server defaults affect new topics and random quizzes; a run override does not change the saved topic duration. Closing a poll early does not reset a topic's daily quota or the random cooldown.
 

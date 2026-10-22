@@ -19,7 +19,7 @@ function Invoke-Checked([string]$Executable, [string[]]$Arguments) {
   if ($commandExitCode -ne 0) { throw "$Executable failed with exit code $commandExitCode. Raw output withheld for privacy." }
   Write-Host "$Executable completed successfully."
 }
-foreach ($testName in @('check', 'build', 'test:db:fresh', 'test:ai', 'test:scoring', 'test:experience', 'test:achievements', 'test:score-card', 'test:features', 'test:command-ux', 'test:permissions', 'test:quiz-limits', 'test:topic-calendar', 'test:idle-database', 'test:poll-controls', 'test:privacy')) {
+foreach ($testName in @('check', 'build', 'test:db:fresh', 'test:ai', 'test:scoring', 'test:experience', 'test:achievements', 'test:score-card', 'test:features', 'test:command-ux', 'test:permissions', 'test:quiz-limits', 'test:topic-calendar', 'test:timezones', 'test:idle-database', 'test:poll-controls', 'test:privacy')) {
   Write-Host "Running $testName."
   Invoke-Checked 'npm.cmd' @('run', $testName)
 }

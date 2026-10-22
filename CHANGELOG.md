@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v3.0.0 - 2026-10-22
+
+- Replace `/dilemma defaults` with `/dilemma timezone`, including IANA timezone autocomplete, current-zone feedback and six-language help. Keep topic scheduling options in `create` and `configure`; preserve historical default-setting data and migrations.
+- Add nullable `GuildSettings.timezone` through matching additive migrations. Use each server's zone for schedules, date validation and daily quiz limits. Keep the optional deployment timezone as a fallback and preserve elapsed-time cooldowns and poll durations.
+- Recalculate existing in-memory deadlines after a timezone change without periodic database queries. Require a tested migration and command re-registration before release.
+
 ## v2.0.0 - 2026-10-22
 
 - Add a server-specific delegated management role, configured with `/dilemma permissions set role:...`, inspected with `show` and removed with `clear`. Members of this ordinary Discord role can manage Dilemma topics, settings and quiz closing without Manage Server. Only members with Manage Server, including administrators, can change the delegation. Keep player commands public and enforce the same checks on close buttons and topic autocomplete.

@@ -20,6 +20,8 @@ members of the same server. Usernames and avatars are not stored for scoring.
 When delegated bot management is configured, server configuration includes the
 selected management role's Discord ID. The bot uses it only to authorize
 management actions and does not grant Discord server permissions.
+Server configuration can also store an administrator-selected timezone for
+schedules and daily limits. This value is not inferred from member locations.
 
 Profile cards temporarily process the player's Discord display name, avatar and
 score in memory to render an image. Avatars are fetched only from Discord's CDN.

@@ -1,15 +1,15 @@
 import {
   SlashCommandSubcommandBuilder,
+  type AutocompleteInteraction,
   type ChatInputCommandInteraction
 } from "discord.js";
 import { db } from "../db.js";
-import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
-import { env } from "../config.js";
-import { isGenerationTime } from "../services/quiz-limits.js";
-import { cacheGuildSettings } from "../services/guild-settings.js";
+import { cacheGuildSettings, getGuildSettings } from "../services/guild-settings.js";
 import { canManageDilemma } from "../services/management-permissions.js";
+import { guildTimezone, parseTimezone, timezoneSuggestions } from "../services/timezone.js";
+import { scheduleEvents } from "../services/schedule-events.js";
 
 export const supportedLanguages = [
   { name: "English", value: "en" },
@@ -29,16 +29,14 @@ export const languageCommand = new SlashCommandSubcommandBuilder()
     .setRequired(true)
     .addChoices(...supportedLanguages));
 
-export const defaultsCommand = new SlashCommandSubcommandBuilder()
-  .setName("defaults")
-  .setDescription("Set default AI generation settings for new topics and random quizzes.")
-  .addStringOption((option) => option.setName("generation_hours").setDescription("Default publication time HH:mm in the bot quiz timezone; new topics only.").setRequired(false).setMinLength(5).setMaxLength(5))
-  .addIntegerOption((option) => option.setName("interval_days").setDescription("Days between generations for new topics only.").setRequired(false).setMinValue(1).setMaxValue(30))
-  .addIntegerOption((option) => option.setName("duration_hours").setDescription("Default poll duration in hours (1-24).").setRequired(false).setMinValue(1).setMaxValue(24))
-  .addStringOption(difficultyOption);
+export const timezoneCommand = new SlashCommandSubcommandBuilder()
+  .setName("timezone")
+  .setDescription("Show or set the server timezone for schedules and daily quiz limits.")
+  .addStringOption(option => option.setName("value").setDescription("IANA timezone, such as Europe/London; omit to show the current timezone.")
+    .setAutocomplete(true).setMinLength(1).setMaxLength(100));
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {
-  const { language: currentLanguage, settings: currentSettings, text, reply } = await openFeedback(interaction);
+  const { settings: currentSettings, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
     await reply(text("serverOnly"));
     return;
@@ -59,35 +57,21 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const intervalDays = interaction.options.getInteger("interval_days");
-  const durationHours = interaction.options.getInteger("duration_hours");
-  const requestedDifficulty = interaction.options.getString("difficulty");
-  const generationTime = interaction.options.getString("generation_hours")?.trim() ?? null;
-  if (intervalDays === null && durationHours === null && requestedDifficulty === null && generationTime === null) {
-    await reply(text("defaultsMissing"));
-    return;
-  }
-  if (generationTime !== null && !isGenerationTime(generationTime)) {
-    await reply(text("timeInvalid"));
-    return;
-  }
-  if (intervalDays !== null && (!Number.isInteger(intervalDays) || intervalDays < 1 || intervalDays > 30)) {
-    await reply(text("intervalInvalid")); return;
-  }
-  if (durationHours !== null && (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 24)) {
-    await reply(text("durationInvalid")); return;
-  }
+  const requested = interaction.options.getString("value");
+  if (requested === null) { await reply(text("timezoneCurrent", { timezone: guildTimezone(currentSettings) })); return; }
+  const timezone = parseTimezone(requested);
+  if (!timezone) { await reply(text("timezoneInvalid")); return; }
   const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
-    create: { guildId: interaction.guildId, defaultIntervalDays: intervalDays ?? 1, defaultPollDurationHours: durationHours ?? 24,
-      defaultGenerationTime: generationTime,
-      defaultDifficulty: parseDifficulty(requestedDifficulty) },
-    update: { ...(intervalDays === null ? {} : { defaultIntervalDays: intervalDays }),
-      ...(durationHours === null ? {} : { defaultPollDurationHours: durationHours }),
-      ...(generationTime === null ? {} : { defaultGenerationTime: generationTime }),
-      ...(requestedDifficulty === null ? {} : { defaultDifficulty: parseDifficulty(requestedDifficulty) }) }
+    create: { guildId: interaction.guildId, timezone }, update: { timezone }
   }));
-  await reply(text("defaultsSet", { days: settings.defaultIntervalDays, hours: settings.defaultPollDurationHours,
-    time: settings.defaultGenerationTime ?? text("scheduleUnset"), timezone: env.QUIZ_TIMEZONE,
-    difficulty: message(currentLanguage, parseDifficulty(settings.defaultDifficulty)) }));
+  scheduleEvents.emit("guildTimezoneChanged", interaction.guildId, guildTimezone(settings));
+  await reply(text("timezoneSet", { timezone: guildTimezone(settings) }));
+}
+
+export async function handleTimezoneAutocomplete(interaction: AutocompleteInteraction) {
+  if (!interaction.guildId || !canManageDilemma(interaction, await getGuildSettings(interaction.guildId))) {
+    await interaction.respond([]); return;
+  }
+  await interaction.respond(timezoneSuggestions(String(interaction.options.getFocused())));
 }

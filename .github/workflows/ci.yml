@@ -40,4 +40,4 @@ jobs:
       - name: Build
         run: npm run build
       - name: Test migrations and features
-        run: npm run test:db:fresh && npm run test:ai && npm run test:features && npm run test:command-ux && npm run test:permissions && npm run test:quiz-limits && npm run test:topic-calendar && npm run test:idle-database && npm run test:poll-controls && npm run test:scoring && npm run test:experience && npm run test:achievements && npm run test:score-card && npm run test:privacy
+        run: npm run test:db:fresh && npm run test:ai && npm run test:features && npm run test:command-ux && npm run test:permissions && npm run test:quiz-limits && npm run test:topic-calendar && npm run test:timezones && npm run test:idle-database && npm run test:poll-controls && npm run test:scoring && npm run test:experience && npm run test:achievements && npm run test:score-card && npm run test:privacy

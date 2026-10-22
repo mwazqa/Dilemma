@@ -22,7 +22,8 @@ for (const statement of ["throw error", "Promise.reject(error)"]) {
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
 const { db } = await import("../dist/db.js");
 const { runDueTopics } = await import("../dist/scheduler.js");
-db.topic.findMany = async () => [{ name: marker, channelId: "test", generationTime: "00:00", lastGeneratedAt: null, intervalDays: 1 }];
+db.topic.findMany = async () => [{ guildId: "fixture-guild", name: marker, channelId: "test", generationTime: "00:00", lastGeneratedAt: null, intervalDays: 1 }];
+db.guildSettings.findUnique = async () => null;
 const originalConsoleError = console.error;
 const messages = [];
 try {

@@ -38,6 +38,11 @@ try {
   assert.equal(settings.defaultDifficulty, "medium");
   assert.equal(settings.language, "pl");
   assert.equal(settings.managerRoleId, null, "Existing servers keep administrator-only management");
+  assert.equal(settings.timezone, null, "Existing servers keep the deployment timezone until explicitly configured");
+  const timezoneMigration = "20261022190000_guild_timezone/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${timezoneMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${timezoneMigration}`, "utf8"));
+  database.exec(`UPDATE "GuildSettings" SET "timezone" = 'Europe/London' WHERE "guildId" = 'test'`);
+  assert.equal(database.prepare('SELECT timezone FROM "GuildSettings" WHERE guildId = ?').get("test").timezone, "Europe/London");
   const managementMigration = "20261022160000_manager_role/migration.sql";
   assert.equal(readFileSync(`prisma/migrations/${managementMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${managementMigration}`, "utf8"));
   database.exec(`UPDATE "GuildSettings" SET "managerRoleId" = 'fixture-role' WHERE "guildId" = 'test'`);

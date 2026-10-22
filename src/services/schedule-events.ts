@@ -1,12 +1,13 @@
 import { EventEmitter } from "node:events";
 import type { QuizSettlement, Topic } from "@prisma/client";
 
-export type TopicSchedule = Pick<Topic, "id" | "enabled" | "channelId" | "generationTime" | "startDate" | "lastGeneratedAt" | "intervalDays">;
+export type TopicSchedule = Pick<Topic, "id" | "guildId" | "enabled" | "channelId" | "generationTime" | "startDate" | "lastGeneratedAt" | "intervalDays"> & { timezone?: string };
 export type SettlementSchedule = Pick<QuizSettlement, "messageId" | "expiresAt" | "closedAt" | "scoredAt" | "nextCheckAt">;
 
 export const scheduleEvents = new EventEmitter<{
   topicChanged: [topic: TopicSchedule];
   topicDeleted: [id: string];
+  guildTimezoneChanged: [guildId: string, timezone: string];
   settlementChanged: [quiz: SettlementSchedule];
   settlementClosed: [messageId: string, at: Date];
 }>();

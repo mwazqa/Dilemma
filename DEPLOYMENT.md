@@ -61,8 +61,13 @@ Apply PostgreSQL migrations explicitly before starting the read-only bot contain
 Back up production data before a schema change. The running bot never applies migrations.
 The preparation command converts dotenv quoting to Docker's environment-file
 format and writes a separate file with owner-only permissions. Rerun it whenever
-you change `.env`. The `Europe/Warsaw` timezone keeps configured quiz hours in
-Polish local time; change it if your server uses another timezone.
+you change `.env`. Configure each Discord server independently with
+`/dilemma timezone value:Europe/London`. The optional `QUIZ_TIMEZONE` environment
+variable is only a fallback for servers without a saved timezone; omitting it
+uses `Europe/Warsaw`. Changing the bot language does not change its timezone.
+Apply `20261022190000_guild_timezone` after testing it on an isolated database
+and retaining a production backup. Re-register commands to replace `defaults`
+with `timezone`. The running bot does not poll for timezone changes.
 
 ## Required production variables
 

@@ -18,9 +18,9 @@ const friendlyFeedbackKeys = [
   "badgeUnknown", "badgeSelectionInvalid", "pollClosing", "topicDailyLimit", "randomCooldown", "randomDailyLimit", "serverOnly",
   "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
   "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
-  "timeInvalid", "configured", "languageSet", "defaultsSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
+  "timeInvalid", "configured", "languageSet", "timezoneSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
   "helpIntro", "helpSchedule", "helpAnswers", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
-  "optionCountInvalid", "intervalInvalid", "durationInvalid", "defaultsMissing", "manualPublication", "scoreEmpty", "partial"
+  "optionCountInvalid", "intervalInvalid", "durationInvalid", "timezoneInvalid", "manualPublication", "scoreEmpty", "partial"
 ];
 const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];
 assert.ok(Object.keys(feedbackKaomoji).length >= 20);
@@ -73,7 +73,7 @@ for (const language of messageLanguages) {
   for (const command of ["create", "configure", "enable", "disable", "run", "random", "list", "delete"]) {
     assert.ok(commands.includes(`/dilemma ${command}`));
   }
-  assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma defaults") && commands.includes("/dilemma poll end") && commands.includes("/dilemma score"));
+  assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma timezone") && commands.includes("/dilemma poll end") && commands.includes("/dilemma score"));
   assert.doesNotMatch(commands, /`\/(?:settings|help|score|poll|ping)(?: |`)/);
   for (const sub of ["profile", "leaderboard", "achievements", "badge", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
 }
@@ -141,7 +141,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "defaults", "permissions", "ping", "score", "poll"].sort());
+  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "timezone", "permissions", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);
@@ -243,61 +243,40 @@ assert.equal(privateRandom.replies[0], message("en", "serverOnly"));
 const invalid = interaction("random", { options: "A,A" });
 await handleTopic(invalid);
 assert.match(invalid.replies[0], /różne odpowiedzi/);
-await handleSettings(interaction("defaults", { interval_days: 3, duration_hours: 2, difficulty: "medium" }));
-assert.equal(settings.defaultPollDurationHours, 2);
-assert.equal(settings.defaultDifficulty, "medium");
-assert.equal(topic.difficulty, "easy", "Server defaults do not overwrite existing topics");
-await handleSettings(interaction("defaults", { interval_days: 4 }));
-assert.equal(settings.defaultPollDurationHours, 2);
-assert.equal(settings.defaultDifficulty, "medium");
-const defaultsOption = dilemmaCommand.toJSON().options.find(sub => sub.name === "defaults");
-const generationOption = defaultsOption.options.find(option => option.name === "generation_hours");
-assert.equal(generationOption.type, 3, "Publication time is a string, not an hourly interval");
-assert.equal(generationOption.min_length, 5);
-assert.equal(generationOption.max_length, 5);
-assert.ok(defaultsOption.options.every(option => !option.required), "Allow changing the publication time alone");
 const { isGenerationTime, isTopicDue } = await import("../dist/services/quiz-limits.js");
 for (const time of ["00:00", "18:30", "23:59"]) assert.equal(isGenerationTime(time), true);
-for (const time of ["", " ", "9:00", "24:00", "18:60", "-1:00", "18.30", "18:30:00"]) {
-  assert.equal(isGenerationTime(time), false);
-  const before = { ...settings };
-  const invalidTime = interaction("defaults", { generation_hours: time });
-  await routeCommand(invalidTime);
-  assert.equal(invalidTime.replies[0], message("pl", "timeInvalid"));
-  assert.deepEqual(settings, before, "Invalid hours must not write settings");
-}
-const beforeEmpty = { ...settings };
-const emptyDefaults = interaction("defaults");
-await routeCommand(emptyDefaults);
-assert.equal(emptyDefaults.replies[0], message("pl", "defaultsMissing"));
-assert.deepEqual(settings, beforeEmpty);
+for (const time of ["", " ", "9:00", "24:00", "18:60", "-1:00", "18.30", "18:30:00"]) assert.equal(isGenerationTime(time), false);
 const beforeSchedule = { ...topic };
-const setTime = interaction("defaults", { generation_hours: "18:30" });
-await routeCommand(setTime);
-assert.equal(settings.defaultGenerationTime, "18:30");
-assert.equal(settings.defaultIntervalDays, 4);
-assert.equal(settings.defaultPollDurationHours, 2);
-assert.equal(settings.defaultDifficulty, "medium");
-assert.ok(setTime.replies[0].includes("18:30") && setTime.replies[0].includes("Europe/Warsaw"));
-assert.deepEqual(topic, beforeSchedule, "Defaults must not update existing schedules or last run");
-await routeCommand(interaction("create", { name: "Test", option_count: 4 }));
-assert.equal(topic.generationTime, "18:00", "Updating an existing topic preserves its explicit time");
+const beforeSettings = { ...settings };
+const setZone = interaction("timezone", { value: "Europe/London" });
+await routeCommand(setZone);
+assert.equal(settings.timezone, "Europe/London");
+assert.deepEqual(topic, beforeSchedule, "Timezone changes preserve stored topic dates and clock times");
+assert.deepEqual(settings, { ...beforeSettings, timezone: "Europe/London" });
+const currentZone = interaction("timezone");
+await routeCommand(currentZone);
+assert.equal(currentZone.replies[0], message("pl", "timezoneCurrent", { timezone: "Europe/London" }));
+const retiredDefaults = interaction("defaults", { duration_hours: 3 });
+await routeCommand(retiredDefaults);
+assert.deepEqual(retiredDefaults.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
+for (const zone of ["", "Invalid/Zone", "18:30", "+02:00"]) {
+  const before = { ...settings };
+  const invalidZone = interaction("timezone", { value: zone });
+  await routeCommand(invalidZone);
+  assert.equal(invalidZone.replies[0], message("pl", "timezoneInvalid"));
+  assert.deepEqual(settings, before);
+}
+await routeCommand(interaction("timezone", { value: "Europe/Warsaw" }));
 const existingTopic = topic;
 topic = undefined;
-await routeCommand(interaction("create", { name: "Scheduled", option_count: 4 }));
-assert.equal(topic.generationTime, "18:30", "A new topic inherits the default publication time");
+await routeCommand(interaction("create", { name: "Scheduled", generation_time: "18:30", interval_days: 4, option_count: 4 }));
+assert.equal(topic.generationTime, "18:30");
 assert.equal(topic.intervalDays, 4);
 assert.equal(isTopicDue(topic, new Date("2026-10-12T16:29:00Z")), false);
 assert.equal(isTopicDue(topic, new Date("2026-10-12T16:30:00Z")), true);
 await routeCommand(interaction("configure", { name: "Scheduled", generation_time: "19:45" }));
-assert.equal(topic.generationTime, "19:45", "Per-topic time can override the inherited default");
-assert.equal(settings.defaultGenerationTime, "18:30");
+assert.equal(topic.generationTime, "19:45");
 topic = existingTopic;
-await routeCommand(interaction("defaults", { duration_hours: 3 }));
-assert.equal(settings.defaultGenerationTime, "18:30", "Omitting the time preserves the saved default");
-for (const language of messageLanguages) {
-  assert.ok(message(language, "defaultsSet", { days: 1, hours: 24, difficulty: "Easy", time: "18:30", timezone: "Europe/Warsaw" }).includes("18:30"));
-}
 await handleSettings(interaction("language", { value: "ja" }));
 topic.language = "en";
 const savedDuration = topic.pollDurationHours;
@@ -348,7 +327,7 @@ for (const command of [dilemmaCommand.toJSON()]) {
     const duration = sub.options?.find(option => option.name === "duration_hours");
     if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, 24); }
   }
-  for (const sub of command.options.filter(sub => ["create", "configure", "random", "defaults"].includes(sub.name))) {
+  for (const sub of command.options.filter(sub => ["create", "configure", "random"].includes(sub.name))) {
     const option = sub.options.find(option => option.name === "difficulty");
     assert.deepEqual(option.choices.map(choice => choice.value), ["easy", "medium", "hard"]);
     assert.ok(!option.required);
@@ -361,7 +340,7 @@ assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("ja").to
 const routedPing = interaction("ping", {}, false);
 await routeCommand(routedPing);
 assert.equal(routedPing.replies[0], message("ja", "ping"));
-for (const sub of ["language", "defaults", "create", "configure", "enable", "disable", "delete", "run", "list"]) {
+for (const sub of ["language", "timezone", "create", "configure", "enable", "disable", "delete", "run", "list"]) {
   const deniedRoute = interaction(sub, { value: "en", name: "Test" }, false);
   const topicBefore = { ...topic };
   const settingsBefore = { ...settings };
@@ -372,9 +351,8 @@ for (const sub of ["language", "defaults", "create", "configure", "enable", "dis
 }
 await routeCommand(interaction("language", { value: "pl" }));
 assert.equal(settings.language, "pl");
-await routeCommand(interaction("defaults", { interval_days: 5, duration_hours: 4 }));
-assert.equal(settings.defaultIntervalDays, 5);
-assert.equal(settings.defaultPollDurationHours, 4);
+await routeCommand(interaction("timezone", { value: "Europe/Warsaw" }));
+assert.equal(settings.timezone, "Europe/Warsaw");
 const routedList = interaction("list");
 await routeCommand(routedList);
 assert.ok(routedList.replies[0].includes("Test"));
@@ -406,12 +384,9 @@ assert.equal((lastPrompt.match(/Random history \d+\?/g) ?? []).length, 20);
 randomHistory = []; topicHistory = [];
 const establishedSettings = settings;
 settings = undefined;
-const firstDefaults = interaction("defaults", { generation_hours: "00:00" });
-await routeCommand(firstDefaults);
-assert.equal(settings.defaultGenerationTime, "00:00", "A new server can set the time without an interval");
-assert.equal(settings.defaultIntervalDays, 1);
-assert.equal(settings.defaultPollDurationHours, 24);
-assert.equal(settings.defaultDifficulty, "medium");
+const firstTimezone = interaction("timezone", { value: "UTC" });
+await routeCommand(firstTimezone);
+assert.equal(settings.timezone, "UTC", "A new server can set its timezone independently");
 settings = establishedSettings;
 await db.$disconnect();
-console.log("PASS: six-locale help without a self-entry, default publication times, inheritance, timezone, partial updates, preserved schedules and permissions");
+console.log("PASS: six-locale help, standalone timezone, retired defaults, preserved schedules and permissions");

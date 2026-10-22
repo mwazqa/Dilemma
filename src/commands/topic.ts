@@ -4,6 +4,7 @@ import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError } fr
 import { getHelpEmbed } from "./help.js";
 import { AiGenerationError } from "../services/question-generator.js";
 import { env } from "../config.js";
+import { guildTimezone } from "../services/timezone.js";
 import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message, type MessageKey } from "../messages.js";
@@ -84,7 +85,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
 
   if (subcommand === "list") {
     const topics = await db.topic.findMany({ where: { guildId: interaction.guildId }, orderBy: { name: "asc" } });
-    const lines = topics.map((topic) => topicSummary(topic, language));
+    const lines = topics.map((topic) => topicSummary(topic, language, guildTimezone(managementSettings)));
     await reply(lines.length ? lines.join("\n") : text("emptyTopics"));
     return;
   }
@@ -156,7 +157,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     }
     const invalid = numberError(intervalDays, 1, 30, "intervalInvalid") ?? numberError(pollDurationHours, 1, 24, "durationInvalid") ?? numberError(optionCount, 2, 4, "optionCountInvalid");
     if (invalid) { await reply(text(invalid)); return; }
-    if (startDate !== null && (!isScheduleDate(startDate) || startDate < quizDay(new Date()))) {
+    if (startDate !== null && (!isScheduleDate(startDate) || startDate < quizDay(new Date(), guildTimezone(settings)))) {
       await reply(text("dateInvalid"));
       return;
     }
@@ -202,8 +203,8 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       }
       throw error;
     }
-    scheduleEvents.emit("topicChanged", topic);
-    await reply(text(creating ? "topicCreated" : "configured", { summary: topicSummary(topic, language) }));
+    scheduleEvents.emit("topicChanged", { ...topic, timezone: guildTimezone(settings) });
+    await reply(text(creating ? "topicCreated" : "configured", { summary: topicSummary(topic, language, guildTimezone(settings)) }));
     return;
   }
 
@@ -256,8 +257,8 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
 
   const enabled = subcommand === "enable";
   const updatedTopic = await db.topic.update({ where: { id: topic.id }, data: { enabled } });
-  scheduleEvents.emit("topicChanged", updatedTopic);
-  await reply(text("configured", { summary: topicSummary({ ...topic, enabled }, language) }));
+  scheduleEvents.emit("topicChanged", { ...updatedTopic, timezone: guildTimezone(settings) });
+  await reply(text("configured", { summary: topicSummary({ ...topic, enabled }, language, guildTimezone(settings)) }));
 }
 
 export async function handleTopicAutocomplete(interaction: AutocompleteInteraction) {
@@ -297,9 +298,9 @@ function numberError(value: number | null, min: number, max: number, key: Messag
   return value !== null && (!Number.isInteger(value) || value < min || value > max) ? key : null;
 }
 
-function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; pollDurationHours: number; generationTime: string | null; startDate?: string | null; difficulty: string; options: string; optionCount: number }, language: string) {
+function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; pollDurationHours: number; generationTime: string | null; startDate?: string | null; difficulty: string; options: string; optionCount: number }, language: string, timezone: string) {
   const summary = message(language, "summary", { name: topic.name, state: message(language, topic.enabled ? "enabled" : "disabled"), days: topic.intervalDays,
-    hours: topic.pollDurationHours, time: topic.generationTime ? `${topic.generationTime} (${env.QUIZ_TIMEZONE})` : message(language, "manualPublication"), difficulty: message(language, parseDifficulty(topic.difficulty)),
+    hours: topic.pollDurationHours, time: topic.generationTime ? `${topic.generationTime} (${timezone})` : message(language, "manualPublication"), difficulty: message(language, parseDifficulty(topic.difficulty)),
     answers: topic.options || message(language, "aiAnswers", { count: topic.optionCount }) });
   return topic.startDate ? `${summary}; ${message(language, "scheduleStart", { date: topic.startDate })}` : summary;
 }

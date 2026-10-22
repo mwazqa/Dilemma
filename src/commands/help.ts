@@ -18,7 +18,7 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
       ["/dilemma list", "helpList"], ["/dilemma enable` / `/dilemma disable", "helpToggle"],
       ["/dilemma delete", "helpManage"]
     ] },
-    { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma defaults", "helpDefaults"],
+    { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma timezone", "helpTimezone"],
       ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
       ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
       ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },

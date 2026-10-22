@@ -12,6 +12,7 @@ import {
 import { env } from "./config.js";
 import { db } from "./db.js";
 import { supportedLanguages } from "./commands/settings.js";
+import { guildTimezone } from "./services/timezone.js";
 import { handleEndPollButton } from "./commands/poll.js";
 import { routeAutocomplete, routeCommand } from "./commands/dilemma.js";
 import { startScheduler } from "./scheduler.js";
@@ -102,13 +103,14 @@ async function handleLanguageSelection(interaction: StringSelectMenuInteraction)
   const language = interaction.values[0];
   if (!supportedLanguages.some(item => item.value === language)) throw new Error("Unsupported language selection");
   rememberLanguage(interaction, language);
-  cacheGuildSettings(await db.guildSettings.upsert({
+  const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, language },
     update: { language }
   }));
   await interaction.editReply({
-    content: message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)!.name }),
+    content: message(language, "languageSet", { language: supportedLanguages.find(item => item.value === language)!.name }) +
+      (settings.timezone ? "" : `\n\n${message(language, "timezoneSetup", { timezone: guildTimezone(settings) })}`),
     components: []
   });
 }

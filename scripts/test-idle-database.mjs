@@ -123,6 +123,7 @@ try {
   let settings = { guildId: "guild", language: "pl", defaultIntervalDays: 1, defaultGenerationTime: null,
     defaultPollDurationHours: 2, defaultDifficulty: "easy" };
   db.guildSettings.findUnique = async () => { settingReads++; return settings ? { ...settings } : null; };
+  db.guildSettings.findMany = async () => settings ? [{ guildId: settings.guildId, timezone: settings.timezone ?? null }] : [];
   db.guildSettings.upsert = async ({ create, update }) => {
     settingWrites++;
     return settings = { ...(settings ?? create), ...update };
@@ -318,9 +319,9 @@ try {
   await handleHelp(interaction("help"));
   await handlePing(interaction("ping"));
   assert.equal(settingReads, readsAfterLanguage, "Help/ping reuse the saved language without SQL");
-  await handleSettings(interaction("defaults", { difficulty: "hard", generation_hours: "18:30" }));
-  assert.equal((await getGuildSettings("guild")).defaultDifficulty, "hard");
-  await handleTopic(interaction("create", { name: "new", option_count: 2 }));
+  await handleSettings(interaction("timezone", { value: "Europe/Warsaw" }));
+  assert.equal((await getGuildSettings("guild")).timezone, "Europe/Warsaw");
+  await handleTopic(interaction("create", { name: "new", option_count: 2, generation_time: "18:30", difficulty: "hard" }));
   assert.equal(topics.get("created").generationTime, "18:30");
   assert.equal(topics.get("created").difficulty, "hard");
   await handleTopic(interaction("delete", { name: "new" }));

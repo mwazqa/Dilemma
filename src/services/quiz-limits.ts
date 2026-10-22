@@ -2,12 +2,19 @@ import { Prisma, type DailyQuizRun } from "@prisma/client";
 import { db } from "../db.js";
 import { env } from "../config.js";
 
-const dayFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: env.QUIZ_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit"
-});
-const timeFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: env.QUIZ_TIMEZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
-});
+const formatters = new Map<string, { day: Intl.DateTimeFormat; time: Intl.DateTimeFormat }>();
+function zoneFormatters(timezone: string) {
+  let value = formatters.get(timezone);
+  if (!value) {
+    value = {
+      day: new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }),
+      time: new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    };
+    formatters.set(timezone, value);
+    if (formatters.size > 256) formatters.delete(formatters.keys().next().value!);
+  }
+  return value;
+}
 
 export class DailyQuizLimitError extends Error {
   constructor(public readonly kind: "topic" | "random") {
@@ -23,7 +30,7 @@ export class TopicScheduleNotReadyError extends Error {
 export const RANDOM_COOLDOWN_MS = 8 * 60 * 60 * 1000;
 export const RANDOM_DAILY_LIMIT = 2;
 const randomDailyScope = "random-daily";
-export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun };
+export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun; timezone?: string };
 
 export class RandomQuizCooldownError extends Error {
   constructor(public readonly retryAt: Date) {
@@ -32,8 +39,8 @@ export class RandomQuizCooldownError extends Error {
   }
 }
 
-async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: Date, exclude: DailyQuizRun[] = []) {
-  const { day, start, end } = quizDayBounds(now);
+async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: Date, timezone: string, exclude: DailyQuizRun[] = []) {
+  const { day, start, end } = quizDayBounds(now, timezone);
   const cutoff = new Date(now.getTime() - RANDOM_COOLDOWN_MS);
   const [poll, stored] = await Promise.all([
     tx.randomPoll.findFirst({ where: { guildId, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
@@ -53,11 +60,11 @@ async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: D
     latest: Math.max(poll?.createdAt.getTime() ?? 0, ...rows.map(row => +row.createdAt)) };
 }
 
-async function claimRandomQuiz(guildId: string, now: Date): Promise<QuizRun> {
+async function claimRandomQuiz(guildId: string, now: Date, timezone: string): Promise<QuizRun> {
   const key = { guildId, scope: "random", day: "cooldown", slot: 1 };
   try {
     return await db.$transaction(async tx => {
-      const usage = await randomUsage(tx, guildId, now);
+      const usage = await randomUsage(tx, guildId, now, timezone);
       if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError("random");
       const cutoff = new Date(now.getTime() - RANDOM_COOLDOWN_MS);
       if (usage.latest > +cutoff) throw new RandomQuizCooldownError(new Date(usage.latest + RANDOM_COOLDOWN_MS));
@@ -75,7 +82,7 @@ async function claimRandomQuiz(guildId: string, now: Date): Promise<QuizRun> {
       for (let slot = 1; slot <= RANDOM_DAILY_LIMIT; slot++) {
         if (occupied.has(slot)) continue;
         const dailyRun = await tx.dailyQuizRun.create({ data: { guildId, scope: randomDailyScope, day: usage.day, slot, createdAt: now } });
-        return { ...run, dailyRun };
+        return { ...run, dailyRun, timezone };
       }
       throw new DailyQuizLimitError("random");
     });
@@ -86,7 +93,7 @@ async function claimRandomQuiz(guildId: string, now: Date): Promise<QuizRun> {
   }
 }
 
-export async function refreshRandomQuizRun(run: QuizRun): Promise<QuizRun> {
+export async function refreshRandomQuizRun(run: QuizRun, timezone = run.timezone ?? env.QUIZ_TIMEZONE): Promise<QuizRun> {
   const dailyRun = run.dailyRun;
   if (!dailyRun) throw new Error("Missing random daily reservation");
   const createdAt = new Date();
@@ -94,37 +101,37 @@ export async function refreshRandomQuizRun(run: QuizRun): Promise<QuizRun> {
     const updated = await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot,
       createdAt: run.createdAt, messageId: null }, data: { createdAt } });
     if (!updated.count) throw new RandomQuizCooldownError(new Date(createdAt.getTime() + RANDOM_COOLDOWN_MS));
-    const usage = await randomUsage(tx, run.guildId, createdAt, [run, dailyRun]);
+    const usage = await randomUsage(tx, run.guildId, createdAt, timezone, [run, dailyRun]);
     if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError("random");
     const refreshed = await tx.dailyQuizRun.updateMany({ where: { ...runKey(dailyRun).guildId_scope_day_slot,
       createdAt: dailyRun.createdAt, messageId: null }, data: { createdAt } });
     if (!refreshed.count) throw new Error("Random daily reservation changed");
-    return { ...run, createdAt, dailyRun: { ...dailyRun, createdAt } };
+    return { ...run, createdAt, timezone, dailyRun: { ...dailyRun, createdAt } };
   });
 }
 
-export function quizDay(now: Date): string {
-  const parts = dayFormatter.formatToParts(now);
+export function quizDay(now: Date, timezone = env.QUIZ_TIMEZONE): string {
+  const parts = zoneFormatters(timezone).day.formatToParts(now);
   const part = (name: string) => parts.find(item => item.type === name)!.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-function dayStart(day: string): Date {
+function dayStart(day: string, timezone: string): Date {
   const center = Date.parse(day + "T00:00:00Z");
   let low = center - 36 * 3_600_000;
   let high = center + 36 * 3_600_000;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (quizDay(new Date(middle)) < day) low = middle + 1;
+    if (quizDay(new Date(middle), timezone) < day) low = middle + 1;
     else high = middle;
   }
   return new Date(low);
 }
 
-export function quizDayBounds(now: Date) {
-  const day = quizDay(now);
+export function quizDayBounds(now: Date, timezone = env.QUIZ_TIMEZONE) {
+  const day = quizDay(now, timezone);
   const nextDay = new Date(Date.parse(day + "T00:00:00Z") + 86_400_000).toISOString().slice(0, 10);
-  return { day, start: dayStart(day), end: dayStart(nextDay) };
+  return { day, start: dayStart(day, timezone), end: dayStart(nextDay, timezone) };
 }
 
 export function isGenerationTime(value: string): boolean {
@@ -145,64 +152,64 @@ function calendarDay(day: string, offset: number): string {
   return new Date(Date.parse(day + "T00:00:00Z") + offset * 86_400_000).toISOString().slice(0, 10);
 }
 
-function publicationAt(day: string, time: string): number {
-  const end = +dayStart(calendarDay(day, 1));
-  for (let at = +dayStart(day); at < end; at += 60_000) {
-    if (timeFormatter.format(new Date(at)) >= time) return at;
+function publicationAt(day: string, time: string, timezone: string): number {
+  const end = +dayStart(calendarDay(day, 1), timezone);
+  for (let at = +dayStart(day, timezone); at < end; at += 60_000) {
+    if (zoneFormatters(timezone).time.format(new Date(at)) >= time) return at;
   }
   return end;
 }
 
-function latestPublicationDay(topic: TopicCalendar, now: Date, early: boolean): string | null {
+function latestPublicationDay(topic: TopicCalendar, now: Date, early: boolean, timezone: string): string | null {
   const start = topic.startDate!;
-  const days = (Date.parse(quizDay(now)) - Date.parse(start)) / 86_400_000;
+  const days = (Date.parse(quizDay(now, timezone)) - Date.parse(start)) / 86_400_000;
   let cycle = Math.floor(days / topic.intervalDays);
   if (cycle < 0) return null;
   let day = calendarDay(start, cycle * topic.intervalDays);
-  if (!early && +now < publicationAt(day, topic.generationTime!)) {
+  if (!early && +now < publicationAt(day, topic.generationTime!, timezone)) {
     if (--cycle < 0) return null;
     day = calendarDay(start, cycle * topic.intervalDays);
   }
   return day;
 }
 
-export function isTopicDue(topic: TopicCalendar, now: Date, early = false): boolean {
+export function isTopicDue(topic: TopicCalendar, now: Date, early = false, timezone = env.QUIZ_TIMEZONE): boolean {
   if (topic.startDate) {
     if (!isScheduleDate(topic.startDate) || !topic.generationTime || !isGenerationTime(topic.generationTime)) return false;
-    const day = latestPublicationDay(topic, now, early);
-    return day !== null && (!topic.lastGeneratedAt || quizDay(topic.lastGeneratedAt) < day);
+    const day = latestPublicationDay(topic, now, early, timezone);
+    return day !== null && (!topic.lastGeneratedAt || quizDay(topic.lastGeneratedAt, timezone) < day);
   }
-  if (!topic.generationTime || timeFormatter.format(now) < topic.generationTime) return false;
+  if (!topic.generationTime || zoneFormatters(timezone).time.format(now) < topic.generationTime) return false;
   if (!topic.lastGeneratedAt) return true;
-  const days = (Date.parse(quizDay(now)) - Date.parse(quizDay(topic.lastGeneratedAt))) / 86_400_000;
+  const days = (Date.parse(quizDay(now, timezone)) - Date.parse(quizDay(topic.lastGeneratedAt, timezone))) / 86_400_000;
   return days >= topic.intervalDays;
 }
 
 export function nextTopicRunAt(topic: {
   enabled: boolean; channelId: string | null; generationTime: string | null;
   lastGeneratedAt: Date | null; intervalDays: number; startDate?: string | null
-}, now = new Date()): number | null {
+}, now = new Date(), timezone = env.QUIZ_TIMEZONE): number | null {
   if (!topic.enabled || !topic.channelId || !topic.generationTime || !isGenerationTime(topic.generationTime)) return null;
   if (topic.startDate && !isScheduleDate(topic.startDate)) return null;
-  if (isTopicDue(topic, now)) return +now;
+  if (isTopicDue(topic, now, false, timezone)) return +now;
   if (topic.startDate) {
-    const today = quizDay(now);
-    const afterLast = topic.lastGeneratedAt ? calendarDay(quizDay(topic.lastGeneratedAt), 1) : topic.startDate;
+    const today = quizDay(now, timezone);
+    const afterLast = topic.lastGeneratedAt ? calendarDay(quizDay(topic.lastGeneratedAt, timezone), 1) : topic.startDate;
     const earliest = today > afterLast ? today : afterLast;
     const cycle = Math.max(0, Math.ceil((Date.parse(earliest) - Date.parse(topic.startDate)) / (86_400_000 * topic.intervalDays)));
-    return publicationAt(calendarDay(topic.startDate, cycle * topic.intervalDays), topic.generationTime);
+    return publicationAt(calendarDay(topic.startDate, cycle * topic.intervalDays), topic.generationTime, timezone);
   }
-  const today = quizDay(now);
+  const today = quizDay(now, timezone);
   const eligible = topic.lastGeneratedAt
-    ? new Date(Date.parse(quizDay(topic.lastGeneratedAt)) + topic.intervalDays * 86_400_000).toISOString().slice(0, 10)
+    ? new Date(Date.parse(quizDay(topic.lastGeneratedAt, timezone)) + topic.intervalDays * 86_400_000).toISOString().slice(0, 10)
     : today;
   const day = eligible > today ? eligible : today;
   const nextDay = new Date(Date.parse(day) + 86_400_000).toISOString().slice(0, 10);
-  const end = +dayStart(nextDay);
-  for (let at = +dayStart(day); at < end; at += 60_000) {
-    if (at >= +now && timeFormatter.format(new Date(at)) >= topic.generationTime) return at;
+  const end = +dayStart(nextDay, timezone);
+  for (let at = +dayStart(day, timezone); at < end; at += 60_000) {
+    if (at >= +now && zoneFormatters(timezone).time.format(new Date(at)) >= topic.generationTime) return at;
   }
-  return +dayStart(nextDay);
+  return +dayStart(nextDay, timezone);
 }
 
 export function validatePollDuration(hours: number): number {
@@ -210,9 +217,9 @@ export function validatePollDuration(hours: number): number {
   return hours;
 }
 
-export async function claimQuizRun(guildId: string, topicId?: string, now = new Date(), early = true): Promise<QuizRun> {
-  if (!topicId) return claimRandomQuiz(guildId, now);
-  const { day, start, end } = quizDayBounds(now);
+export async function claimQuizRun(guildId: string, topicId?: string, now = new Date(), early = true, timezone = env.QUIZ_TIMEZONE): Promise<QuizRun> {
+  if (!topicId) return claimRandomQuiz(guildId, now, timezone);
+  const { day, start, end } = quizDayBounds(now, timezone);
   const scope = topicId ? `topic:${topicId}` : "random";
   const kind = "topic";
   const limit = 1;
@@ -222,11 +229,11 @@ export async function claimQuizRun(guildId: string, topicId?: string, now = new 
     ...(recordedMessages.length ? { messageId: { notIn: recordedMessages } } : {}) };
   const legacyCount = await db.generatedPoll.count({ where: { ...where, topicId } });
   const topic = await db.topic.findUnique({ where: { id: topicId } });
-  if (topic?.lastGeneratedAt && quizDay(topic.lastGeneratedAt) === day) throw new DailyQuizLimitError(kind);
+  if (topic?.lastGeneratedAt && quizDay(topic.lastGeneratedAt, timezone) === day) throw new DailyQuizLimitError(kind);
   if (topic?.startDate) {
-    if (!isTopicDue(topic, now, early)) throw new TopicScheduleNotReadyError();
+    if (!isTopicDue(topic, now, early, timezone)) throw new TopicScheduleNotReadyError();
     if (runs.length || legacyCount) throw new DailyQuizLimitError(kind);
-    const cycleDay = latestPublicationDay(topic, now, early)!;
+    const cycleDay = latestPublicationDay(topic, now, early, timezone)!;
     try {
       return await db.$transaction(async tx => {
         const run = await tx.dailyQuizRun.create({ data: { guildId, scope, day, slot: 1 } });
