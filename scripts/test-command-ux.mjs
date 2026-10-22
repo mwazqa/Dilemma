@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
   DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test",
-  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODELS: "", QUIZ_TIMEZONE: "Europe/Warsaw" });
+  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODELS: "", OPENROUTER_DYNAMIC_FALLBACK: "false", QUIZ_TIMEZONE: "Europe/Warsaw" });
 const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in UX test"); };
 globalThis.fetch = (...args) => fetchFixture(...args);

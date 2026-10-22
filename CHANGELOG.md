@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v1.0.0 - 2026-10-22
+
+- Publish the first stable Dilemma release, retaining topic calendars, random quizzes, native Discord polls, six-language feedback, guild-scoped scoring, EXP, levels, rankings and cosmetic achievements. Stable release status does not guarantee external AI availability or factual accuracy.
+- Extend the preferred free-model fallback pool with lazy discovery from the account-filtered OpenRouter catalog. Keep only zero-price, text-capable, JSON-compatible models with controllable reasoning and sufficient context; exclude expired and malformed entries. Preserve account privacy preferences and guardrails, use zero-price inference guards, rotate through eligible models and try at most three additional candidates within the existing overall deadline.
+- Cache catalog results in memory for six hours, share concurrent fetches, bound catalog calls to three seconds and back off failed discovery for 30 seconds. Add no idle polling or database work. Retain bounded retries, quiz validation and reservation/publication safety. Add deterministic discovery, cache, rotation, failure and concurrency regressions to existing AI checks. No database migration or command registration refresh is required from v0.8.1-beta.
+
 ## v0.8.1-beta - 2026-10-22
 
 - Recover from unavailable OpenRouter models through an ordered, configurable three-model free pool with zero-price routing guards, per-attempt and shared overall deadlines, bounded retries and unchanged account privacy settings. Validate output before publication and distinguish AI unavailability, limits, invalid output and access configuration from Discord publication permissions in all six languages. Add fallback and command-stage regression tests; preserve reservation release before send and never retry uncertain publication.

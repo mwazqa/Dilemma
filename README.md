@@ -6,16 +6,16 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 ## Current status
 
-Current MVP:
+Stable release:
 
-Latest release: `v0.8.1-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v1.0.0`. See [CHANGELOG.md](CHANGELOG.md).
 
-Version v0.8.1-beta extends duplicate-question comparisons to 365 recent questions while keeping the AI history prompt capped at 20. Commands and database schema are unchanged from v0.8.0-beta. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below.
+Version v1.0.0 is the first stable release. It adds on-demand discovery of compatible free models after the preferred OpenRouter pool fails, while retaining quiz generation, calendar schedules, points, EXP, levels, rankings, achievements and six-language feedback. Commands and database schema are unchanged from v0.8.1-beta. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below. Stable release status does not provide an uptime or correctness guarantee for external AI services.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
-- OpenRouter support with ordered, free-model fallbacks
+- OpenRouter support with preferred free models and dynamic free-model discovery
 - AI-generated topic answers and optional custom answers for on-demand random quizzes
 - Topic intervals, one question per run, configurable poll duration, fixed generation time and optional first publication date
 - Automatic scheduled generation
@@ -68,11 +68,15 @@ The default OpenRouter pool contains three models, in this order: `dots-studio/d
 
 As checked on 2026-10-22, OpenRouter [announces retirement of the free Dots preview on 2026-12-31](https://openrouter.ai/dots-studio/dots-3-note-preview:free). Keep the configurable pool current; if a model disappears, the next eligible fallback is tried. No free model is promised to remain available indefinitely.
 
-`OPENROUTER_FALLBACK_MODELS` overrides the comma-separated list with up to three `:free` IDs; an empty value disables model fallbacks. The configured primary is tried first, and duplicate IDs are removed. Existing installations retaining the older Nemotron primary can therefore recover through the default fallback pool without changing credentials. Requests for `:free` models enforce zero prompt, completion and per-request price ceilings. There is no automatic switch to a paid model, paid variant or another API account. An explicitly configured paid primary or `AI_PROVIDER=openai` remains an operator choice, not a free fallback.
+`OPENROUTER_FALLBACK_MODELS` overrides the comma-separated preferred list with up to three `:free` IDs; an empty value disables only the preferred backups. The configured primary is tried first, and duplicate IDs are removed. Existing installations retaining the older Nemotron primary can recover through the preferred pool without changing credentials. Requests for `:free` and dynamically discovered zero-price models enforce zero prompt, completion and per-request price ceilings. There is no automatic switch to a paid model, paid variant or another API account. An explicitly configured paid primary or `AI_PROVIDER=openai` remains an operator choice, not a free fallback.
 
-Each unique model gets one attempt; `AI_MAX_RETRIES` (default 3) adds at most that many further attempts across the pool, not per model. Provider unavailability, 404, transient failures, 429, timeouts and invalid quiz responses can advance to the next model. Authentication, access-policy and account-balance errors stop the request; the bot never loosens privacy settings. `AI_MODEL_TIMEOUT_MS` defaults to 12000 per OpenRouter attempt; `AI_GENERATION_TIMEOUT_MS` defaults to 60000 overall, including queue waits, retries and duplicate-question attempts. `AI_MIN_INTERVAL_MS` still spaces all API calls. No model catalog or database health polling is added.
+`OPENROUTER_DYNAMIC_FALLBACK=true` enables discovery after every preferred model fails with a recoverable error, before retrying already attempted models. It applies only to a `:free` OpenRouter primary. Discovery uses OpenRouter's [account-filtered catalog](https://openrouter.ai/docs/api/api-reference/models/list-models-filtered-by-user-provider-preferences-privacy-settings-and-guardrails), preserving provider preferences, privacy settings and guardrails. It never falls back to an unfiltered catalog or changes account settings. Eligible models must advertise zero input/output prices, no nonzero per-request fee, text input/output, JSON mode, controllable reasoning and at least 16384 context tokens. Mandatory reasoning, expired models, unknown input/output prices and malformed entries are excluded. Zero-price models without a `:free` suffix can qualify; every inference request still enforces zero input/output/request price guards, including when per-request pricing is absent from the catalog or prices change. Capability metadata is not a quality guarantee, so quiz validation remains mandatory.
 
-Free-pool requests use JSON mode with reasoning disabled and require parameter support. Responses still undergo schema, declared-language, answer-count and custom-answer validation before publication. AI failures have separate localized feedback from Discord permission errors; uncertain sends ask the user to check the channel before retrying. An AI failure before sending releases the quiz reservation; publication is never retried automatically. `npm run test:ai` covers fallback ordering, price guards, access errors, invalid output, deadlines and bounded attempts with synthetic fixtures.
+The catalog is loaded only when needed, with one shared fetch and a three-second timeout. Successful results stay in process memory for six hours; failures suppress another fetch for 30 seconds. Restarting clears the cache. Discovery rotates through the eligible pool, excluding preferred models and selecting at most three additional models per generation call. Cached models are excluded immediately at their announced expiry. No periodic catalog requests, database reads or background polling are added. Set `OPENROUTER_DYNAMIC_FALLBACK=false` to disable discovery; also leave `OPENROUTER_FALLBACK_MODELS` empty to use only the primary.
+
+Each selected model gets one attempt; `AI_MAX_RETRIES` (default 3) adds at most that many further attempts across the combined pool, not per model. The maximum pool is four unique preferred models plus three discovered models, or ten inference attempts with default retries. Provider unavailability, 404, transient failures, 429, timeouts and invalid quiz responses can advance to the next model. Authentication, access-policy and account-balance errors stop the request; the bot never loosens privacy settings. `AI_MODEL_TIMEOUT_MS` defaults to 12000 per OpenRouter attempt; `AI_GENERATION_TIMEOUT_MS` defaults to 60000 overall, including queue waits, discovery, retries and duplicate-question attempts, so not every selected model is guaranteed an attempt before the deadline. `AI_MIN_INTERVAL_MS` still spaces all inference calls.
+
+Free-pool requests use JSON mode with reasoning disabled and require parameter support. Responses still undergo schema, declared-language, answer-count and custom-answer validation before publication. AI failures have separate localized feedback from Discord permission errors; uncertain sends ask the user to check the channel before retrying. An AI failure before sending releases the quiz reservation; publication is never retried automatically. `npm run test:ai` covers fallback ordering, dynamic discovery, eligibility and price guards, cache expiry, concurrent discovery, access errors, invalid output, deadlines and bounded attempts with synthetic fixtures.
 
 ## Commands
 
@@ -192,7 +196,7 @@ Guild language and defaults use a bounded, process-local cache with a one-hour l
 - Final-vote scoring with atomic, idempotent settlements and restart recovery
 - Self-service deletion of stored answers and scores
 
-The beta marks the first release with working points, streaks and leaderboards. `v1.0.0` follows live poll validation and community feedback.
+The beta introduced points, streaks and leaderboards. These features remain available in the stable `v1.0.0` release.
 
 ### Future releases
 

@@ -4,7 +4,7 @@ const isOpenAI = process.argv.includes("--openai");
 Object.assign(process.env, {
   DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: isOpenAI ? "openai" : "openrouter",
   OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test", OPENAI_MODEL: "test-model", AI_GENERATION_TIMEOUT_MS: "1000",
-  OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", OPENROUTER_FALLBACK_MODELS: "",
+  OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", OPENROUTER_FALLBACK_MODELS: "", OPENROUTER_DYNAMIC_FALLBACK: "false",
   AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "1"
 });
 const question = { language: "pl", topic: "geografia", question: "Stolica Polski?", options: ["🏙️ Warszawa", "Krakow"], topicEmoji: "", optionEmojis: ["", ""], correctOption: 0, explanation: "Warszawa jest stolica Polski." };

@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test",
   OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", AI_MAX_RETRIES: "0", AI_MIN_INTERVAL_MS: "0",
-  AI_MODEL_TIMEOUT_MS: "1000", AI_GENERATION_TIMEOUT_MS: "5000" });
+  AI_MODEL_TIMEOUT_MS: "1000", AI_GENERATION_TIMEOUT_MS: "5000", OPENROUTER_DYNAMIC_FALLBACK: "false" });
 delete process.env.OPENROUTER_FALLBACK_MODELS;
 const fixture = { language: "pl", topic: "Kosmos", question: "Która planeta jest największa?", options: ["Jowisz", "Mars", "Ziemia", "Wenus"],
   correctOption: 0, explanation: "Jowisz jest największą planetą Układu Słonecznego.", topicEmoji: "", optionEmojis: ["", "", "", ""] };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", QUIZ_TIMEZONE: "Europe/Warsaw",
-  AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
+  AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_DYNAMIC_FALLBACK: "false" });
 const { Prisma } = await import("@prisma/client");
 const { db } = await import("../dist/db.js");
 const { claimQuizRun, refreshRandomQuizRun, releaseQuizRun, runKey, quizDay, quizDayBounds, isTopicDue,

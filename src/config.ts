@@ -16,6 +16,7 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_MODEL: z.string().default("dots-studio/dots-3-note-preview:free"),
   OPENROUTER_FALLBACK_MODELS: z.string().default("dots-studio/dots-3-note-preview:free,xingchen-agi/xing4.0-29b-a4b:free,google/gemma-4-31b-it:free").transform(value => [...new Set(value.split(",").map(model => model.trim()).filter(Boolean))]).refine(models => models.length <= 3 && models.every(model => /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+:free$/.test(model)), "Use up to three free fallback model IDs"),
+  OPENROUTER_DYNAMIC_FALLBACK: z.enum(["true", "false"]).default("true").transform(value => value === "true"),
   AI_MODEL_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(12_000),
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(3),
   AI_MIN_INTERVAL_MS: z.coerce.number().int().min(0).max(60_000).default(1_000),
