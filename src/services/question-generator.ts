@@ -93,7 +93,7 @@ export async function generateQuestion(
     "Only explicitly provided custom answer options must remain unchanged, even if written in another language.";
   for (let attempt = 0; attempt <= env.AI_MAX_RETRIES; attempt += 1) {
     try {
-      const prompt = dilemmaPrompt + ` Difficulty: ${parseDifficulty(difficulty)}. ${difficultyInstructions[difficulty]} ` + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
+      const prompt = `Difficulty: ${parseDifficulty(difficulty)}. ${difficultyInstructions[difficulty]} ` + " Create one accurate, inclusive multiple-choice quiz question about " + topic +
           " in " + language + ". " + (allowedOptions.length
             ? "Use exactly these answer options: " + allowedOptions.join(", ") + "."
             : "Create exactly " + optionCount + " suitable answer options.") +

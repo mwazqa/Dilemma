@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v3.0.2 - 2026-10-22
+
+- Strengthen quiz-writing instructions against unnecessary semantic hints, answer-revealing titles and emoji, and implausible or uneven distractors. Include the beak/electroreception example while preserving difficulty, required context and custom answer text/order.
+- Send the shared quiz instructions once instead of repeating them in the request input. Keep the model, output schema, token limits, retries and single-request generation flow unchanged; no extra AI review call is added.
+- Extend synthetic AI request regressions for six-language quality guidance, the revised mammal question and unchanged custom answer mapping. Prompt instructions reduce unwanted hints but do not guarantee their absence.
+
 ## v3.0.1 - 2026-10-22
 
 - Rename the Polish quiz-closing button to `Zakończ quiz`. Keep its behavior and other translations unchanged.

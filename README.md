@@ -6,7 +6,9 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 ## Current status
 
-Code version: `v3.0.1`. See [CHANGELOG.md](CHANGELOG.md).
+Code version: `v3.0.2`. See [CHANGELOG.md](CHANGELOG.md).
+
+Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
 Version v3.0.1 renames the Polish quiz-closing button to `Zakończ quiz` and corrects documentation. No database migration or command re-registration is required when upgrading from v3.0.0.
 
@@ -70,6 +72,8 @@ Never commit .env or bot/API keys.
 Quiz generation now uses OpenAI directly, with `gpt-6-luna` as the default model. The provider switch, free-model discovery and model fallback pool have been removed. Configure a project-scoped service-account key in the ignored `.env` file as `OPENAI_API_KEY`; never paste a key into an issue, chat, screenshot or commit. Revoke any exposed key before deployment. An expiring key must be replaced before expiry or generation will stop.
 
 Requests use the Responses API with strict JSON Schema and `store: false`. The schema constrains the language, answer count, answer lengths and correct-answer index. Local validation still checks the complete quiz, unique answers and exact custom-answer order before publication. Schema compliance does not guarantee factual accuracy. Profile cards are rendered locally without AI.
+
+Quiz-writing instructions target one fact at a time and omit unrelated clues from anatomy, habitat, nationality, word roots, titles and emoji. Generated alternatives should be plausible, grammatically parallel and comparably detailed; custom answer text and order remain unchanged. For example, a question about electroreception should not also mention the animal's beak when the choices are platypus and porcupine. The model reviews its draft within the same generation request, and shared instructions are sent only once. These are generation instructions, not a semantic guarantee: local schema validation cannot detect every hint or ambiguous fact. Synthetic tests verify the request contract, not live-model question quality.
 
 `OPENAI_REASONING_EFFORT` defaults to `low` and supports `low` or `medium`. `AI_MAX_OUTPUT_TOKENS` defaults to 2048, including reasoning and visible output, and accepts 512-4096. These settings bound each attempt, not total monthly spend. OpenAI inference is paid; repeated successful but invalid or duplicate responses can also incur costs. There is no automatic switch to a more expensive model or another provider.
 
