@@ -1,8 +1,8 @@
 import { PermissionFlagsBits, SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
-import { publishRandomQuestion, publishTopicQuestions } from "../services/poll-publisher.js";
+import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError } from "../services/poll-publisher.js";
 import { getHelpEmbed } from "./help.js";
-import { AiGenerationTimeoutError } from "../services/question-generator.js";
+import { AiGenerationError } from "../services/question-generator.js";
 import { env } from "../config.js";
 import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
@@ -122,12 +122,9 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         await reply(text("randomCooldown", { minutes: Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000)) }));
         return;
       }
-      if (error instanceof AiGenerationTimeoutError) {
-        await reply(text("timeout"));
-        return;
-      }
-      if (isOpenAIQuotaError(error)) {
-        await reply(text("quota"));
+      const feedback = quizErrorFeedback(error);
+      if (feedback) {
+        await reply(text(feedback));
         return;
       }
       console.error("Random dilemma failed:", privateErrorSummary(error));
@@ -245,12 +242,9 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         await reply(text("topicDailyLimit"));
         return;
       }
-      if (error instanceof AiGenerationTimeoutError) {
-        await reply(text("timeout"));
-        return;
-      }
-      if (isOpenAIQuotaError(error)) {
-        await reply(text("quota"));
+      const feedback = quizErrorFeedback(error);
+      if (feedback) {
+        await reply(text(feedback));
         return;
       }
       throw error;
@@ -305,8 +299,10 @@ function topicSummary(topic: { name: string; enabled: boolean; intervalDays: num
   return topic.startDate ? `${summary}; ${message(language, "scheduleStart", { date: topic.startDate })}` : summary;
 }
 
-function isOpenAIQuotaError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const apiError = error as { status?: number; code?: string };
-  return apiError.status === 429 || apiError.code === "insufficient_quota" || apiError.code === "credit_balance_exhausted";
+function quizErrorFeedback(error: unknown): MessageKey | null {
+  if (error instanceof AiGenerationError) {
+    return { unavailable: "aiUnavailable", limit: "quota", configuration: "aiConfiguration", "invalid-response": "aiInvalidResponse", timeout: "timeout" }[error.kind] as MessageKey;
+  }
+  if (error instanceof QuizPublicationError) return error.permissionDenied ? "publishPermission" : "generationFailed";
+  return null;
 }

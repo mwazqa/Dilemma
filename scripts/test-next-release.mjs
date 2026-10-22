@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENROUTER_MODEL: "nvidia/nemotron-3-super-120b-a12b:free", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
-const { messages, messageLanguages, message, normalizeLanguage } = await import("../dist/messages.js");
+const { messages, messageLanguages, message, normalizeLanguage, feedbackKaomoji } = await import("../dist/messages.js");
 const { getHelpContent, getHelpEmbed, handleHelp } = await import("../dist/commands/help.js");
 const { difficultySchema } = await import("../dist/difficulty.js");
 for (const [key, translations] of Object.entries(messages)) {
@@ -23,17 +23,33 @@ const friendlyFeedbackKeys = [
   "optionCountInvalid", "intervalInvalid", "durationInvalid", "defaultsMissing", "manualPublication", "scoreEmpty", "partial"
 ];
 const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];
+assert.ok(Object.keys(feedbackKaomoji).length >= 20);
+assert.ok(new Set(Object.values(feedbackKaomoji)).size >= 12);
 for (const [index, language] of messageLanguages.entries()) {
+  for (const [key, kaomoji] of Object.entries(feedbackKaomoji)) {
+    const rendered = message(language, key);
+    assert.ok(rendered.includes(kaomoji), `${key} uses its contextual kaomoji in ${language}`);
+    assert.equal(rendered.split(kaomoji).length - 1, 1);
+    assert.equal(message(language, key), rendered, "Feedback styling stays deterministic");
+    if (kaomoji !== "(≧◡≦)") assert.ok(!rendered.includes("(≧◡≦)"));
+    if (kaomoji !== "(｡•̀ᴗ-)✧") assert.ok(!rendered.includes("(｡•̀ᴗ-)✧"));
+  }
+  const literalName = "Player (≧◡≦) ♡ {count}";
+  assert.ok(message(language, "randomDone", { name: literalName, count: 4 }).includes(literalName), "Kaomoji formatting never changes user text");
+  const summary = "Saved topic (｡•̀ᴗ-)✧";
+  assert.equal(message(language, "configured", { summary }).split("\n")[1], summary);
   for (const key of friendlyFeedbackKeys) {
     assert.ok(message(language, key).includes("~"), `${key} keeps the shared feedback voice in ${language}`);
     assert.ok(message(language, key).length <= 2000);
   }
   for (const key of ["forgetConfirm", "scoreForgotten"]) {
+    assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Permanent-deletion warnings are not decorated");
     assert.match(message(language, key), permanentDeletionWords[index]);
   }
   assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
   for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scorePoints", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
+    assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Short labels remain readable");
   }
   assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
@@ -85,22 +101,37 @@ db.topic.update = async ({ data }) => {
   topic = { ...topic, ...data, questionsGenerated: data.questionsGenerated?.increment ? topic.questionsGenerated + data.questionsGenerated.increment : topic.questionsGenerated };
   return topic;
 };
-db.randomPoll.findMany = async () => [];
+let randomHistory = [], topicHistory = [];
+db.randomPoll.findMany = async ({ where, select, orderBy, take }) => {
+  assert.deepEqual(where, { guildId: "guild" });
+  assert.deepEqual(select, { question: true });
+  assert.deepEqual(orderBy, { createdAt: "desc" });
+  assert.equal(take, 365);
+  return randomHistory.slice(0, take);
+};
 db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => randomPoll = data;
-db.generatedPoll.findMany = async () => [];
+db.generatedPoll.findMany = async ({ where, select, orderBy, take }) => {
+  assert.deepEqual(where, { topicId: topic.id });
+  assert.deepEqual(select, { question: true });
+  assert.deepEqual(orderBy, { createdAt: "desc" });
+  assert.equal(take, 365);
+  return topicHistory.slice(0, take);
+};
 db.generatedPoll.create = async ({ data }) => generatedPoll = data;
 db.quizSettlement.create = async ({ data }) => data;
 db.$transaction = async callback => callback(db);
 let lastPrompt;
 let counter = 0;
+let questionTexts = [];
 globalThis.fetch = async (_, options) => {
   const body = JSON.parse(options.body);
   assert.equal(body.messages[0].role, "system");
   assert.ok(body.messages[0].content.includes(`(${settings.language})`));
   lastPrompt = body.messages[1].content;
   assert.equal(body.reasoning.enabled, false);
-  const q = { language: settings.language, topic: "Test", question: `Pytanie ${++counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
+  counter++;
+  const q = { language: settings.language, topic: "Test", question: questionTexts.shift() ?? `Pytanie ${counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
   return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(q) } }] }), { headers: { "content-type": "application/json" } });
 };
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
@@ -354,6 +385,26 @@ for (const name of ["settings", "language", "help", "ping", "score", "poll"]) {
   await routeCommand(legacy);
   assert.equal(legacy.replies.length, 0, "No legacy top-level aliases");
 }
+topicHistory = Array.from({ length: 366 }, (_, index) => ({ question: `Topic history ${index}?` }));
+questionTexts = [topicHistory[100].question, topicHistory[364].question, "A new topic question?"];
+resetTopicDay();
+const beforeTopicHistory = counter;
+await publishTopicQuestions(topic, channel);
+assert.equal(counter, beforeTopicHistory + 3, "Reject duplicates beyond 100 and at the 365th retained question");
+assert.equal(generatedPoll.question, "A new topic question?");
+assert.equal((lastPrompt.match(/Topic history \d+\?/g) ?? []).length, 20, "AI still receives at most 20 historical questions");
+questionTexts = [topicHistory[365].question];
+resetTopicDay();
+await publishTopicQuestions(topic, channel);
+assert.equal(generatedPoll.question, topicHistory[365].question, "Questions outside the 365-row window are not retained");
+randomHistory = Array.from({ length: 366 }, (_, index) => ({ question: `Random history ${index}?` }));
+questionTexts = [randomHistory[100].question, randomHistory[364].question, "A new random question?"];
+const beforeRandomHistory = counter;
+await handleTopic(interaction("random", { option_count: 4 }));
+assert.equal(counter, beforeRandomHistory + 3);
+assert.equal(randomPoll.question, "A new random question?");
+assert.equal((lastPrompt.match(/Random history \d+\?/g) ?? []).length, 20);
+randomHistory = []; topicHistory = [];
 const establishedSettings = settings;
 settings = undefined;
 const firstDefaults = interaction("defaults", { generation_hours: "00:00" });

@@ -1,7 +1,7 @@
 import type { SendableChannels } from "discord.js";
 import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
-import { generateQuestion } from "./question-generator.js";
+import { AiGenerationError, generateQuestion } from "./question-generator.js";
 import { getVotePrompt } from "../brand.js";
 import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
@@ -11,6 +11,17 @@ import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, va
 import { pollControls } from "./poll-controls.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
+
+const questionHistoryLimit = 365;
+
+export class QuizPublicationError extends Error {
+  readonly permissionDenied: boolean;
+  constructor(error: unknown) {
+    super("Quiz publication could not be confirmed");
+    this.name = "QuizPublicationError";
+    this.permissionDenied = !!error && typeof error === "object" && "code" in error && (error.code === 50013 || error.code === 50001);
+  }
+}
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels, early = true): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
@@ -24,7 +35,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       where: { topicId: topic.id },
       select: { question: true },
       orderBy: { createdAt: "desc" },
-      take: 100
+      take: questionHistoryLimit
     })).map((poll) => poll.question);
     const difficulty = parseDifficulty(topic.difficulty);
     const question = await generateUniqueQuestion(topic.name, language, options, topic.optionCount, previousQuestions, difficulty);
@@ -48,7 +59,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
         duration,
         allowMultiselect: false
       }
-    });
+    }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = settlementData(sentPoll, topic.guildId, difficulty, question.options, question.correctOption);
     const updatedTopic = await db.$transaction(async tx => {
       const updated = await tx.topic.update({
@@ -101,7 +112,7 @@ export async function publishRandomQuestion(
       where: { guildId },
       select: { question: true },
       orderBy: { createdAt: "desc" },
-      take: 100
+      take: questionHistoryLimit
     })).map((poll) => poll.question);
     const question = await generateUniqueQuestion(
       "a random, surprising and family-friendly general-knowledge topic",
@@ -126,7 +137,7 @@ export async function publishRandomQuestion(
         duration,
         allowMultiselect: false
       }
-    });
+    }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = settlementData(sentPoll, guildId, difficulty, question.options, question.correctOption);
     await db.$transaction(async tx => {
       await tx.randomPoll.create({
@@ -173,7 +184,7 @@ async function generateUniqueQuestion(
     if (!normalizedPrevious.has(normalizeQuestionText(question.question))) return question;
     previousQuestions.push(question.question);
   }
-  throw new Error("AI generated a duplicate question three times");
+  throw new AiGenerationError("invalid-response");
 }
 
 function normalizeQuestionText(value: string): string {

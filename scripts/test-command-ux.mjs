@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
   DISCORD_CLIENT_ID: "test", AI_PROVIDER: "openrouter", OPENROUTER_API_KEY: "test", OPENAI_API_KEY: "test",
-  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", QUIZ_TIMEZONE: "Europe/Warsaw" });
+  AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODELS: "", QUIZ_TIMEZONE: "Europe/Warsaw" });
 const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in UX test"); };
 globalThis.fetch = (...args) => fetchFixture(...args);
@@ -44,7 +44,9 @@ db.dailyQuizRun.create = async ({ data }) => { reservations++; return { ...data,
 db.dailyQuizRun.updateMany = async () => ({ count: 1 });
 db.dailyQuizRun.deleteMany = async () => { releases++; return { count: 1 }; };
 db.randomPoll.count = async () => 0;
+db.generatedPoll.count = async () => 0;
 db.randomPoll.findMany = async () => [];
+db.generatedPoll.findMany = async () => [];
 db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => { savedPoll = data; return data; };
 db.quizSettlement.create = async ({ data }) => data;
@@ -173,8 +175,38 @@ try {
   await invoke("random", { option_count: 3 }); assert.equal(sent.poll.answers.length, 3);
   const beforeWrongAnswers = { deliveries, releases };
   const wrong = await invoke("random", { options: "Yes,No" });
-  assert.equal(wrong.replies.at(-1), message("pl", "generationFailed"));
+  assert.equal(wrong.replies.at(-1), message("pl", "aiInvalidResponse"));
   assert.equal(deliveries, beforeWrongAnswers.deliveries); assert.ok(releases > beforeWrongAnswers.releases);
+  const successfulFetch = fetchFixture;
+  for (const subcommand of ["random", "run"]) {
+    topic.lastGeneratedAt = null;
+    const values = subcommand === "run" ? { name: "New" } : {};
+    for (const [status, key] of [[404, "aiUnavailable"], [429, "quota"], [401, "aiConfiguration"], [403, "aiConfiguration"]]) {
+      const before = { deliveries, releases };
+      fetchFixture = async () => new Response(JSON.stringify({ error: { message: "Fixture private provider details" } }), {
+        status, headers: { "content-type": "application/json" } });
+      const failed = await invoke(subcommand, values);
+      assert.equal(failed.replies.at(-1), message("pl", key));
+      assert.equal(deliveries, before.deliveries);
+      assert.ok(releases > before.releases, "AI failure releases reservations before any Discord send");
+      assert.doesNotMatch(failed.replies.at(-1), /Fixture|uprawnienia/);
+    }
+  }
+  fetchFixture = successfulFetch; generatedAnswers = ["A", "B", "C", "D"]; topic.optionCount = 4;
+  const successfulSend = channel.send;
+  for (const subcommand of ["random", "run"]) {
+    const values = subcommand === "run" ? { name: "New" } : {};
+    for (const code of [50013, 50001, 50000]) {
+      channel.send = async () => { deliveries++; throw { code, message: "Fixture private Discord details" }; };
+      const before = { requests, deliveries, releases };
+      const failed = await invoke(subcommand, values);
+      assert.equal(failed.replies.at(-1), message("pl", code === 50000 ? "generationFailed" : "publishPermission"));
+      assert.equal(requests, before.requests + 1); assert.equal(deliveries, before.deliveries + 1);
+      assert.equal(releases, before.releases, "Never release uncertain sends or publish twice");
+      assert.doesNotMatch(failed.replies.at(-1), /Fixture/);
+    }
+  }
+  channel.send = successfulSend;
   await handleTopicAutocomplete({ guildId: "guild", options: { getFocused: () => ({ name: "name", value: "" }), getSubcommand: () => "create" },
     respond: async choices => assert.deepEqual(choices, []) });
   const beforeRace = writes;
@@ -186,6 +218,9 @@ try {
     assert.ok(help.description.includes(message(language, "helpAnswers")));
     assert.ok(help.description.length < 4096 && help.fields.every(field => field.value.length < 1024));
     assert.ok(message(language, "languagePlaceholder").length <= 150);
+    for (const key of ["aiUnavailable", "aiInvalidResponse", "aiConfiguration", "publishPermission", "generationFailed"]) {
+      assert.ok(message(language, key).includes("~") && message(language, key).length < 2000);
+    }
   }
   console.log(JSON.stringify({ check: "command-ux", passed: true, sharedFields: true, dependentFields: true, noInvalidWrites: true,
     createOnly: true, configurePreservesState: true, customRandomAnswers: true, aiAnswerContract: true, localizedHelp: true }));

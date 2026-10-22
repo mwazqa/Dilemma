@@ -78,7 +78,11 @@ export const messages = {
   randomDone: ["Your quiz is ready~ **{name}**, {count} answers! (≧◡≦) ♡", "Quiz gotowy~ **{name}**, {count} odpowiedzi! (≧◡≦) ♡", "Dein Quiz ist fertig~ **{name}**, {count} Antworten! (≧◡≦) ♡", "¡Tu quiz está listo~ **{name}**, {count} respuestas! (≧◡≦) ♡", "Ton quiz est prêt~ **{name}**, {count} réponses ! (≧◡≦) ♡", "クイズ完成~ **{name}**、選択肢は{count}個！ (≧◡≦) ♡"],
   timeout: ["The AI ran out of time~ I haven't published a new quiz for this question. Try again shortly.", "AI nie zdążyło z odpowiedzią~ Dla tego pytania nie opublikowałam nowego quizu. Spróbuj za chwilę.", "Die KI hat nicht rechtzeitig geantwortet~ Für diese Frage wurde kein neues Quiz veröffentlicht. Versuche es gleich noch einmal.", "La IA no llegó a tiempo~ No he publicado un nuevo quiz para esta pregunta. Prueba de nuevo en un momento.", "L'IA n'a pas répondu à temps~ Je n'ai pas publié de nouveau quiz pour cette question. Réessaie dans un instant.", "AIの回答が時間切れになったよ~ この問題の新しいクイズは投稿していないよ。少し待って試してね。"],
   quota: ["The AI is taking a break because of provider limits or credits~ Please try again later.", "AI jest chwilowo niedostępne przez limity lub saldo dostawcy~ Wróć później.", "Die KI macht wegen Anbieterlimits oder Guthaben gerade Pause~ Versuche es später noch einmal.", "La IA está en pausa por los límites o el saldo del proveedor~ Vuelve a intentarlo más tarde.", "L'IA fait une pause à cause des limites ou du solde du fournisseur~ Réessaie plus tard.", "提供元の制限や残高の都合で、AIはひと休み中だよ~ 後でもう一度試してね。"],
-  generationFailed: ["I couldn't finish this quiz~ Check AI availability and the bot's Send Messages and Send Polls permissions.", "Nie udało mi się dokończyć quizu~ Sprawdź dostępność AI oraz uprawnienia bota do wysyłania wiadomości i ankiet.", "Ich konnte dieses Quiz nicht fertigstellen~ Prüfe die KI sowie die Bot-Berechtigungen Nachrichten senden und Umfragen senden.", "No he podido terminar este quiz~ Revisa la IA y los permisos del bot para enviar mensajes y encuestas.", "Je n'ai pas pu terminer ce quiz~ Vérifie l'IA et les permissions du bot pour envoyer des messages et des sondages.", "クイズを完成できなかったよ~ AIの状態と、ボットのメッセージ送信・投票送信の権限を確認してね。"],
+  aiUnavailable: ["The AI models are unavailable right now~ No new quiz was published. Please try again later.", "Modele AI są teraz niedostępne~ Nie opublikowałam nowego quizu. Spróbuj później.", "Die KI-Modelle sind gerade nicht verfügbar~ Es wurde kein neues Quiz veröffentlicht. Versuche es später erneut.", "Los modelos de IA no están disponibles ahora~ No he publicado un nuevo quiz. Inténtalo más tarde.", "Les modèles d'IA sont indisponibles~ Aucun nouveau quiz n'a été publié. Réessaie plus tard.", "今はAIモデルを利用できないよ~ 新しいクイズは投稿していないよ。後でもう一度試してね。"],
+  aiInvalidResponse: ["The AI couldn't prepare a valid question~ No new quiz was published. Let's try again later.", "AI nie przygotowało poprawnego pytania~ Nie opublikowałam nowego quizu. Spróbujmy później.", "Die KI konnte keine gültige Frage erstellen~ Es wurde kein neues Quiz veröffentlicht. Versuchen wir es später.", "La IA no pudo preparar una pregunta válida~ No he publicado un nuevo quiz. Probemos más tarde.", "L'IA n'a pas préparé de question valide~ Aucun nouveau quiz n'a été publié. Réessayons plus tard.", "AIが正しい形式の問題を作れなかったよ~ 新しいクイズは投稿していないよ。後でまた試そう。"],
+  aiConfiguration: ["The AI needs its access settings checked~ No new quiz was published. Please contact the bot operator.", "Trzeba sprawdzić ustawienia dostępu do AI~ Nie opublikowałam nowego quizu. Daj znać opiekunowi bota.", "Die KI-Zugangseinstellungen müssen geprüft werden~ Es wurde kein neues Quiz veröffentlicht. Informiere den Botbetreiber.", "Hay que revisar el acceso a la IA~ No he publicado un nuevo quiz. Avisa al responsable del bot.", "L'accès à l'IA doit être vérifié~ Aucun nouveau quiz n'a été publié. Préviens la personne qui gère le bot.", "AIへのアクセス設定を確認する必要があるよ~ 新しいクイズは投稿していないよ。ボットの管理者に知らせてね。"],
+  publishPermission: ["I couldn't send the quiz here~ Check my View Channel, Send Messages and Send Polls permissions.", "Nie mogłam wysłać tutaj quizu~ Sprawdź moje uprawnienia do wyświetlania kanału oraz wysyłania wiadomości i ankiet.", "Ich konnte das Quiz hier nicht senden~ Prüfe meine Rechte zum Anzeigen des Kanals und Senden von Nachrichten und Umfragen.", "No pude enviar el quiz aquí~ Revisa mis permisos para ver el canal y enviar mensajes y encuestas.", "Je n'ai pas pu envoyer le quiz ici~ Vérifie mes permissions de voir le salon et d'envoyer des messages et des sondages.", "ここにクイズを送れなかったよ~ チャンネルの表示・メッセージ送信・投票送信の権限を確認してね。"],
+  generationFailed: ["I couldn't confirm that the quiz finished~ Check the channel before trying again; a poll may already be there.", "Nie mogłam potwierdzić ukończenia quizu~ Przed ponowieniem sprawdź kanał; ankieta mogła już się pojawić.", "Ich konnte den Abschluss nicht bestätigen~ Prüfe vor einem neuen Versuch den Kanal; dort könnte schon eine Umfrage sein.", "No pude confirmar que el quiz terminara~ Revisa el canal antes de repetir; puede que la encuesta ya esté allí.", "Je n'ai pas pu confirmer la fin du quiz~ Vérifie le salon avant de réessayer ; le sondage est peut-être déjà là.", "クイズの完了を確認できなかったよ~ 再実行の前にチャンネルを確認してね。投票は届いているかもしれないよ。"],
   missing: ["I couldn't find topic **{name}**~ Have a look at `/dilemma list`.", "Nie znalazłam tematu **{name}**~ Sprawdź `/dilemma list`.", "Ich habe das Thema **{name}** nicht gefunden~ Schau unter `/dilemma list` nach.", "No he encontrado el tema **{name}**~ Echa un vistazo a `/dilemma list`.", "Je n'ai pas trouvé le thème **{name}**~ Regarde dans `/dilemma list`.", "テーマ **{name}** が見つからないよ~ `/dilemma list`を確認してね。"],
   optionsInvalid: ["Let's line up the answers~ Provide 2-4 distinct answers separated by commas, each at most 55 characters.", "Ułóżmy odpowiedzi~ Podaj 2-4 różne odpowiedzi oddzielone przecinkami, każda do 55 znaków.", "Sortieren wir die Antworten~ Gib 2-4 verschiedene Antworten mit Kommas getrennt an, jeweils höchstens 55 Zeichen.", "Ordenemos las respuestas~ Indica 2-4 respuestas distintas separadas por comas, de hasta 55 caracteres cada una.", "Préparons les réponses~ Donne 2-4 réponses différentes séparées par des virgules, de 55 caractères maximum chacune.", "回答を整えよう~ カンマで区切った異なる回答を2-4個、各55文字以内で入力してね。"],
   optionsMismatch: ["One little adjustment~ With custom answers, `option_count` must match their count.", "Jeszcze drobna poprawka~ Przy własnych odpowiedziach `option_count` musi odpowiadać ich liczbie.", "Noch eine kleine Anpassung~ Bei eigenen Antworten muss `option_count` ihrer Anzahl entsprechen.", "Un pequeño ajuste~ Con respuestas propias, `option_count` debe coincidir con su cantidad.", "Un petit ajustement~ Avec tes propres réponses, `option_count` doit correspondre à leur nombre.", "あと少し調整しよう~ 回答を指定する場合、`option_count`は回答数と一致させてね。"],
@@ -126,11 +130,52 @@ export const messages = {
   partial: ["Some questions may already be on the channel~ Check before trying again.", "Część pytań mogła już trafić na kanał~ Sprawdź go przed ponowną próbą.", "Einige Fragen könnten schon im Kanal sein~ Schau vor einem neuen Versuch nach.", "Puede que algunas preguntas ya estén en el canal~ Revisa antes de intentarlo de nuevo.", "Certaines questions sont peut-être déjà dans le salon~ Vérifie avant de réessayer.", "問題がすでにチャンネルに投稿されているかもしれないよ~ 再試行する前に確認してね。"],
 } as const satisfies Record<string, Translations>;
 export type MessageKey = keyof typeof messages;
+export const feedbackKaomoji: Partial<Record<MessageKey, string>> = {
+  welcome: "(｡･ω･｡)ﾉ",
+  topicCreated: "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧",
+  configured: "(๑•̀ㅂ•́)و✧",
+  defaultsSet: "(•̀ᴗ•́)و",
+  languageSet: "(｡･ω･｡)ﾉ",
+  randomDone: "(ﾉ≧∀≦)ﾉ",
+  runDone: "(ง •̀ω•́)ง",
+  pollDone: "(๑˃ᴗ˂)ﻭ",
+  badgeSet: "(✿◠‿◠)",
+  generating: "(っ˘ω˘ς)",
+  pollClosing: "(｡•ᴗ•｡)っ",
+  randomCooldown: "( ˘ω˘ )",
+  topicDailyLimit: "(˘︶˘)",
+  randomDailyLimit: "(˘︶˘)",
+  timeout: "(｡•́︿•̀｡)",
+  quota: "(´・ω・)",
+  generationFailed: "(｡•́︿•̀｡)",
+  aiUnavailable: "(｡•́︿•̀｡)",
+  aiInvalidResponse: "(・_・ヾ)",
+  aiConfiguration: "(´・ω・)",
+  publishPermission: "(｡•́‿•̀｡)",
+  pollFailed: "(｡•́︿•̀｡)",
+  error: "(｡•́‿•̀｡)",
+  permission: "(｡•́‿•̀｡)",
+  missing: "(・_・ヾ)",
+  optionsInvalid: "(・_・ヾ)",
+  optionsMismatch: "(・_・ヾ)",
+  dateInvalid: "(•̀ᴗ•́)و",
+  timeInvalid: "(•̀ᴗ•́)و",
+  scheduleTimeRequired: "(•̀ᴗ•́)و",
+  helpIntro: "(๑˘︶˘๑)",
+  ping: "(｡･∀･)ﾉﾞ",
+  scoreEmpty: "(っ•ᴗ•)っ"
+};
 export function normalizeLanguage(language: string): Language {
   const base = language.toLowerCase().split("-")[0];
   return messageLanguages.includes(base as Language) ? base as Language : "en";
 }
 export function message(language: string, key: MessageKey, values: Record<string, string | number> = {}): string {
-  const text = messages[key][messageLanguages.indexOf(normalizeLanguage(language))];
+  let text: string = messages[key][messageLanguages.indexOf(normalizeLanguage(language))];
+  const kaomoji = feedbackKaomoji[key];
+  if (kaomoji) {
+    const [firstLine, ...remainingLines] = text.split("\n");
+    const heading = firstLine.replace(/\s*\(≧◡≦\)(?:\s*♡)?|\s*\(｡•̀ᴗ-\)✧/gu, "").replace(/\s*♡$/u, "").trimEnd();
+    text = [`${heading} ${kaomoji}`, ...remainingLines].join("\n");
+  }
   return text.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`));
 }

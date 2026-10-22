@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.8.1-beta - 2026-10-22
+
+- Recover from unavailable OpenRouter models through an ordered, configurable three-model free pool with zero-price routing guards, per-attempt and shared overall deadlines, bounded retries and unchanged account privacy settings. Validate output before publication and distinguish AI unavailability, limits, invalid output and access configuration from Discord publication permissions in all six languages. Add fallback and command-stage regression tests; preserve reservation release before send and never retry uncertain publication.
+- Add varied, contextual kaomoji for success, waiting, guidance and recoverable failures in all six languages. Keep styling deterministic, preserve user text and existing placeholders, and leave compact labels, profile names and permanent-deletion warnings undecorated.
+- Increase duplicate-question history from 100 to 365 recent questions per saved topic and per server's random history. Preserve separate scopes, local normalized-text comparisons, the 20-question AI prompt cap and existing retry/timeout limits. Add regressions for duplicates beyond the former limit and at the new window boundary; no schema or command-registration changes are needed.
+
 ## v0.8.0-beta - 2026-10-22
 
 - Unify new-topic creation and existing-topic configuration around the same scheduling-first fields, including voting duration and AI answer count. Stop overwriting existing topics through `create`; preserve omitted settings, enabled state, channel and history through `configure`. Validate dates, dependent publication times, counts and ranges before writing; allow clearing a date/time pair without resetting quota. Keep legacy fixed topic answers unless answer count is explicitly changed.

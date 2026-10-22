@@ -8,14 +8,14 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Current MVP:
 
-Latest release: `v0.8.0-beta`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v0.8.1-beta`. See [CHANGELOG.md](CHANGELOG.md).
 
-Version v0.8.0-beta unifies topic setup, adds custom answers to random quizzes and refreshes Dilemma's localized feedback. Upgrades from v0.7.0-beta require refreshed slash-command registration, but no additional database migration. Older deployments must first apply the migrations described below.
+Version v0.8.1-beta extends duplicate-question comparisons to 365 recent questions while keeping the AI history prompt capped at 20. Commands and database schema are unchanged from v0.8.0-beta. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
-- OpenRouter support with configurable model
+- OpenRouter support with ordered, free-model fallbacks
 - AI-generated topic answers and optional custom answers for on-demand random quizzes
 - Topic intervals, one question per run, configurable poll duration, fixed generation time and optional first publication date
 - Automatic scheduled generation
@@ -28,7 +28,7 @@ Version v0.8.0-beta unifies topic setup, adds custom answers to random quizzes a
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 - Server-specific cosmetic achievements and up to three selected profile badge icons, derived from settled scores
 
-Command replies, onboarding, language selection, help and quiz controls use the same warm voice across all six languages, including badge selection, cooldowns and validation. Short statistic labels stay concise; permanent-deletion warnings speak in Dilemma's voice but stay explicit and undecorated. Profile names have no added decorations. Native Discord command and option descriptions intentionally remain neutral English text.
+Command replies, onboarding, language selection, help and quiz controls use the same warm voice across all six languages, including badge selection, cooldowns and validation. Success, waiting, guidance and recoverable failures use varied, contextual kaomoji, chosen consistently by message rather than randomly. Styling is applied before user values are inserted, so names and custom text stay intact. Short statistic labels stay concise; permanent-deletion warnings speak in Dilemma's voice but stay explicit and undecorated. Profile names have no added decorations. Native Discord command and option descriptions intentionally remain neutral English text.
 
 ## Setup
 
@@ -57,10 +57,20 @@ Required variables:
 - DISCORD_REGISTER_GLOBAL, set `true` for global command registration
 - `AI_PROVIDER=openrouter`
 - OPENROUTER_API_KEY
-- OPENROUTER_MODEL, default: `nvidia/nemotron-3-super-120b-a12b:free`. Nemotron 3 Super requests use JSON mode with reasoning disabled. Free-provider rate limits still apply.
+- OPENROUTER_MODEL, default: `dots-studio/dots-3-note-preview:free`
 - DATABASE_URL, default: `file:./dev.db`
 
 Never commit .env or bot/API keys.
+
+### AI availability and free fallbacks
+
+The default OpenRouter pool contains three models, in this order: `dots-studio/dots-3-note-preview:free`, `xingchen-agi/xing4.0-29b-a4b:free`, `google/gemma-4-31b-it:free`. They use different model families and upstream providers, but all still depend on OpenRouter. Free availability and limits can change; neither a fallback pool nor a successful smoke test guarantees uptime or factual accuracy.
+
+`OPENROUTER_FALLBACK_MODELS` overrides the comma-separated list with up to three `:free` IDs; an empty value disables model fallbacks. The configured primary is tried first, and duplicate IDs are removed. Existing installations retaining the older Nemotron primary can therefore recover through the default fallback pool without changing credentials. Requests for `:free` models enforce zero prompt, completion and per-request price ceilings. There is no automatic switch to a paid model, paid variant or another API account. An explicitly configured paid primary or `AI_PROVIDER=openai` remains an operator choice, not a free fallback.
+
+Each unique model gets one attempt; `AI_MAX_RETRIES` (default 3) adds at most that many further attempts across the pool, not per model. Provider unavailability, 404, transient failures, 429, timeouts and invalid quiz responses can advance to the next model. Authentication, access-policy and account-balance errors stop the request; the bot never loosens privacy settings. `AI_MODEL_TIMEOUT_MS` defaults to 12000 per OpenRouter attempt; `AI_GENERATION_TIMEOUT_MS` defaults to 60000 overall, including queue waits, retries and duplicate-question attempts. `AI_MIN_INTERVAL_MS` still spaces all API calls. No model catalog or database health polling is added.
+
+Free-pool requests use JSON mode with reasoning disabled and require parameter support. Responses still undergo schema, declared-language, answer-count and custom-answer validation before publication. AI failures have separate localized feedback from Discord permission errors; uncertain sends ask the user to check the channel before retrying. An AI failure before sending releases the quiz reservation; publication is never retried automatically. `npm run test:ai` covers fallback ordering, price guards, access errors, invalid output, deadlines and bounded attempts with synthetic fixtures.
 
 ## Commands
 
@@ -94,6 +104,10 @@ Use `/dilemma defaults generation_hours:18:30` to choose the publication time fo
 Topic forms follow the planning sequence: name, first date, publication time, repeat interval, voting duration, difficulty and answer count. Date-based scheduling requires a time: a new topic can inherit the server default, while an existing topic keeps its saved time unless explicitly changed. You can clear date and time together. A date without a time is rejected before writing. Duration is independent of repeat interval and uses whole hours (1-24), so it cannot exceed the shortest one-day interval. Random duration can outlast its eight-hour cooldown; active polls can overlap.
 
 Discord does not support conditionally hidden or conditionally required slash-command options. The bot validates dependent fields before changing a topic, reserving random quota or calling AI; it explains missing or conflicting values privately. Custom answers cannot be empty, duplicated ignoring case, longer than 55 characters or outside the 2-4 answer range. AI output must match the requested answer count and preserve custom text and order; mismatches retry within the existing timeout and retry budget, then fail without publishing. Existing topics with legacy fixed answers keep them until `configure option_count` explicitly switches them to generated answers. `npm run test:command-ux` covers the forms, dependencies, permissions, preserved settings and random answer flow with local fixtures, not live Discord or AI calls.
+
+### Duplicate questions
+
+Duplicate-question checks compare against the latest 365 published questions within the same saved topic, or the latest 365 random questions on the same server. These histories remain separate; topics are not compared with each other or with random quizzes. Comparison normalizes letter case and whitespace, not meaning or paraphrases. The AI avoidance prompt still contains at most 20 historical questions per attempt; the larger comparison window stays local to the bot. Duplicate candidates can trigger up to three generation attempts within the existing overall timeout.
 
 ### Plan topics ahead by date
 
