@@ -126,7 +126,8 @@ export async function generateQuestion(
               provider: { require_parameters: true, ...(model.endsWith(":free") ? { max_price: { prompt: 0, completion: 0, request: 0 } } : {}) }
             } : {})
           }, { signal: requestSignal });
-          return response.choices[0]?.message.content ?? "";
+          const content = response.choices?.[0]?.message?.content;
+          return typeof content === "string" ? content : "";
         }
         const response = await client.responses.create({
           model: env.OPENAI_MODEL,

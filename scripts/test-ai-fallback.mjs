@@ -25,7 +25,7 @@ globalThis.fetch = async (_, options) => {
   });
   const payload = action.status ? { error: { message: "Fixture provider failure" } } : { choices: [{ message: {
     content: action.content ?? JSON.stringify({ ...fixture, ...action.question }) } }] };
-  return new Response(JSON.stringify(payload), { status: action.status ?? 200, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(action.payload ?? payload), { status: action.status ?? 200, headers: { "content-type": "application/json" } });
 };
 const { env } = await import("../dist/config.js");
 const { generateQuestion, AiGenerationError, AiGenerationTimeoutError } = await import("../dist/services/question-generator.js");
@@ -46,7 +46,8 @@ try {
     await assert.rejects(generate(), error => error instanceof AiGenerationError && error.kind === kind);
     assert.equal(requests.length, 1, "Account and invalid-request errors never bypass access settings");
   }
-  for (const invalid of [{ content: "" }, { content: "{broken}" }, { question: { language: "en" } },
+  for (const invalid of [{ payload: { error: { message: "Fixture incomplete response" } } }, { payload: { choices: [{}] } },
+    { payload: { choices: [{ message: { content: {} } }] } }, { content: "" }, { content: "{broken}" }, { question: { language: "en" } },
     { question: { options: ["A", "B"] } }, { question: { correctOption: 7 } }]) {
     reset([invalid, {}]); await generate(); assert.deepEqual(requests, models.slice(0, 2));
   }
