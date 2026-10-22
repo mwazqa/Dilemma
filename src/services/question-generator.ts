@@ -175,7 +175,7 @@ export async function generateQuestion(
 
 function generationError(error: unknown): AiGenerationError {
   if (error instanceof AiGenerationError) return error;
-  if (error instanceof OpenAI.APIConnectionTimeoutError || error instanceof OpenAI.APIUserAbortError) return new AiGenerationTimeoutError();
+  if (isRequestTimeout(error)) return new AiGenerationTimeoutError();
   const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
   if (status === 401 || status === 403) return new AiGenerationError("configuration");
   if (status === 402 || status === 429) return new AiGenerationError("limit");
@@ -183,8 +183,13 @@ function generationError(error: unknown): AiGenerationError {
   return new AiGenerationError();
 }
 
+function isRequestTimeout(error: unknown): boolean {
+  return error instanceof AiGenerationTimeoutError || error instanceof OpenAI.APIConnectionTimeoutError || error instanceof OpenAI.APIUserAbortError ||
+    (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError"));
+}
+
 function isRetryableAiError(error: unknown): boolean {
-  if (error instanceof AiLanguageMismatchError || error instanceof AiAnswerOptionsMismatchError || error instanceof SyntaxError || error instanceof OpenAI.APIConnectionError || error instanceof OpenAI.APIUserAbortError) return true;
+  if (isRequestTimeout(error) || error instanceof AiLanguageMismatchError || error instanceof AiAnswerOptionsMismatchError || error instanceof SyntaxError || error instanceof OpenAI.APIConnectionError) return true;
   if (!error || typeof error !== "object") return false;
   const apiError = error as { status?: number; code?: string; name?: string };
   const message = error instanceof Error ? error.message : "";

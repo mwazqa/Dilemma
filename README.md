@@ -8,9 +8,9 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 Stable release:
 
-Latest release: `v1.0.0`. See [CHANGELOG.md](CHANGELOG.md).
+Latest release: `v1.0.1`. See [CHANGELOG.md](CHANGELOG.md).
 
-Version v1.0.0 is the first stable release. It adds on-demand discovery of compatible free models after the preferred OpenRouter pool fails, while retaining quiz generation, calendar schedules, points, EXP, levels, rankings, achievements and six-language feedback. Commands and database schema are unchanged from v0.8.1-beta. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below. Stable release status does not provide an uptime or correctness guarantee for external AI services.
+Version v1.0.1 fixes model failover when an HTTP response body is interrupted by a raw abort or timeout. These errors now advance to the next preferred or discovered free model within the existing overall deadline, rather than stopping with misleading unavailable-model feedback. The first stable release, v1.0.0, introduced on-demand free-model discovery. Quiz generation, calendar schedules, points, EXP, levels, rankings, achievements and six-language feedback remain unchanged. No database migration or command registration refresh is needed from v1.0.0. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below. Stable release status does not provide an uptime or correctness guarantee for external AI services.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`

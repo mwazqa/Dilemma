@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v1.0.1 - 2026-10-22
+
+- Treat raw `AbortError` and `TimeoutError` failures during response-body reads as recoverable model timeouts. Advance to the next preferred or discovered free model while the overall deadline permits, instead of stopping with misleading model-unavailable feedback. Report exhausted model timeouts as timeouts; never retry after the shared overall deadline.
+- Add regression coverage using partial HTTP 200 JSON response bodies interrupted during reading, including fallback ordering, raw abort/timeout variants, dynamic discovery, exhausted attempts, request-queue recovery and overall-deadline enforcement. Keep account privacy settings, zero-price guards, attempt limits, quiz validation and publication safety unchanged. No database migration or command registration refresh is required.
+
 ## v1.0.0 - 2026-10-22
 
 - Publish the first stable Dilemma release, retaining topic calendars, random quizzes, native Discord polls, six-language feedback, guild-scoped scoring, EXP, levels, rankings and cosmetic achievements. Stable release status does not guarantee external AI availability or factual accuracy.

@@ -92,6 +92,9 @@ try {
     const body = JSON.parse(options.body); requests.push(body.model);
     assert.deepEqual(body.provider.max_price, { prompt: 0, completion: 0, request: 0 });
     assert.equal(body.provider.require_parameters, true); assert.equal(body.response_format.type, "json_object");
+    if (mode === "body-abort" && body.model === "fixture/primary:free") return new Response(new ReadableStream({
+      start(controller) { controller.error(new DOMException("Fixture interrupted response body", "AbortError")); }
+    }), { headers: { "content-type": "application/json" } });
     let status = 200;
     if (mode === "forbidden") status = 403;
     else if (mode === "all-fail" || (mode === "rescue" && body.model === "fixture/primary:free")) status = 404;
@@ -109,6 +112,10 @@ try {
   mode = "rescue"; requests = [];
   await generate(); assert.equal(catalogCalls, before + 1);
   assert.deepEqual(requests, ["fixture/primary:free", entries[0].id]);
+  mode = "body-abort"; requests = [];
+  await generate(); assert.equal(catalogCalls, before + 1);
+  assert.equal(requests.length, 2); assert.equal(requests[0], "fixture/primary:free");
+  assert.ok(entries.some(entry => entry.id === requests[1]), "Body-read abort enters dynamic discovery after preferred models fail");
   mode = "all-fail"; requests = [];
   await assert.rejects(generate(), AiGenerationError);
   assert.equal(requests.length, 4, "One primary plus at most three discovered candidates");

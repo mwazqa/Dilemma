@@ -18,6 +18,12 @@ globalThis.fetch = async (_, options) => {
   assert.equal(body.response_format.type, "json_object");
   assert.equal(body.reasoning.enabled, false);
   const action = actions.shift() ?? {};
+  if (action.bodyAbort) return new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode('{"choices":['));
+    const abort = () => controller.error(new DOMException("Fixture interrupted response body", action.bodyAbort));
+    if (action.immediate || options.signal.aborted) abort();
+    else options.signal.addEventListener("abort", abort, { once: true });
+  } }), { headers: { "content-type": "application/json" } });
   if (action.hang) return new Promise((_, reject) => {
     const abort = () => reject(new DOMException("Aborted", "AbortError"));
     if (options.signal.aborted) abort();
@@ -32,6 +38,7 @@ const { generateQuestion, AiGenerationError, AiGenerationTimeoutError } = await 
 const models = [env.OPENROUTER_MODEL, ...env.OPENROUTER_FALLBACK_MODELS];
 const reset = values => { actions = values; requests = []; };
 const generate = signal => generateQuestion("Kosmos", "pl", [], 4, [], signal);
+const keepAlive = setInterval(() => {}, 1000);
 try {
   assert.equal(new Set(models).size, 4);
   for (const status of [404, 408, 409, 429, 500, 503]) {
@@ -57,6 +64,17 @@ try {
   reset([{ hang: true }, {}]);
   const started = Date.now(); await generate();
   assert.equal(requests.length, 2); assert.ok(Date.now() - started < 2500);
+  for (const name of ["AbortError", "TimeoutError"]) {
+    reset([{ bodyAbort: name }, {}]);
+    await generate(); assert.deepEqual(requests, models.slice(0, 2), "Timeout while reading a response body advances to the next model");
+    reset(models.map(() => ({ bodyAbort: name, immediate: true })));
+    await assert.rejects(generate(), AiGenerationTimeoutError, "Exhausted body timeouts use timeout feedback rather than unavailable-model feedback");
+    assert.deepEqual(requests, models, "Body timeouts remain within the model-attempt budget");
+  }
+  reset([{ bodyAbort: "AbortError" }]);
+  await assert.rejects(generate(AbortSignal.timeout(80)), AiGenerationTimeoutError);
+  assert.equal(requests.length, 1, "Overall deadline stops fallback even while a response body is open");
+  reset([{}]); await generate(); assert.equal(requests.length, 1, "Response-body cancellation releases the request queue");
   reset([{ hang: true }]);
   await assert.rejects(generate(AbortSignal.timeout(80)), AiGenerationTimeoutError);
   assert.equal(requests.length, 1, "Overall deadline prevents further attempts");
@@ -82,4 +100,7 @@ try {
   }
   console.log(JSON.stringify({ check: "ai-fallback", passed: true, orderedFreeModels: true, priceCeiling: true,
     providerFailures: true, validationFailures: true, boundedRetries: true, deadlines: true, noAccessBypass: true }));
-} finally { globalThis.fetch = realFetch; }
+} catch (error) {
+  console.error(JSON.stringify({ check: "ai-fallback", passed: false, category: error instanceof assert.AssertionError ? "assertion" : "test-error",
+    line: Number(error.stack?.match(/test-ai-fallback\.mjs:(\d+)/)?.[1] ?? 0) })); process.exitCode = 1;
+} finally { clearInterval(keepAlive); globalThis.fetch = realFetch; }
