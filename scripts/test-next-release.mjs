@@ -66,7 +66,7 @@ for (const language of messageLanguages) {
   assert.ok(getHelpContent(language).length < 4000);
   const card = getHelpEmbed(language).toJSON();
   assert.equal(card.title, message(language, "helpIntro"));
-  assert.equal(card.fields.length, 3);
+  assert.equal(card.fields.length, 4);
   assert.ok(card.fields.every(field => field.value.length <= 1024));
   const commands = card.fields.map(field => field.value).join("\n");
   assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
@@ -141,7 +141,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "defaults", "ping", "score", "poll"].sort());
+  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "defaults", "permissions", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);

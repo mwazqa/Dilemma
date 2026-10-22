@@ -17,6 +17,10 @@ progress used for achievements.
 Server leaderboards and profiles can display these scores to other
 members of the same server. Usernames and avatars are not stored for scoring.
 
+When delegated bot management is configured, server configuration includes the
+selected management role's Discord ID. The bot uses it only to authorize
+management actions and does not grant Discord server permissions.
+
 Profile cards temporarily process the player's Discord display name, avatar and
 score in memory to render an image. Avatars are fetched only from Discord's CDN.
 Card rendering does not send this data to an AI provider, write player images to

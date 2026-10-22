@@ -5,6 +5,7 @@ import { handlePoll, pollCommand } from "./poll.js";
 import { handleScore, handleScoreAutocomplete, scoreCommand } from "./score.js";
 import { defaultsCommand, handleSettings, languageCommand } from "./settings.js";
 import { handleTopic, handleTopicAutocomplete, topicCommand } from "./topic.js";
+import { handlePermissions, permissionsCommand } from "./permissions.js";
 
 export const dilemmaCommand = topicCommand
   .setDescription("Dilemma quizzes, profile, leaderboard and server settings.")
@@ -12,9 +13,10 @@ export const dilemmaCommand = topicCommand
   .addSubcommand(defaultsCommand)
   .addSubcommand(pingCommand)
   .addSubcommandGroup(scoreCommand)
-  .addSubcommandGroup(pollCommand);
+  .addSubcommandGroup(pollCommand)
+  .addSubcommandGroup(permissionsCommand);
 
-const commandOrder = ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "defaults", "poll", "help", "ping", "delete"];
+const commandOrder = ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "defaults", "permissions", "poll", "help", "ping", "delete"];
 dilemmaCommand.options.sort((first, second) => commandOrder.indexOf(first.toJSON().name) - commandOrder.indexOf(second.toJSON().name));
 
 export async function routeCommand(interaction: ChatInputCommandInteraction) {
@@ -22,6 +24,7 @@ export async function routeCommand(interaction: ChatInputCommandInteraction) {
   const group = interaction.options.getSubcommandGroup(false);
   if (group === "score") { await handleScore(interaction); return; }
   if (group === "poll") { await handlePoll(interaction); return; }
+  if (group === "permissions") { await handlePermissions(interaction); return; }
   if (group !== null) { await handleHelp(interaction); return; }
   const subcommand = interaction.options.getSubcommand();
   if (subcommand === "language" || subcommand === "defaults") { await handleSettings(interaction); return; }

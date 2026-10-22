@@ -6,11 +6,13 @@ Dilemma lets Discord communities configure quiz topics and daily question limits
 
 ## Current status
 
-Stable release:
+Release preparation:
 
-Latest release: `v2.0.0`. See [CHANGELOG.md](CHANGELOG.md).
+Code version: `v2.0.0`. See [CHANGELOG.md](CHANGELOG.md).
 
-Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking configuration change: provision `OPENAI_API_KEY` and replace the old provider settings using `.env.example`. Inference is paid; the default model is `gpt-6-luna`, with strict JSON output, low reasoning effort and bounded output/retries. Quiz schedules, points, EXP, levels, rankings, achievements and six-language feedback remain unchanged. No database migration or command registration refresh is needed from v1.0.1. Upgrades from v0.7.0-beta still require the command registration refresh introduced in v0.8.0-beta; older deployments must first apply the migrations described below. Stable release status does not guarantee external AI availability or factual accuracy.
+Version v2.0.0 also adds delegated management roles. Apply the additive `20261022160000_manager_role` migration and re-register commands before using this feature. Existing servers keep administrator-only management until a role is explicitly selected.
+
+Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking configuration change: provision `OPENAI_API_KEY` and replace the old provider settings using `.env.example`. Inference is paid; the default model is `gpt-6-luna`, with strict JSON output, low reasoning effort and bounded output/retries. Quiz schedules, points, EXP, levels, rankings, achievements and six-language feedback remain unchanged. Upgrading from v1.0.1 requires the management-role migration and command registration refresh noted above. Older deployments must also apply the earlier migrations described below. Stable release status does not guarantee external AI availability or factual accuracy.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
@@ -90,7 +92,7 @@ See the current [OpenAI model documentation](https://developers.openai.com/api/d
 - `/dilemma defaults` - set generation defaults; optional `generation_hours:HH:mm` sets the publication time inherited by new topics
 - `/dilemma ping` - check whether the bot is online
 - `/dilemma poll end` - end a poll and publish its result
-- Each new quiz also has a localized **Let's end this quiz** button. Members with Manage Server permission can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
+- Each new quiz also has a localized **Let's end this quiz** button. Members with Manage Server permission or the configured Dilemma management role can close that poll without copying its message ID; button feedback is private. The button and `/dilemma poll end` use the same validation and scoring flow. Early closing does not reset daily quota. Controls are disabled after manual closing or finalized automatic scoring; handling uses persistent message records and works after a restart.
 - `/dilemma score profile user:optional` - show points, accuracy, current and best correct-answer streak
 - Score cards also show the player's level and EXP progress, separately from answer accuracy.
 - Profile headers show only the player's display name, without a title prefix or added decorations. A compact rank badge sits beside the avatar on the same line as the name. The top three places have prominent gold, silver and bronze styling; other places use a muted badge. Ranking matches `/dilemma score leaderboard`: points descending, correct answers descending, then user ID ascending to resolve ties. Players without settled answers show a dash, with a localized explanation in accessible text; incorrect settled answers still count as participation.
@@ -100,7 +102,17 @@ See the current [OpenAI model documentation](https://developers.openai.com/api/d
 - `/dilemma score badge achievement:...` - select one unlocked badge or hide it with `none`
 - `/dilemma score forget confirm:true` - permanently delete your stored answers and score on the current server
 
-Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to refresh command descriptions. Registration groups frequent player actions first, then topic setup and operation, server settings, poll controls and help; topic deletion is last. Discord clients may apply their own display sorting. Help, ping, score and random quizzes are available to ordinary players, subject to Discord's own application-command and channel permissions. Language, defaults, topic management, scheduled-topic runs and closing any quiz require Manage Server permission, checked in their handlers rather than on the shared root command. Creating a random quiz does not grant permission to close it: both the localized close button and `/dilemma poll end` stay administrative for random and scheduled quizzes.
+Only `/dilemma` is registered; standalone `/settings`, `/language`, `/help`, `/poll`, `/ping` and `/score` are not aliases. Re-register commands after upgrading to refresh command descriptions. Registration groups frequent player actions first, then topic setup and operation, server settings, delegated access, poll controls and help; topic deletion is last. Discord clients may apply their own display sorting. Help, ping, score and random quizzes are available to ordinary players, subject to Discord's own application-command and channel permissions. Language, defaults, topic management, scheduled-topic runs and closing any quiz require Manage Server permission or the configured management role, checked in their handlers rather than on the shared root command. Creating a random quiz does not grant permission to close it. The localized close button and `/dilemma poll end` use the same management check for random and scheduled quizzes. Topic-name autocomplete is also restricted to managers.
+
+### Delegate bot management without server administration
+
+1. A server administrator creates an ordinary Discord role with any name, for example `Quiz Keeper`. Do not give it Manage Server or Administrator just to manage Dilemma.
+2. A member with Manage Server runs `/dilemma permissions set role:@Quiz Keeper` once on that server.
+3. Assign that role to the members who should manage Dilemma. The bot does not create roles, assign roles or change Discord permissions.
+
+Role members can manage topics, schedules, language/defaults and quiz closing, but cannot change the delegated role. `/dilemma permissions show` displays the configured role to managers. Only a member with Manage Server, including administrators, can use `/dilemma permissions set` or `/dilemma permissions clear`. Clearing the setting restores administrator-only management immediately. Removing the role from a member removes their access on their next interaction. Role IDs, not names, determine access, and each server has its own setting. `@everyone`, integration-managed, deleted and foreign-server roles cannot be selected. Existing servers have no delegated role by default.
+
+Delegation grants access to Dilemma only; any unrelated Discord permissions already attached to that role still apply. Members also need the normal Discord permissions to view the channel and use application commands. Discord integration/channel restrictions remain in force. Settings are cached and updated after role changes made through these commands, without new background queries. Before enabling this feature, apply `20261022160000_manager_role` on an isolated test database and then production with a backup, and re-register commands. `npm run test:permissions` verifies authorization with synthetic fixtures and no external API or production database calls.
 
 Omitted difficulty uses the server default for random quizzes and new topics. Existing topics keep their saved level. `/dilemma defaults` can set a new default without changing existing topics. Existing data migrates to medium.
 

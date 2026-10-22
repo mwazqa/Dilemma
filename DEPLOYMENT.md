@@ -85,6 +85,8 @@ DATABASE_URL=postgresql://...
 
 ## Register commands
 
+For the v2.0.0 management-role feature, apply the additive `20261022160000_manager_role` migration before starting the new code, then register commands. Existing servers retain administrator-only management until a member with Manage Server explicitly selects a role through `/dilemma permissions set`. Validate the migration on an isolated database and retain a production backup before applying it. Never apply schema changes automatically from the running bot.
+
 Run registration once from the VM, using the same `.env`:
 
 ```bash

@@ -37,6 +37,11 @@ try {
   const settings = database.prepare('SELECT * FROM "GuildSettings" WHERE guildId = ?').get("test");
   assert.equal(settings.defaultDifficulty, "medium");
   assert.equal(settings.language, "pl");
+  assert.equal(settings.managerRoleId, null, "Existing servers keep administrator-only management");
+  const managementMigration = "20261022160000_manager_role/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${managementMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${managementMigration}`, "utf8"));
+  database.exec(`UPDATE "GuildSettings" SET "managerRoleId" = 'fixture-role' WHERE "guildId" = 'test'`);
+  assert.equal(database.prepare('SELECT managerRoleId FROM "GuildSettings" WHERE guildId = ?').get("test").managerRoleId, "fixture-role");
   assert.equal(settings.defaultPollDurationHours, 24);
   assert.equal(settings.defaultGenerationTime, null, "Do not automatically enable schedules for existing servers");
   const scheduleMigration = "20261012120000_default_generation_time/migration.sql";

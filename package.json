@@ -15,6 +15,7 @@
     "test:ai": "node scripts/test-ai-generation.mjs && node scripts/test-ai-errors.mjs",
     "test:features": "node scripts/test-next-release.mjs",
     "test:command-ux": "node scripts/test-command-ux.mjs",
+    "test:permissions": "node scripts/test-management-permissions.mjs",
     "test:quiz-limits": "node scripts/test-quiz-limits.mjs",
     "test:topic-calendar": "node scripts/test-topic-calendar.mjs",
     "test:topic-calendar:postgres": "node scripts/test-topic-calendar-postgres.mjs",

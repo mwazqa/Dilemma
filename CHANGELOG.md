@@ -4,9 +4,13 @@
 
 ## v2.0.0 - 2026-10-22
 
+- Add a server-specific delegated management role, configured with `/dilemma permissions set role:...`, inspected with `show` and removed with `clear`. Members of this ordinary Discord role can manage Dilemma topics, settings and quiz closing without Manage Server. Only members with Manage Server, including administrators, can change the delegation. Keep player commands public and enforce the same checks on close buttons and topic autocomplete.
+- Add the nullable `GuildSettings.managerRoleId` field in matching additive SQLite/PostgreSQL migrations. Existing servers retain administrator-only management until a role is explicitly configured. Update cached settings immediately after a configuration change; do not poll or grant Discord permissions. Upgrade requires the new migration and command re-registration.
+- Add six-language feedback/help and isolated authorization regressions for privilege escalation, server isolation, revoked roles, invalid role selection, command/button parity and cached authorization. Include these tests in CI and production deployment checks.
+
 - Replace the free-model provider pool and discovery with direct OpenAI Responses API generation using `gpt-6-luna` by default. Remove obsolete provider configuration and model-selection helpers. Keep historical release notes unchanged.
 - Require strict JSON output, disable response storage, bound output to 2048 tokens by default, use low reasoning effort and one additional attempt by default. Respect retry delays and shared deadlines; never retry insufficient account quota, refusals or incomplete output automatically. Preserve six-language validation, custom answers, duplicate detection, quiz quotas and publication safety.
-- Update setup, deployment and privacy documentation and replace provider-specific tests with OpenAI contract and failure regressions. No database migration or command registration change is required. Deployment requires a fresh private API key; exposed keys must be revoked.
+- Update setup, deployment and privacy documentation and replace provider-specific tests with OpenAI contract and failure regressions. The delegated role feature requires its additive database migration and Discord command re-registration. Deployment requires a fresh private API key; exposed keys must be revoked.
 
 ## v1.0.1 - 2026-10-22
 

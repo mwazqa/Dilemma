@@ -7,6 +7,7 @@ const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { pollControls, END_QUIZ_BUTTON_ID } = await import("../dist/services/poll-controls.js");
 const { runDueSettlements } = await import("../dist/services/scoring.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
+const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 
 for (const language of messageLanguages) {
   const button = pollControls(language)[0].toJSON().components[0];
@@ -17,7 +18,10 @@ for (const language of messageLanguages) {
 }
 let stored, discordMessage, ends, patches, results, settlementUpdates, denyClaim, failEnd, failPatch, gate;
 let random = false, recorded = true;
+let managerRoleId = null;
 function reset() {
+  managerRoleId = null;
+  clearGuildSettingsCache();
   stored = { messageId: "poll", guildId: "guild", channelId: "channel", endedAt: null,
     options: "Alpha||Beta", correctOption: 0, optionEmojis: "||", explanation: "Test fact." };
   discordMessage = { id: "poll", author: { id: "bot" }, poll: {
@@ -45,7 +49,7 @@ const client = { user: { id: "bot" }, rest: { patch: async (_, { body }) => {
 const channel = { id: "channel", isTextBased: () => true, isSendable: () => true,
   messages: { fetch: async id => { assert.equal(id, "poll"); return discordMessage; } },
   send: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); results.push(payload.content); } };
-db.guildSettings.findUnique = async () => ({ language: "pl" });
+db.guildSettings.findUnique = async () => ({ guildId: "guild", language: "pl", managerRoleId });
 db.generatedPoll.findUnique = async () => recorded && !random ? stored : null;
 db.randomPoll.findUnique = async () => recorded && random ? stored : null;
 const claim = async ({ where, data }) => {
@@ -65,10 +69,10 @@ db.quizSettlement.updateMany = async ({ where, data }) => {
 };
 db.quizSettlement.findMany = async () => [];
 db.dailyQuizRun.deleteMany = async () => { throw new Error("Closing must not reset quota"); };
-function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID } = {}) {
+function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID, roles = [] } = {}) {
   const replies = [];
   let deferred = false;
-  return { commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client,
+  return { commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client, member: { roles },
     memberPermissions: { has: permission => { assert.equal(permission, PermissionFlagsBits.ManageGuild); return permitted; } },
     options: { getSubcommandGroup: () => "poll", getSubcommand: () => "end", getString: () => "poll" },
     deferReply: async payload => { assert.equal(payload.flags, MessageFlags.Ephemeral); deferred = true; },
@@ -87,6 +91,21 @@ assert.equal(ends, 0);
 reset();
 await handleEndPollButton(interaction({ customId: "other:button" }));
 assert.equal(ends, 0);
+for (const useRandom of [false, true]) {
+  for (const button of [false, true]) {
+    reset(); random = useRandom; managerRoleId = "fixture-manager";
+    const request = interaction({ permitted: false, roles: [managerRoleId] });
+    if (button) await handleEndPollButton(request);
+    else await routeCommand(request);
+    assert.equal(ends, 1, "Delegated managers can close scheduled and random quizzes");
+    assert.equal(results.length, 1);
+  }
+}
+reset(); managerRoleId = "fixture-manager";
+await handleEndPollButton(interaction({ permitted: false, roles: ["different-role"] }));
+assert.equal(ends, 0);
+await handleEndPollButton(interaction({ permitted: false, roles: [] }));
+assert.equal(ends, 0, "A removed role cannot close a quiz");
 for (const property of ["guildId", "channelId", "author", "recorded", "poll"]) {
   reset();
   if (property === "guildId") stored.guildId = "other";

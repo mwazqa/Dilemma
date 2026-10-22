@@ -21,7 +21,11 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
     { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma defaults", "helpDefaults"],
       ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
       ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
-      ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] }
+      ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },
+    { title: "helpPermissionsTitle", commands: [
+      ["/dilemma permissions show", "helpPermissionsShow"], ["/dilemma permissions set", "helpPermissionsSet"],
+      ["/dilemma permissions clear", "helpPermissionsClear"]
+    ] }
   ];
   return new EmbedBuilder()
     .setColor(0x8b5cf6)

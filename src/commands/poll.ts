@@ -1,9 +1,10 @@
-import { PermissionFlagsBits, SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { openFeedback } from "../feedback.js";
 import { scheduleEvents } from "../services/schedule-events.js";
 import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
+import { canManageDilemma } from "../services/management-permissions.js";
 
 const closingPolls = new Set<string>();
 
@@ -28,12 +29,12 @@ export async function handleEndPollButton(interaction: ButtonInteraction) {
 }
 
 async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteraction, messageId: string) {
-  const { language, text, reply } = await openFeedback(interaction);
+  const { language, settings, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
     await reply(text("serverOnly"));
     return;
   }
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (!canManageDilemma(interaction, settings)) {
     await reply(text("permission"));
     return;
   }

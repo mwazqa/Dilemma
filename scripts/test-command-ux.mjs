@@ -90,7 +90,7 @@ try {
   assert.deepEqual(names(find("random")), ["options", "option_count", "difficulty", "duration_hours"]);
   assert.ok(find("random").options.every(option => !option.required));
   assert.deepEqual(names(find("defaults")), ["generation_hours", "interval_days", "duration_hours", "difficulty"]);
-  assert.deepEqual(menu.options.map(option => option.name), ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "defaults", "poll", "help", "ping", "delete"]);
+  assert.deepEqual(menu.options.map(option => option.name), ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "defaults", "permissions", "poll", "help", "ping", "delete"]);
   function validateOptions(command) {
     if (command.description) {
       assert.ok(command.description.length <= 100);

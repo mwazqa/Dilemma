@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError } from "../services/poll-publisher.js";
 import { getHelpEmbed } from "./help.js";
@@ -9,7 +9,8 @@ import { openFeedback } from "../feedback.js";
 import { message, type MessageKey } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { DailyQuizLimitError, RandomQuizCooldownError, TopicScheduleNotReadyError, isGenerationTime, isScheduleDate, quizDay } from "../services/quiz-limits.js";
-import { ensureGuildSettings } from "../services/guild-settings.js";
+import { ensureGuildSettings, getGuildSettings } from "../services/guild-settings.js";
+import { canManageDilemma } from "../services/management-permissions.js";
 import { scheduleEvents } from "../services/schedule-events.js";
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
@@ -66,7 +67,7 @@ export const topicCommand = new SlashCommandBuilder()
 const topicSubcommands = new Set(topicCommand.toJSON().options?.map(sub => sub.name));
 
 export async function handleTopic(interaction: ChatInputCommandInteraction) {
-  const { language, text, reply } = await openFeedback(interaction);
+  const { language, settings: managementSettings, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
     await reply(text("serverOnly"));
     return;
@@ -76,7 +77,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     await reply({ content: null, embeds: [getHelpEmbed(language)] });
     return;
   }
-  if (subcommand !== "random" && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (subcommand !== "random" && !canManageDilemma(interaction, managementSettings)) {
     await reply(text("permission"));
     return;
   }
@@ -267,6 +268,10 @@ export async function handleTopicAutocomplete(interaction: AutocompleteInteracti
 
   const focused = interaction.options.getFocused(true);
   if (focused.name !== "name" || interaction.options.getSubcommand() === "create") {
+    await interaction.respond([]);
+    return;
+  }
+  if (!canManageDilemma(interaction, await getGuildSettings(interaction.guildId))) {
     await interaction.respond([]);
     return;
   }

@@ -1,5 +1,4 @@
 import {
-  PermissionFlagsBits,
   SlashCommandSubcommandBuilder,
   type ChatInputCommandInteraction
 } from "discord.js";
@@ -10,6 +9,7 @@ import { message } from "../messages.js";
 import { env } from "../config.js";
 import { isGenerationTime } from "../services/quiz-limits.js";
 import { cacheGuildSettings } from "../services/guild-settings.js";
+import { canManageDilemma } from "../services/management-permissions.js";
 
 export const supportedLanguages = [
   { name: "English", value: "en" },
@@ -38,12 +38,12 @@ export const defaultsCommand = new SlashCommandSubcommandBuilder()
   .addStringOption(difficultyOption);
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {
-  const { language: currentLanguage, text, reply } = await openFeedback(interaction);
+  const { language: currentLanguage, settings: currentSettings, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) {
     await reply(text("serverOnly"));
     return;
   }
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  if (!canManageDilemma(interaction, currentSettings)) {
     await reply(text("permission"));
     return;
   }
