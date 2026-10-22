@@ -9,6 +9,8 @@ const { runDueSettlements } = await import("../dist/services/scoring.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
 const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 
+assert.equal(pollControls("pl")[0].toJSON().components[0].label, "Zakończ quiz");
+
 for (const language of messageLanguages) {
   const button = pollControls(language)[0].toJSON().components[0];
   assert.equal(button.custom_id, END_QUIZ_BUTTON_ID);

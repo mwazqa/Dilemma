@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v3.0.1 - 2026-10-22
+
+- Rename the Polish quiz-closing button to `Zakończ quiz`. Keep its behavior and other translations unchanged.
+- Correct README references to removed defaults commands, three-badge selection and event-driven scoring. No database migration or command re-registration is required from v3.0.0.
+
 ## v3.0.0 - 2026-10-22
 
 - Replace `/dilemma defaults` with `/dilemma timezone`, including IANA timezone autocomplete, current-zone feedback and six-language help. Keep topic scheduling options in `create` and `configure`; preserve historical default-setting data and migrations.
