@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Code version: `v3.1.0`, with per-topic destinations, dedicated random channels, a filtered topic list and optional start-role notifications. See [CHANGELOG.md](CHANGELOG.md). Upgrading requires the additive channel/notification migrations and command re-registration.
+Code version: `v3.1.1`, with per-topic destinations, dedicated random channels, a filtered topic list and optional start-role notifications. See [CHANGELOG.md](CHANGELOG.md). Upgrading from versions before v3.1.0 requires the additive channel/notification migrations and command re-registration; v3.1.1 only simplifies the help reply.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -173,7 +173,7 @@ For a different topic every weekday, create these seven topics before the first 
 
 The Monday topic starts on October 26, then repeats on November 2, November 9 and so on. The other topics keep their own dates. Use real subject names rather than weekday names if you want AI to generate questions about a particular subject. Creation saves topic configuration, not a batch of ready questions; AI generates a new question at each publication.
 
-To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. The list uses the configured first date, not the next repeat or creation date, and sorts names alphabetically within each date. Its native Discord menus filter status, difficulty and destination; page buttons keep every saved topic accessible without sending a separate message per page. Each click refreshes the current server's data and checks management access; no background polling or schema change is needed for this view. Help explains the same options in all six supported languages, without restoring parameter examples to the help card.
+To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. The list uses the configured first date, not the next repeat or creation date, and sorts names alphabetically within each date. Its native Discord menus filter status, difficulty and destination; page buttons keep every saved topic accessible without sending a separate message per page. Each click refreshes the current server's data and checks management access; no background polling or schema change is needed for this view. Help lists the related commands in all six supported languages, without an explanatory introduction or parameter examples.
 
 Repeats are anchored to the first date, not the actual time of a late run. After downtime, the bot publishes at most the latest overdue slot rather than replaying every missed quiz; the next planned date stays unchanged. Calendar-day intervals retain the local hour across daylight-saving changes. A missing local hour runs at the first later local minute; a repeated hour uses its first occurrence. Choosing today with an already-passed publication time makes the quiz due immediately.
 

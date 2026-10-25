@@ -5,7 +5,7 @@ import { openFeedback } from "../feedback.js";
 
 export function getHelpContent(language = "en"): string {
   const embed = getHelpEmbed(language).toJSON();
-  return [embed.title, embed.description, ...(embed.fields ?? []).flatMap(field => [field.name, field.value])].join("\n");
+  return [embed.title, embed.description, ...(embed.fields ?? []).flatMap(field => [field.name, field.value])].filter(Boolean).join("\n");
 }
 
 export function getHelpEmbed(language = "en"): EmbedBuilder {
@@ -34,7 +34,6 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x8b5cf6)
     .setTitle(message(language, "helpIntro"))
-    .setDescription(`${message(language, "helpSchedule")}\n\n${message(language, "helpAnswers")}\n\n${message(language, "helpVoting")}\n\n${message(language, "helpNotifications")}`)
     .addFields(sections.map(section => ({
       name: message(language, section.title),
       value: section.commands.map(([command, key]) => `- \`${command}\` - ${message(language, key)}`).join("\n"),
