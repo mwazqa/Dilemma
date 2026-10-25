@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Code version: `v3.1.1`, with per-topic destinations, dedicated random channels, a filtered topic list and optional start-role notifications. See [CHANGELOG.md](CHANGELOG.md). Upgrading from versions before v3.1.0 requires the additive channel/notification migrations and command re-registration; v3.1.1 only simplifies the help reply.
+Code version: `v3.1.2`, with per-topic destinations, dedicated random channels, a filtered topic list and optional start-role notifications. See [CHANGELOG.md](CHANGELOG.md). Upgrading from versions before v3.1.0 requires the additive channel/notification migrations. Re-register Discord commands for v3.1.2 to remove `clear_ping` from creation; it remains available when configuring an existing topic. This patch introduces no database migration.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -145,7 +145,7 @@ Discord does not support conditionally hidden or conditionally required slash-co
 
 ### Notify a role when a saved quiz starts
 
-Set `ping_role` in `/dilemma create` or `/dilemma configure` to notify one role in the quiz's saved channel when it is published. This includes the automatic schedule and an early `/dilemma run`. Random quizzes do not ping. Omitted roles default to no notification on creation and preserve the saved role on configuration; `clear_ping:true` removes it. Do not combine `ping_role` with `clear_ping:true`. Only Dilemma managers can change this setting.
+Set `ping_role` in `/dilemma create` or `/dilemma configure` to notify one role in the quiz's saved channel when it is published. This includes the automatic schedule and an early `/dilemma run`. Random quizzes do not ping. Omitted roles default to no notification on creation and preserve the saved role on configuration; `clear_ping:true` is available only in `/dilemma configure` to remove it. Do not combine `ping_role` with `clear_ping:true`. Only Dilemma managers can change this setting.
 
 For example, configure a topic with `/dilemma configure name:Monday ping_role:@Quiz`, or disable notifications with `/dilemma configure name:Monday clear_ping:true`. Choose an existing server role other than `@everyone`. The role must be mentionable, or the bot must have Mention Everyone permission in the destination channel. The bot does not change role permissions. Personal Discord notification settings can suppress push alerts even when a role mention succeeds.
 

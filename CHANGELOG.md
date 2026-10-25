@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.1.2 - 2026-10-25
+
+- Keep `clear_ping` only in `/dilemma configure`; remove the redundant option from `/dilemma create` while retaining `ping_role` in both commands.
+
 ## v3.1.1 - 2026-10-25
 
 - Simplify the help card in all six languages by removing the explanatory introduction and keeping the grouped command list.
