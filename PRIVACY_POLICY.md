@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 22, 2026
+Last updated: October 25, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -18,10 +18,18 @@ Server leaderboards and profiles can display these scores to other
 members of the same server. Usernames and avatars are not stored for scoring.
 
 When delegated bot management is configured, server configuration includes the
-selected management role's Discord ID. The bot uses it only to authorize
+selected management role's Discord ID. Topic configuration can separately store
+an optional notification role's Discord ID to mention it when a saved quiz starts.
+Notification role IDs are not included in AI requests.
+The selected management role is separate from this notification setting.
+The bot uses the management role only to authorize
 management actions and does not grant Discord server permissions.
 Server configuration can also store an administrator-selected timezone for
 schedules and daily limits. This value is not inferred from member locations.
+Random-channel configuration stores allowed channel IDs per server. These settings
+restrict where random quizzes can be started. They do not block individual voters.
+Voting takes place in Discord polls; Dilemma reads final answers after closure
+to calculate scores. Discord user IDs and votes are not sent to the AI provider.
 
 Profile cards temporarily process the player's Discord display name, avatar and
 score in memory to render an image. Avatars are fetched only from Discord's CDN.
@@ -49,7 +57,7 @@ questions, show results, and calculate server-specific scores and streaks.
 Use `/dilemma score forget confirm:true` to permanently delete your stored answers and
 score on the current server. Polls that have not yet been scored and future
 votes can create new records. Already scored polls are not scored again after
-deletion. This command does not remove your vote from Discord itself.
+deletion. This command does not remove a vote from a Discord poll.
 User IDs and votes are not sent to the AI provider for quiz generation.
 The operator may delete stored server data by
 removing the bot and deleting its database records. Retention depends on the

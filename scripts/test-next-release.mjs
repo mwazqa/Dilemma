@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { quizAnswers, quizDuration } from "./fixtures/native-quiz.mjs";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test", OPENAI_REASONING_EFFORT: "low", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { messages, messageLanguages, message, normalizeLanguage, feedbackKaomoji } = await import("../dist/messages.js");
 const { getHelpContent, getHelpEmbed, handleHelp } = await import("../dist/commands/help.js");
@@ -37,7 +39,7 @@ for (const [index, language] of messageLanguages.entries()) {
   const literalName = "Player (≧◡≦) ♡ {count}";
   assert.ok(message(language, "randomDone", { name: literalName, count: 4 }).includes(literalName), "Kaomoji formatting never changes user text");
   const summary = "Saved topic (｡•̀ᴗ-)✧";
-  assert.equal(message(language, "configured", { summary }).split("\n")[1], summary);
+  assert.equal(message(language, "configured", { summary }).split("\n\n")[1], summary);
   for (const key of friendlyFeedbackKeys) {
     assert.ok(message(language, key).includes("~"), `${key} keeps the shared feedback voice in ${language}`);
     assert.ok(message(language, key).length <= 2000);
@@ -66,7 +68,7 @@ for (const language of messageLanguages) {
   assert.ok(getHelpContent(language).length < 4000);
   const card = getHelpEmbed(language).toJSON();
   assert.equal(card.title, message(language, "helpIntro"));
-  assert.equal(card.fields.length, 4);
+  assert.equal(card.fields.length, 5);
   assert.ok(card.fields.every(field => field.value.length <= 1024));
   const commands = card.fields.map(field => field.value).join("\n");
   assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
@@ -81,6 +83,7 @@ assert.equal(normalizeLanguage("es-ES"), "es");
 assert.equal(normalizeLanguage("unknown"), "en");
 assert.throws(() => difficultySchema.parse("expert"));
 const { db } = await import("../dist/db.js");
+db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 let settings = { guildId: "guild", language: "pl", defaultDifficulty: "hard", defaultIntervalDays: 7, defaultPollDurationHours: 24, defaultGenerationTime: null };
 let topic;
 let randomPoll;
@@ -141,7 +144,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "timezone", "permissions", "ping", "score", "poll"].sort());
+  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "timezone", "random-channels", "permissions", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);
@@ -163,15 +166,15 @@ const { DailyQuizLimitError, RandomQuizCooldownError } = await import("../dist/s
 const { handlePing } = await import("../dist/commands/ping.js");
 let sent;
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
-  assert.equal(payload.components[0].toJSON().components[0].custom_id, "quiz:end");
-  assert.equal(payload.components[0].toJSON().components[0].disabled, false);
+  assert.equal(payload.components.at(-1).toJSON().components[0].custom_id, "quiz:end");
+  assert.equal(payload.components.at(-1).toJSON().components[0].disabled, false);
   assert.equal(payload.flags, undefined, "Polls use classic components, not Components V2");
-  sent = payload; return { id: `message-${counter}`, channelId: "channel", poll: { allowMultiselect: false, expiresAt: new Date(Date.now() + 86400000), answers: new Map(payload.poll.answers.map((answer, i) => [7 + i * 3, { id: 7 + i * 3, text: answer.text }])) } }; } };
+  sent = payload; return { id: `message-${counter}`, channelId: "channel", poll: { allowMultiselect: false, expiresAt: new Date(Date.now() + 86400000), answers: new Map(quizAnswers(payload).map((answer, i) => [7 + i * 3, { id: 7 + i * 3, text: answer.text }])) } }; } };
 function interaction(subcommand, values = {}, permitted = true) {
   const replies = [];
   let acknowledged = false;
-  return { commandName: "dilemma", guildId: "guild", locale: "en-US", channel, channelId: "channel", memberPermissions: { has: () => permitted },
-    options: { getSubcommandGroup: () => null, getSubcommand: () => subcommand, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
+  return { user: { id: "actor" }, commandName: "dilemma", guildId: "guild", guild: quizGuild("guild", [{ ...channel, guildId: "guild", type: 0, permissionsFor: () => ({ has: () => true }) }]), locale: "en-US", channel, channelId: "channel", memberPermissions: { has: () => permitted },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => subcommand, getRole: name => values[name] ?? null, getBoolean: name => values[name] ?? null, getChannel: name => values[name] ?? null, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     deferReply: async () => { acknowledged = true; },
     editReply: async payload => { assert.ok(acknowledged); replies.push(payload.content ?? payload); }, replies };
 }
@@ -355,7 +358,8 @@ await routeCommand(interaction("timezone", { value: "Europe/Warsaw" }));
 assert.equal(settings.timezone, "Europe/Warsaw");
 const routedList = interaction("list");
 await routeCommand(routedList);
-assert.ok(routedList.replies[0].includes("Test"));
+assert.ok(routedList.replies[0].embeds[0].toJSON().fields.some(field => field.name.includes("Test")));
+assert.equal(routedList.replies[0].components.length, 4);
 for (const name of ["settings", "language", "help", "ping", "score", "poll"]) {
   const legacy = interaction("help");
   legacy.commandName = name;

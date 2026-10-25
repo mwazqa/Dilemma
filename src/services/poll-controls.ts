@@ -3,7 +3,6 @@ import { message } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
 
 export const END_QUIZ_BUTTON_ID = "quiz:end";
-
 export function pollControls(language: string, disabled = false) {
   return [new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()

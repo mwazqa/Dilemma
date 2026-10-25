@@ -19,15 +19,28 @@ try {
     database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
-  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "DailyQuizRun"]) {
+  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "DailyQuizRun", "QuizChannel"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");
+  const channelMigration = "20261025120000_quiz_channels/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${channelMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${channelMigration}`, "utf8"));
+  assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizChannel"').get().count, 0);
+  database.exec(`INSERT INTO "QuizChannel" (guildId, channelId) VALUES ('test', 'first'), ('test', 'second'), ('other', 'first')`);
+  assert.throws(() => database.exec(`INSERT INTO "QuizChannel" (guildId, channelId) VALUES ('test', 'first')`));
+  database.exec(`DELETE FROM "QuizChannel" WHERE guildId = 'test' AND channelId = 'first'`);
+  assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizChannel" WHERE guildId = ?').get('test').count, 1);
+  assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizChannel" WHERE guildId = ?').get('other').count, 1);
   assert.equal(topic.difficulty, "medium");
   assert.equal(topic.intervalDays, 7);
   assert.equal(topic.name, "Legacy");
   assert.equal(topic.generationTime, "06:45", "Do not replace existing topic schedules");
   assert.equal(topic.startDate, null, "Do not change legacy schedules when adding fixed start dates");
+  assert.equal(topic.pingRoleId, null, "Existing schedules do not start pinging after an upgrade");
+  const pingMigration = "20261025150000_quiz_ping_role/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${pingMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${pingMigration}`, "utf8"));
+  database.exec(`UPDATE "Topic" SET "pingRoleId" = 'fixture-notification-role' WHERE id = 'legacy'`);
+  assert.equal(database.prepare('SELECT pingRoleId FROM "Topic" WHERE id = ?').get("legacy").pingRoleId, "fixture-notification-role");
   const startDateMigration = "20261021120000_topic_start_date/migration.sql";
   assert.equal(readFileSync(`prisma/migrations/${startDateMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${startDateMigration}`, "utf8"));
   database.exec(`UPDATE "Topic" SET "startDate" = '2026-10-26' WHERE id = 'legacy'`);

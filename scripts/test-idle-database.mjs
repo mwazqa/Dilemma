@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { quizAnswers, quizDuration } from "./fixtures/native-quiz.mjs";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 
 Object.assign(process.env, { DATABASE_URL: "file::memory:", DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test",
   QUIZ_TIMEZONE: "Europe/Warsaw", OPENAI_API_KEY: "test",
@@ -7,6 +9,7 @@ const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in test"); };
 globalThis.fetch = (...args) => fetchFixture(...args);
 const { db } = await import("../dist/db.js");
+db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 const { DeadlineQueue, retryDelay } = await import("../dist/services/deadline-queue.js");
 const { scheduleEvents, settlementDeadline } = await import("../dist/services/schedule-events.js");
 const { nextTopicRunAt, quizDay } = await import("../dist/services/quiz-limits.js");
@@ -204,13 +207,15 @@ try {
   db.dailyQuizRun.updateMany = async () => ({ count: 1 });
   db.generatedPoll.count = async () => 0;
   db.generatedPoll.findMany = async () => [];
-  db.generatedPoll.findUnique = async ({ where }) => polls.get(where.messageId) ?? null;
+  db.generatedPoll.findUnique = async ({ where }) => { const poll = polls.get(where.messageId); return poll?.kind === "random" ? null : poll ?? null; };
   db.generatedPoll.updateMany = async ({ where, data }) => { const poll = polls.get(where.messageId); if (poll.endedAt) return { count: 0 }; Object.assign(poll, data); return { count: 1 }; };
   db.generatedPoll.create = async ({ data }) => { polls.set(data.messageId, { ...data, endedAt: null }); return data; };
   db.randomPoll.findFirst = async () => null;
   db.randomPoll.count = async () => 0;
   db.randomPoll.findMany = async () => [];
-  db.randomPoll.create = async ({ data }) => data;
+  db.randomPoll.create = async ({ data }) => { polls.set(data.messageId, { ...data, kind: "random", endedAt: null }); return data; };
+  db.randomPoll.findUnique = async ({ where }) => { const poll = polls.get(where.messageId); return poll?.kind === "random" ? poll : null; };
+  db.randomPoll.updateMany = db.generatedPoll.updateMany;
   db.$transaction = async work => work(db);
   fetchFixture = async () => {
     aiCalls++;
@@ -227,8 +232,8 @@ try {
       if (!payload.poll) return;
       const id = `poll-${++sent}`;
       return { id, channelId: "channel", poll: { allowMultiselect: false,
-        expiresAt: new Date(now + payload.poll.duration * 3_600_000),
-        answers: new Map(payload.poll.answers.map((answer, i) => [i + 1, { id: i + 1, text: answer.text }])) } };
+        expiresAt: new Date(now + quizDuration(payload) * 3_600_000),
+        answers: new Map(quizAnswers(payload).map((answer, i) => [i + 1, { id: i + 1, text: answer.text }])) } };
     } };
   const client = { user: { id: "bot" }, ws: { ping: 1 }, channels: { fetch: async () => channel }, rest: {
     patch: async () => { patches++; },
@@ -247,8 +252,8 @@ try {
     return topic;
   }
   function interaction(sub, values = {}) {
-    return { guildId: "guild", locale: "en", client, channel, channelId: "channel", message: { id: values.messageId }, customId: "quiz:end",
-      memberPermissions: { has: () => true }, options: { getSubcommand: () => sub, getString: key => values[key] ?? null, getInteger: key => values[key] ?? null },
+    return { user: { id: "actor" }, guildId: "guild", guild: quizGuild("guild", [{ ...channel, guildId: "guild", type: 0, permissionsFor: () => ({ has: () => true }) }]), locale: "en", client, channel, channelId: "channel", message: { id: values.messageId }, customId: "quiz:end",
+      memberPermissions: { has: () => true }, options: { getSubcommand: () => sub, getRole: key => values[key] ?? null, getBoolean: key => values[key] ?? null, getChannel: key => values[key] ?? null, getString: key => values[key] ?? null, getInteger: key => values[key] ?? null },
       deferReply: async () => {}, editReply: async () => {} };
   }
 

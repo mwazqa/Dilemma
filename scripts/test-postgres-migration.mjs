@@ -5,6 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { requireTestDatabase } from './test-database-guard.mjs';
 requireTestDatabase(process.env);
 const db = new PrismaClient();
+const { db: channelDb } = await import("../dist/db.js");
+const { assignQuizChannel } = await import("../dist/services/quiz-channels.js");
 const tables = ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "UserScore"];
 const snapshot = async () => Object.fromEntries(await Promise.all(tables.map(async table => [table,
   await db.$queryRawUnsafe(`SELECT * FROM "${table}" ORDER BY ${table === "UserScore" ? '"guildId", "userId"' : `"${table === "GuildSettings" ? "guildId" : "id"}"`}`)])));
@@ -18,7 +20,7 @@ try {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, timezone: null }
       : table === "UserScore" ? { selectedBadge: null }
-      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null } : { difficulty: "medium" };
+      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }
@@ -26,6 +28,12 @@ try {
     assert.deepEqual(after[table].map(row => Object.fromEntries(Object.entries(row).filter(([key]) => fields.has(key)))), before[table], `Preserve ${table}`);
   }
   const guildId = "migration-difficulty-test";
+  const channelKey = { guildId, channelId: "migration-channel" };
+  await Promise.all(Array.from({ length: 3 }, () => assignQuizChannel(channelKey.guildId, channelKey.channelId)));
+  assert.equal(await db.quizChannel.count({ where: channelKey }), 1);
+  await db.quizChannel.create({ data: { guildId, channelId: "migration-second-channel" } });
+  assert.equal(await db.quizChannel.count({ where: { guildId } }), 2);
+  await db.quizChannel.deleteMany({ where: { guildId } });
   const settings = await db.guildSettings.create({ data: { guildId, language: "pl", defaultDifficulty: "hard", defaultGenerationTime: "18:30" } });
   assert.equal(settings.defaultGenerationTime, "18:30");
   assert.equal(settings.timezone, null);
@@ -42,6 +50,10 @@ try {
   const topic = await db.topic.create({ data: { guildId, name: "Difficulty migration test", options: "", difficulty: settings.defaultDifficulty } });
   assert.equal(topic.difficulty, "hard");
   assert.equal(topic.startDate, null);
+  assert.equal(topic.pingRoleId, null);
+  const notified = await db.topic.update({ where: { id: topic.id }, data: { pingRoleId: "migration-notification-role" } });
+  assert.equal(notified.pingRoleId, "migration-notification-role");
+  assert.equal((await db.topic.update({ where: { id: topic.id }, data: { pingRoleId: null } })).pingRoleId, null);
   const scheduled = await db.topic.update({ where: { id: topic.id }, data: { startDate: "2026-10-26", generationTime: "18:00", intervalDays: 7 } });
   assert.equal(scheduled.startDate, "2026-10-26");
   assert.equal(scheduled.intervalDays, 7);
@@ -53,5 +65,6 @@ try {
   console.error(`Migration verification failed (${error?.code ?? error?.name ?? "Error"}).`);
   process.exitCode = 1;
 } finally {
+  await channelDb.$disconnect();
   await db.$disconnect();
 }

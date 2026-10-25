@@ -119,14 +119,14 @@ export async function generateQuestion(
               required: ["language", "topic", "question", "options", "topicEmoji", "optionEmojis", "correctOption", "explanation"],
               properties: {
                 language: { type: "string", enum: [language] },
-                topic: { type: "string", minLength: 1 },
-                question: { type: "string", minLength: 1 },
+                topic: { type: "string", minLength: 1, maxLength: 80 },
+                question: { type: "string", minLength: 1, maxLength: 300 },
                 options: { type: "array", minItems: optionCount, maxItems: optionCount,
                   items: { type: "string", minLength: 1, maxLength: 55, ...(allowedOptions.length ? { enum: allowedOptions } : {}) } },
                 topicEmoji: { type: "string", maxLength: 8 },
                 optionEmojis: { type: "array", minItems: optionCount, maxItems: optionCount, items: { type: "string", maxLength: 8 } },
                 correctOption: { type: "integer", minimum: 0, maximum: optionCount - 1 },
-                explanation: { type: "string", minLength: 1 }
+                explanation: { type: "string", minLength: 1, maxLength: 1000 }
               }
             }
           } }

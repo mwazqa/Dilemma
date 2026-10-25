@@ -2,11 +2,11 @@
 
 International AI-powered Discord quiz bot.
 
-Dilemma lets Discord communities configure quiz topics and daily question limits, then answer AI-generated multiple-choice questions through Discord polls and slash commands.
+Dilemma lets Discord communities configure quiz topics and schedules, then answer AI-generated multiple-choice questions in native Discord single-choice polls. Members can withdraw or change their answer until the poll closes.
 
 ## Current status
 
-Code version: `v3.0.2`. See [CHANGELOG.md](CHANGELOG.md).
+Code version: `v3.1.0`, with per-topic destinations, dedicated random channels, a filtered topic list and optional start-role notifications. See [CHANGELOG.md](CHANGELOG.md). Upgrading requires the additive channel/notification migrations and command re-registration.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -87,11 +87,12 @@ See the current [OpenAI model documentation](https://developers.openai.com/api/d
 
 ## Commands
 
-- `/dilemma create name:...` - create a new topic only; optional settings in order: `start_date`, `generation_time`, `interval_days:1-30`, `duration_hours:1-24`, `difficulty:easy|medium|hard`, `option_count:2-4`. Answers are AI-generated, with 4 by default. Existing names direct you to `configure` rather than overwriting a topic.
+- `/dilemma create name:...` - create a new topic only; optional settings in order: `channel`, `start_date`, `generation_time`, `interval_days:1-30`, `duration_hours:1-24`, `difficulty:easy|medium|hard`, `option_count:2-4`. The destination defaults to the current channel. Answers are AI-generated, with 4 by default. Existing names direct you to `configure` rather than overwriting a topic.
 - `/dilemma configure name:...` - update an existing topic using the same fields and order as `create`; provide at least one change. Omitted fields, channel, enabled state, history and quota remain unchanged. `start_date:none` removes the fixed anchor; `generation_time:none` removes automatic publication time only if there is no active start date.
-- `/dilemma run name:...` - publish an available quiz early without moving fixed repeat dates; optional `duration_hours:1-24` overrides this poll only
+- `/dilemma run name:...` - publish an available quiz early in its saved channel, even when invoked elsewhere, without moving fixed repeat dates; optional `duration_hours:1-24` overrides this poll only
 - `/dilemma random` - generate one quiz without a saved topic. Optional fields in order: `options`, `option_count`, `difficulty`, `duration_hours`. Use 2-4 unique comma-separated `options`, each at most 55 characters; their count is inferred. Without custom answers, AI generates `option_count` answers, or 4 when omitted. When both fields are set, the count must match the custom answers. All members share the same daily quota and cooldown.
-- `/dilemma list` - list topics
+- `/dilemma random-channels add channel:...`, `/dilemma random-channels remove channel:...`, `/dilemma random-channels list` - manage the channels where everyone may start random quizzes; requires Manage Server or the configured management role
+- `/dilemma list` - browse all saved topics in a private card, ordered by configured start date and then name A-Z; topics without a start date come last. Filter by status, difficulty or channel, move between pages, refresh the list or clear filters. Includes disabled topics, saved destinations and the notification role.
 - `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
 - `/dilemma help` - show the grouped command guide without parameter examples or a self-referential help entry
 - `/dilemma language value:en|pl|de|es|fr|ja` - set the server language
@@ -126,9 +127,29 @@ Use `/dilemma timezone value:Europe/London` to select this server's timezone, or
 
 For a server without an explicit timezone, the optional deployment variable `QUIZ_TIMEZONE` is the fallback. Removing that variable uses `Europe/Warsaw`; it does not detect the server's country. Existing servers keep this fallback until a manager selects a timezone. Apply the additive `20261022190000_guild_timezone` migration before running the new code, first on an isolated PostgreSQL copy, then on production with a backup. Re-register commands to replace `defaults` with `timezone`. Settings are cached, and schedule changes reschedule in-memory timers without background polling.
 
-Topic forms follow the planning sequence: name, first date, publication time, repeat interval, voting duration, difficulty and answer count. Date-based scheduling requires a time: a new topic can inherit the server default, while an existing topic keeps its saved time unless explicitly changed. You can clear date and time together. A date without a time is rejected before writing. Duration is independent of repeat interval and uses whole hours (1-24), so it cannot exceed the shortest one-day interval. Random duration can outlast its eight-hour cooldown; active polls can overlap.
+Topic forms follow the planning sequence: name, destination channel, first date, publication time, repeat interval, voting duration, difficulty and answer count. Date-based scheduling requires a time: a new topic can inherit the server default, while an existing topic keeps its saved time unless explicitly changed. You can clear date and time together. A date without a time is rejected before writing. Duration is independent of repeat interval and uses whole hours (1-24), so it cannot exceed the shortest one-day interval. Random duration can outlast its eight-hour cooldown; active polls can overlap.
+
+### Quiz channels and destinations
+
+Starting `/dilemma random` does not require Manage Server or a Dilemma management role. Discord's normal command/channel permissions, the random-channel list, daily quota and cooldown still apply. Only administrators or delegated Dilemma managers can change channel settings. Native polls allow vote changes; Dilemma does not offer per-user voting blocks.
+
+Without assigned random channels, everyone can use `/dilemma random` wherever Discord permits bot messages and the bot has the required permissions. Add one or more channels with `/dilemma random-channels add channel:#quiz` to restrict random quizzes to that list. The first entry enables restrictions for everyone, including administrators. Removing a channel blocks new random quizzes there while other entries remain; removing the last entry restores unrestricted channel access. Ongoing polls and topic schedules are unaffected. Threads do not inherit their parent's assignment when restrictions are active. These settings are isolated per server and persist across restarts; they add no background database polling. The daily quota and cooldown remain shared across all channels.
+
+Each saved topic has its own destination. Use `/dilemma create name:Science channel:#science` to choose it, or `/dilemma configure name:Science channel:#another-channel` to change it. Omitting `channel` during creation uses the current channel; omitting it during configuration preserves the saved destination. Both scheduled publication and `/dilemma run` use that destination. Choosing a topic destination never changes the independent random-channel restrictions; configure those separately with `random-channels add` and `remove`. Only text and announcement channels on the same server are accepted as topic destinations. The bot needs View Channel, Send Messages, Embed Links, Read Message History and Send Polls there. Unavailable destinations are rejected without falling back to the invoking channel. Changes during AI generation are checked again before publication, and publication does not overwrite a newer destination.
+
+Topic confirmations, topic lists and other detailed replies use Markdown bullet lists. Setup instructions use ordered steps where appropriate. Long lists continue in private messages instead of silently dropping topics; generated replies suppress mentions. All six languages share this layout, while Discord's native menu descriptions remain neutral.
+
+Before upgrading, test the additive `20261025120000_quiz_channels` migration on isolated PostgreSQL, back up production, apply the migration, then re-register commands. Existing topic destinations and player data are preserved. The new random-channel list starts empty, so existing servers retain unrestricted random-channel access until a manager assigns a channel. Run `npm run test:quiz-channels`, `npm run test:feedback-layout`, `npm run test:db:fresh` and the existing command, scheduling and quota regressions before release.
 
 Discord does not support conditionally hidden or conditionally required slash-command options. The bot validates dependent fields before changing a topic, reserving random quota or calling AI; it explains missing or conflicting values privately. Custom answers cannot be empty, duplicated ignoring case, longer than 55 characters or outside the 2-4 answer range. AI output must match the requested answer count and preserve custom text and order; mismatches retry within the existing timeout and retry budget, then fail without publishing. Existing topics with legacy fixed answers keep them until `configure option_count` explicitly switches them to generated answers. `npm run test:command-ux` covers the forms, dependencies, permissions, preserved settings and random answer flow with local fixtures, not live Discord or AI calls.
+
+### Notify a role when a saved quiz starts
+
+Set `ping_role` in `/dilemma create` or `/dilemma configure` to notify one role in the quiz's saved channel when it is published. This includes the automatic schedule and an early `/dilemma run`. Random quizzes do not ping. Omitted roles default to no notification on creation and preserve the saved role on configuration; `clear_ping:true` removes it. Do not combine `ping_role` with `clear_ping:true`. Only Dilemma managers can change this setting.
+
+For example, configure a topic with `/dilemma configure name:Monday ping_role:@Quiz`, or disable notifications with `/dilemma configure name:Monday clear_ping:true`. Choose an existing server role other than `@everyone`. The role must be mentionable, or the bot must have Mention Everyone permission in the destination channel. The bot does not change role permissions. Personal Discord notification settings can suppress push alerts even when a role mention succeeds.
+
+The start message permits mentions only for that role; text from names or AI cannot ping other roles, users, `@everyone` or `@here`. Configuration, list replies and result updates remain silent. The current role and destination are checked again after generation. If a role is deleted or can no longer be mentioned, publish the quiz without a ping. Role IDs are stored per topic; no extra idle database polling or environment variables are required. Existing topics keep notifications disabled after the additive `20261025150000_quiz_ping_role` migration.
 
 ### Duplicate questions
 
@@ -138,7 +159,7 @@ Duplicate-question checks compare against the latest 365 published questions wit
 
 Create all your topics now and give each one its own first publication date. `start_date` uses `YYYY-MM-DD` in the server's configured timezone; choose today or a later valid date. Supply `generation_time` when creating a dated topic. `interval_days` accepts 1-30 calendar days and can be set during creation or changed later without losing the start date.
 
-For a different topic every weekday, create these seven topics on their destination channel before the first date. Dates below are examples; replace them with your intended future dates:
+For a different topic every weekday, create these seven topics before the first date. Use `channel` to select a destination, or create them in that channel. Dates below are examples; replace them with your intended future dates:
 
 ```text
 /dilemma create name:Monday start_date:2026-10-26 generation_time:18:30 interval_days:7
@@ -152,7 +173,7 @@ For a different topic every weekday, create these seven topics on their destinat
 
 The Monday topic starts on October 26, then repeats on November 2, November 9 and so on. The other topics keep their own dates. Use real subject names rather than weekday names if you want AI to generate questions about a particular subject. Creation saves topic configuration, not a batch of ready questions; AI generates a new question at each publication.
 
-To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. Help explains the same options in all six supported languages, without restoring parameter examples to the help card.
+To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. The list uses the configured first date, not the next repeat or creation date, and sorts names alphabetically within each date. Its native Discord menus filter status, difficulty and destination; page buttons keep every saved topic accessible without sending a separate message per page. Each click refreshes the current server's data and checks management access; no background polling or schema change is needed for this view. Help explains the same options in all six supported languages, without restoring parameter examples to the help card.
 
 Repeats are anchored to the first date, not the actual time of a late run. After downtime, the bot publishes at most the latest overdue slot rather than replaying every missed quiz; the next planned date stays unchanged. Calendar-day intervals retain the local hour across daylight-saving changes. A missing local hour runs at the first later local minute; a repeated hour uses its first occurrence. Choosing today with an already-passed publication time makes the quiz due immediately.
 
@@ -245,11 +266,11 @@ The profile progress bar tracks EXP, not correct-answer accuracy. Accuracy is sh
 
 Correct answers earn 1 point on easy, 2 on medium and 3 on hard. Wrong answers earn zero and reset the correct-answer streak. Not voting does not affect a streak. Streak order follows poll finish times, not background retry order. Equal finish times use message ID order for a stable tie-break.
 
-Only new polls created after scoring is enabled count. Existing quiz history is preserved without retroactive awards. Scores are calculated after Discord finalizes a closed poll. Settlement starts at the known expiry or early closure; pending finalization retries back off from one minute up to one hour, without idle database polling. The bot must have View Channel and Read Message History permissions for scored polls. No privileged Discord intent is required for voter retrieval.
+All quizzes use native Discord single-choice polls. A member can remove their vote and select another answer until the poll closes. Vote counts follow Discord's normal display behavior. The bot waits for finalized Discord results and uses actual Discord answer IDs, then awards points exactly once for the final answer. A withdrawn vote produces no scored answer and does not reset a streak. No privileged Discord intent is required.
 
-`/dilemma poll end` can close a quiz early. Vote changes before closing are reflected in the final vote. Bot votes are excluded. Scores and leaderboards are isolated per server. Tied leaderboard scores are ordered by correct answers and then user ID. Score responses do not ping players.
+`/dilemma poll end` and the close button can end a poll early, using the same management check. Scores and leaderboards remain isolated per server; tied scores use correct answers, then user ID.
 
-Deleting your answers and score is permanent. Already scored polls are not rescored after deletion, but pending polls and future votes can create new records. See [Privacy Policy](PRIVACY_POLICY.md).
+Deleting your answers and score is permanent. Already scored quizzes are not rescored. Deletion does not withdraw a Discord poll vote; votes in polls that have not yet been scored can create new score records after closure. See [Privacy Policy](PRIVACY_POLICY.md).
 
 ## Publication privacy checks
 

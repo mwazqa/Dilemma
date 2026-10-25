@@ -22,6 +22,10 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
       ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
       ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
       ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },
+    { title: "helpChannelsTitle", commands: [
+      ["/dilemma random-channels add", "helpChannelsAdd"], ["/dilemma random-channels remove", "helpChannelsRemove"],
+      ["/dilemma random-channels list", "helpChannelsList"]
+    ] },
     { title: "helpPermissionsTitle", commands: [
       ["/dilemma permissions show", "helpPermissionsShow"], ["/dilemma permissions set", "helpPermissionsSet"],
       ["/dilemma permissions clear", "helpPermissionsClear"]
@@ -30,10 +34,10 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x8b5cf6)
     .setTitle(message(language, "helpIntro"))
-    .setDescription(`${message(language, "helpSchedule")}\n\n${message(language, "helpAnswers")}`)
+    .setDescription(`${message(language, "helpSchedule")}\n\n${message(language, "helpAnswers")}\n\n${message(language, "helpVoting")}\n\n${message(language, "helpNotifications")}`)
     .addFields(sections.map(section => ({
       name: message(language, section.title),
-      value: section.commands.map(([command, key]) => `\`${command}\` - ${message(language, key)}`).join("\n"),
+      value: section.commands.map(([command, key]) => `- \`${command}\` - ${message(language, key)}`).join("\n"),
       inline: false
     })));
 }

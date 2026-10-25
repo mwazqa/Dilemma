@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 import { spawnSync } from "node:child_process";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test", QUIZ_TIMEZONE: "Europe/Warsaw" });
@@ -78,6 +79,10 @@ try {
   const ny = { ...settings.get("ny"), defaultDifficulty: "medium", defaultIntervalDays: 1, defaultPollDurationHours: 24 };
   cacheGuildSettings(ny);
   const request = { guildId: "ny", channelId: "channel", locale: "pl", memberPermissions: { has: () => true }, options: { getSubcommand: () => "create", getInteger: () => null, getString: key => ({ name: "Local date", start_date: "2026-10-21", generation_time: "18:30" })[key] ?? null }, deferReply: async () => {}, editReply: async payload => assert.ok(payload.content.includes("America/New_York")) };
+  request.guild = quizGuild("ny");
+  request.options.getChannel = () => null;
+  request.options.getRole = () => null;
+  request.options.getBoolean = () => null;
   await handleTopic(request);
   assert.equal(created[0].startDate, "2026-10-21", "Date validation uses the guild's current day, not Warsaw's");
   const reservations = [];

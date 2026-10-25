@@ -1,6 +1,6 @@
-import { SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { ChannelType, SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
-import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError } from "../services/poll-publisher.js";
+import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError, TopicChannelChangedError } from "../services/poll-publisher.js";
 import { getHelpEmbed } from "./help.js";
 import { AiGenerationError } from "../services/question-generator.js";
 import { env } from "../config.js";
@@ -13,10 +13,18 @@ import { DailyQuizLimitError, RandomQuizCooldownError, TopicScheduleNotReadyErro
 import { ensureGuildSettings, getGuildSettings } from "../services/guild-settings.js";
 import { canManageDilemma } from "../services/management-permissions.js";
 import { scheduleEvents } from "../services/schedule-events.js";
+import { inlineText } from "../formatting.js";
+import { canUseRandomQuizChannel, RandomQuizChannelError, QuizChannelAccessError, resolveQuizChannel } from "../services/quiz-channels.js";
+import { showTopicList } from "./topic-list.js";
+import { QuizPingError, resolveQuizPingRole } from "../services/quiz-notifications.js";
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
   return subcommand
     .addStringOption(option => option.setName("name").setDescription(creating ? "Name for a new topic; use configure for an existing topic." : "Existing topic to update; omitted settings remain unchanged.").setRequired(true).setMaxLength(80).setAutocomplete(!creating))
+    .addChannelOption(option => option.setName("channel").setDescription(creating ? "Quiz destination; defaults to this channel." : "New quiz destination; omitted keeps the saved channel.")
+      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to notify when this saved quiz starts; omitted means no ping." : "Role to notify when this saved quiz starts; omitted keeps the saved role."))
+    .addBooleanOption(option => option.setName("clear_ping").setDescription("Remove the notification role; cannot be combined with ping_role."))
     .addStringOption(option => option.setName("start_date").setDescription("First date YYYY-MM-DD; requires a publication time. Use none for rolling scheduling.").setMinLength(4).setMaxLength(10))
     .addStringOption(option => option.setName("generation_time").setDescription("Publication time HH:mm; none clears it only when no start_date is active.").setMinLength(4).setMaxLength(5))
     .addIntegerOption(option => option.setName("interval_days").setDescription("Repeat every 1-30 days; fixed schedules count from start_date.").setMinValue(1).setMaxValue(30))
@@ -48,7 +56,7 @@ export const topicCommand = new SlashCommandBuilder()
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)))
   .addSubcommand((subcommand) => subcommand
     .setName("list")
-    .setDescription("List quiz topics for this server."))
+    .setDescription("Browse all saved quiz topics by start date and name, with filters."))
   .addSubcommand((subcommand) => subcommand
     .setName("help")
     .setDescription("Show Dilemma commands."))
@@ -84,9 +92,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   }
 
   if (subcommand === "list") {
-    const topics = await db.topic.findMany({ where: { guildId: interaction.guildId }, orderBy: { name: "asc" } });
-    const lines = topics.map((topic) => topicSummary(topic, language, guildTimezone(managementSettings)));
-    await reply(lines.length ? lines.join("\n") : text("emptyTopics"));
+    await showTopicList(interaction, language, guildTimezone(managementSettings));
     return;
   }
 
@@ -96,6 +102,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       await reply(text("channel"));
       return;
     }
+    if (!await canUseRandomQuizChannel(interaction.guildId, channel.id)) { await reply(text("randomChannelOnly")); return; }
     const rawOptions = interaction.options.getString("options");
     const options = rawOptions === null ? [] : parseOptions(rawOptions);
     const requestedOptionCount = interaction.options.getInteger("option_count");
@@ -114,7 +121,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     try {
       const generatedTopic = await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty,
         duration ?? settings.defaultPollDurationHours, options);
-      await reply(text("randomDone", { name: generatedTopic, count: optionCount }));
+      await reply(text("randomDone", { name: inlineText(generatedTopic), count: optionCount }));
     } catch (error) {
       if (error instanceof DailyQuizLimitError) {
         await reply(text("randomDailyLimit"));
@@ -152,7 +159,11 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const pollDurationHours = interaction.options.getInteger("duration_hours");
     const optionCount = interaction.options.getInteger("option_count");
     const requestedDifficulty = interaction.options.getString("difficulty");
-    if (!creating && [requestedDate, requestedTime, intervalDays, pollDurationHours, optionCount, requestedDifficulty].every(value => value === null)) {
+    const requestedChannel = interaction.options.getChannel("channel");
+    const requestedPingRole = interaction.options.getRole("ping_role");
+    const clearPing = interaction.options.getBoolean("clear_ping") === true;
+    if (requestedPingRole && clearPing) { await reply(text("quizPingConflict")); return; }
+    if (!creating && !clearPing && [requestedDate, requestedTime, intervalDays, pollDurationHours, optionCount, requestedDifficulty, requestedChannel, requestedPingRole].every(value => value === null)) {
       await reply(text("settingsMissing")); return;
     }
     const invalid = numberError(intervalDays, 1, 30, "intervalInvalid") ?? numberError(pollDurationHours, 1, 24, "durationInvalid") ?? numberError(optionCount, 2, 4, "optionCountInvalid");
@@ -171,6 +182,25 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       await reply(text("scheduleTimeRequired"));
       return;
     }
+    let channelId = existingTopic?.channelId ?? interaction.channelId;
+    if (creating || requestedChannel) {
+      if (requestedChannel && "guildId" in requestedChannel && requestedChannel.guildId !== interaction.guildId) {
+        await reply(text("quizChannelInvalid")); return;
+      }
+      try { channelId = (await resolveQuizChannel(interaction.guild, requestedChannel?.id ?? interaction.channelId)).id; }
+      catch (error) {
+        if (!(error instanceof QuizChannelAccessError)) throw error;
+        await reply(text(error.feedback)); return;
+      }
+    }
+    let pingRoleId = clearPing ? null : existingTopic?.pingRoleId ?? null;
+    if (requestedPingRole || (requestedChannel && pingRoleId)) {
+      try { pingRoleId = await resolveQuizPingRole(interaction.guild, channelId!, requestedPingRole?.id ?? pingRoleId!); }
+      catch (error) {
+        if (!(error instanceof QuizPingError) && !(error instanceof QuizChannelAccessError)) throw error;
+        await reply(text(error.feedback)); return;
+      }
+    }
     let topic;
     try {
       topic = creating ? await db.topic.create({ data: {
@@ -184,9 +214,12 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         pollDurationHours: pollDurationHours ?? settings.defaultPollDurationHours,
         options: "",
         optionCount: optionCount ?? 4,
-        channelId: interaction.channelId
+        channelId,
+        pingRoleId
       } }) : await db.topic.update({ where: { id: existingTopic!.id,
-        startDate: existingTopic!.startDate ?? null, generationTime: existingTopic!.generationTime }, data: {
+        startDate: existingTopic!.startDate ?? null, generationTime: existingTopic!.generationTime, channelId: existingTopic!.channelId }, data: {
+        ...(requestedChannel === null ? {} : { channelId }),
+        ...(requestedPingRole || clearPing ? { pingRoleId } : {}),
         ...(requestedDate === null ? {} : { startDate }),
         ...(requestedTime === null ? {} : { generationTime }),
         ...(intervalDays === null ? {} : { intervalDays }),
@@ -222,15 +255,16 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   }
 
   if (subcommand === "run") {
-    const channel = interaction.channel;
-    if (!channel?.isSendable()) {
-      await reply(text("channel"));
-      return;
-    }
-
     const duration = interaction.options.getInteger("duration_hours");
     const invalid = numberError(duration, 1, 24, "durationInvalid");
     if (invalid) { await reply(text(invalid)); return; }
+    if (!topic.channelId) { await reply(text("topicChannelMissing")); return; }
+    let channel;
+    try { channel = await resolveQuizChannel(interaction.guild, topic.channelId); }
+    catch (error) {
+      if (!(error instanceof QuizChannelAccessError)) throw error;
+      await reply(text(error.feedback)); return;
+    }
     await reply(text("generating", { seconds: Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000), difficulty: text(parseDifficulty(topic.difficulty)) }));
     try {
       await publishTopicQuestions({ ...topic,
@@ -251,7 +285,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       }
       throw error;
     }
-    await reply(text("runDone", { name: topic.name }));
+    await reply(text("runDone", { name: inlineText(topic.name), channel: `<#${channel.id}>` }));
     return;
   }
 
@@ -298,14 +332,18 @@ function numberError(value: number | null, min: number, max: number, key: Messag
   return value !== null && (!Number.isInteger(value) || value < min || value > max) ? key : null;
 }
 
-function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; pollDurationHours: number; generationTime: string | null; startDate?: string | null; difficulty: string; options: string; optionCount: number }, language: string, timezone: string) {
-  const summary = message(language, "summary", { name: topic.name, state: message(language, topic.enabled ? "enabled" : "disabled"), days: topic.intervalDays,
+function topicSummary(topic: { name: string; enabled: boolean; intervalDays: number; pollDurationHours: number; generationTime: string | null; startDate?: string | null; channelId?: string | null; pingRoleId?: string | null; difficulty: string; options: string; optionCount: number }, language: string, timezone: string) {
+  return message(language, "summary", { name: inlineText(topic.name), state: message(language, topic.enabled ? "enabled" : "disabled"), days: topic.intervalDays,
+    start: topic.startDate ?? message(language, "scheduleUnset"),
+    channel: topic.channelId ? `<#${topic.channelId}>` : message(language, "scheduleUnset"),
     hours: topic.pollDurationHours, time: topic.generationTime ? `${topic.generationTime} (${timezone})` : message(language, "manualPublication"), difficulty: message(language, parseDifficulty(topic.difficulty)),
-    answers: topic.options || message(language, "aiAnswers", { count: topic.optionCount }) });
-  return topic.startDate ? `${summary}; ${message(language, "scheduleStart", { date: topic.startDate })}` : summary;
+    answers: topic.options ? inlineText(topic.options) : message(language, "aiAnswers", { count: topic.optionCount }) }) +
+    `\n- ${message(language, "quizPingSummary", { role: topic.pingRoleId ? `<@&${topic.pingRoleId}>` : message(language, "disabled") })}`;
 }
 
 function quizErrorFeedback(error: unknown): MessageKey | null {
+  if (error instanceof TopicChannelChangedError) return "topicChanged";
+  if (error instanceof RandomQuizChannelError) return "randomChannelOnly";
   if (error instanceof AiGenerationError) {
     return { unavailable: "aiUnavailable", limit: "quota", configuration: "aiConfiguration", "invalid-response": "aiInvalidResponse", timeout: "timeout" }[error.kind] as MessageKey;
   }

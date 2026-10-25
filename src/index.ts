@@ -21,6 +21,7 @@ import { message } from "./messages.js";
 import { startScoreScheduler } from "./services/scoring.js";
 import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 import { cacheGuildSettings } from "./services/guild-settings.js";
+import { handleTopicListComponent, TOPIC_LIST_PREFIX } from "./commands/topic-list.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -65,6 +66,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isAutocomplete()) {
       await routeAutocomplete(interaction);
       return;
+    }
+    if (interaction.isMessageComponent() && interaction.customId.startsWith(TOPIC_LIST_PREFIX)) {
+      await handleTopicListComponent(interaction); return;
     }
     if (interaction.isStringSelectMenu() && interaction.customId === "settings:language") {
       await handleLanguageSelection(interaction);

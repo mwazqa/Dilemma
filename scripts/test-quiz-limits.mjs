@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { quizAnswers, quizDuration } from "./fixtures/native-quiz.mjs";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", QUIZ_TIMEZONE: "Europe/Warsaw",
   OPENAI_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
 const { Prisma } = await import("@prisma/client");
 const { db } = await import("../dist/db.js");
+db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 const { claimQuizRun, refreshRandomQuizRun, releaseQuizRun, runKey, quizDay, quizDayBounds, isTopicDue,
   validatePollDuration, DailyQuizLimitError, RandomQuizCooldownError, RANDOM_COOLDOWN_MS, RANDOM_DAILY_LIMIT } =
   await import("../dist/services/quiz-limits.js");
@@ -215,10 +217,10 @@ const channel = { id: "channel", send: async payload => {
   if (failSend) throw new Error("uncertain send");
   now = new Date(+now + sendDelay);
   sent++;
-  durations.push(payload.poll.duration);
+  durations.push(quizDuration(payload));
   return { id: "message-" + sent, channelId: "channel", poll: { allowMultiselect: false,
-    expiresAt: new Date(now.getTime() + payload.poll.duration * 3_600_000),
-    answers: new Map(payload.poll.answers.map((answer, i) => [i + 1, { id: i + 1, text: answer.text }])) } };
+    expiresAt: new Date(now.getTime() + quizDuration(payload) * 3_600_000),
+    answers: new Map(quizAnswers(payload).map((answer, i) => [i + 1, { id: i + 1, text: answer.text }])) } };
 }, isSendable: () => true };
 reset();
 const topic = makeTopic();

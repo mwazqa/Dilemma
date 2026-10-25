@@ -59,6 +59,16 @@ docker run -d \
 
 Apply PostgreSQL migrations explicitly before starting the read-only bot container.
 Back up production data before a schema change. The running bot never applies migrations.
+The next channel-management upgrade adds `20261025120000_quiz_channels`.
+Test it on an isolated PostgreSQL database before production, then re-register
+commands. Existing topic destinations stay intact. Public random quizzes keep
+working wherever Discord allows them until a manager adds the first channel with
+`/dilemma random-channels add channel:#quiz`. Removing the last entry restores
+unrestricted random-channel access.
+All quizzes use native Discord polls; members can change or withdraw votes until closing. Re-register
+commands to expose `/dilemma block`, `/dilemma unblock` and `/dilemma blocks`.
+Use `channel` in topic creation or configuration to choose its destination;
+scheduled quizzes and `/dilemma run` always publish there.
 The preparation command converts dotenv quoting to Docker's environment-file
 format and writes a separate file with owner-only permissions. Rerun it whenever
 you change `.env`. Configure each Discord server independently with
@@ -89,6 +99,8 @@ DATABASE_URL=postgresql://...
 `DISCORD_GUILD_ID` is optional when global command registration is enabled.
 
 ## Register commands
+
+The topic notification options require command registration and the additive `20261025150000_quiz_ping_role` migration. Existing topics keep their pings disabled. Configure `ping_role` per topic after deployment; no new environment variables are needed. Make that role mentionable or grant the bot Mention Everyone permission in the quiz's destination channel. Random quizzes and result updates never send these notifications.
 
 For the v2.0.0 management-role feature, apply the additive `20261022160000_manager_role` migration before starting the new code, then register commands. Existing servers retain administrator-only management until a member with Manage Server explicitly selects a role through `/dilemma permissions set`. Validate the migration on an isolated database and retain a production backup before applying it. Never apply schema changes automatically from the running bot.
 

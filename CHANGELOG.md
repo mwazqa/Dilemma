@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v3.1.0 - 2026-10-25
+
+- Update OpenAI SDK to the compatible 6.x line, Zod to 4.x and the affected HTTP dependency to resolve the reported dependency advisories. Preserve the configured model, generation instructions, token limits and retry policy. Add a dependency audit to CI.
+- Keep native Discord single-choice polls for all quizzes, including vote changes and withdrawal until closing. Score only finalized answers once using actual Discord answer IDs, preserve the close button and retain optional start-role notifications. Document the final-vote behavior in all six languages.
+- Add optional per-topic `ping_role` and `clear_ping` settings to creation and configuration. Mention only the selected server role once in the start message for scheduled topics and early manual runs; keep random quizzes, settings, lists and result updates silent. Validate mentionability and channel permissions, use current settings before publication and preserve quiz publication if a role becomes unavailable. Include the saved role in six-language summaries, help and topic lists. Add matching nullable SQLite/PostgreSQL `Topic.pingRoleId` migrations; existing topics default to no ping.
+- Replace the plain `/dilemma list` reply with a private, paginated Discord card containing every saved topic, including disabled topics. Sort by configured start date ascending and then localized name order; put topics without a start date last. Add native status, difficulty and channel filters, refresh and clear controls, six-language labels and access checks on each interaction. Read current server data only on demand; this view requires no migration.
+
+- Add per-server random quiz channels through `/dilemma random-channels add`, `remove` and `list`, managed by administrators or delegated Dilemma managers. An empty list permits random quizzes wherever Discord allows them; adding the first channel restricts everyone, including administrators, to the list. Removing the last channel restores unrestricted access. Keep saved-topic destinations independent, preserve shared daily limits and recheck the current restriction before sending.
+- Add `channel` to topic creation and configuration. Publish scheduled and early manual quizzes in the saved destination, validate channel type and bot permissions, preserve omitted destinations and stop stale publication when the destination changes during generation. Do not overwrite a newer channel setting after publication.
+- Format detailed command replies as localized Markdown lists, include the topic destination and paginate long private lists without clipping. Keep native command descriptions neutral and update six-language help and README.
+- Add matching additive SQLite/PostgreSQL `QuizChannel` migrations and regression checks for channel isolation, delegated access, destination changes and private reply pagination. Upgrades require migration and command re-registration; existing servers keep unrestricted random-channel access until a manager chooses a channel.
+
 ## v3.0.2 - 2026-10-22
 
 - Strengthen quiz-writing instructions against unnecessary semantic hints, answer-revealing titles and emoji, and implausible or uneven distractors. Include the beak/electroreception example while preserving difficulty, required context and custom answer text/order.

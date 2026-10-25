@@ -1,6 +1,7 @@
 import { AttachmentBuilder, EmbedBuilder, SlashCommandSubcommandGroupBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { getGuildSettings } from "../services/guild-settings.js";
+import { bulletList, inlineText } from "../formatting.js";
 import { openFeedback } from "../feedback.js";
 import { experienceProgress } from "../services/experience.js";
 import { boundedText, renderScoreCard } from "../services/score-card.js";
@@ -57,7 +58,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
       data: { selectedBadge: encodeSelectedBadges(ids) } });
     if (!saved.count) { await reply(text("badgeLocked")); return; }
     const progress = achievementProgress(null);
-    await reply(text("badgeSet", { badge: ids.map(id => text(progress.find(item => item.id === id)!.name)).join(", ") }));
+    await reply(text("badgeSet", { badge: bulletList(ids.map(id => inlineText(text(progress.find(item => item.id === id)!.name)))) }));
     return;
   }
   if (sub === "forget") {
