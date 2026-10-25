@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.1.1 - 2026-10-25
+
+- Simplify the help card in all six languages by removing the explanatory introduction and keeping the grouped command list.
+
 ## v3.1.0 - 2026-10-25
 
 - Update OpenAI SDK to the compatible 6.x line, Zod to 4.x and the affected HTTP dependency to resolve the reported dependency advisories. Preserve the configured model, generation instructions, token limits and retry policy. Add a dependency audit to CI.

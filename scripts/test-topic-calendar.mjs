@@ -16,7 +16,7 @@ globalThis.Date = class extends RealDate {
 const { db } = await import("../dist/db.js");
 const { isScheduleDate, isTopicDue, nextTopicRunAt, claimQuizRun, releaseQuizRun, TopicScheduleNotReadyError } = await import("../dist/services/quiz-limits.js");
 const { handleTopic, topicCommand } = await import("../dist/commands/topic.js");
-const { getHelpContent, getHelpEmbed } = await import("../dist/commands/help.js");
+const { getHelpContent } = await import("../dist/commands/help.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
 const topics = new Map(), runs = new Map();
 let settings = { guildId: "guild", language: "pl", defaultIntervalDays: 1, defaultPollDurationHours: 24,
@@ -138,8 +138,8 @@ try {
   assert.equal(early.cycleRun.day, "2026-10-26", "An explicit early manual run may claim today's slot");
   await releaseQuizRun(early);
   for (const language of messageLanguages) {
-    assert.ok(getHelpContent(language).includes("start_date"));
-    assert.ok(getHelpEmbed(language).toJSON().description.includes("interval_days"));
+    assert.ok(getHelpContent(language).includes("/dilemma create"));
+    assert.ok(getHelpContent(language).includes("/dilemma configure"));
     for (const key of ["dateInvalid", "scheduleTimeRequired", "topicScheduleUnavailable"]) assert.ok(message(language, key).includes("~"));
   }
   for (const command of ["create", "configure"]) assert.ok(topicCommand.toJSON().options.find(option => option.name === command).options.some(option => option.name === "start_date"));

@@ -221,8 +221,8 @@ try {
   assert.equal(race.filter(item => item.replies.at(-1) === message("pl", "topicExists", { name: "Concurrent" })).length, 1);
   for (const language of messageLanguages) {
     const help = getHelpEmbed(language).toJSON();
-    assert.ok(help.description.includes(message(language, "helpAnswers")));
-    assert.ok(help.description.length < 4096 && help.fields.every(field => field.value.length < 1024));
+    assert.equal(help.description, undefined);
+    assert.ok(help.fields.every(field => field.value.length < 1024));
     assert.ok(message(language, "languagePlaceholder").length <= 150);
     for (const key of ["aiUnavailable", "aiInvalidResponse", "aiConfiguration", "publishPermission", "generationFailed"]) {
       assert.ok(message(language, key).includes("~") && message(language, key).length < 2000);
