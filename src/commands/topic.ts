@@ -19,12 +19,13 @@ import { showTopicList } from "./topic-list.js";
 import { QuizPingError, resolveQuizPingRole } from "../services/quiz-notifications.js";
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
-  return subcommand
+  subcommand
     .addStringOption(option => option.setName("name").setDescription(creating ? "Name for a new topic; use configure for an existing topic." : "Existing topic to update; omitted settings remain unchanged.").setRequired(true).setMaxLength(80).setAutocomplete(!creating))
     .addChannelOption(option => option.setName("channel").setDescription(creating ? "Quiz destination; defaults to this channel." : "New quiz destination; omitted keeps the saved channel.")
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
-    .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to notify when this saved quiz starts; omitted means no ping." : "Role to notify when this saved quiz starts; omitted keeps the saved role."))
-    .addBooleanOption(option => option.setName("clear_ping").setDescription("Remove the notification role; cannot be combined with ping_role."))
+    .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to notify when this saved quiz starts; omitted means no ping." : "Role to notify when this saved quiz starts; omitted keeps the saved role."));
+  if (!creating) subcommand.addBooleanOption(option => option.setName("clear_ping").setDescription("Remove the notification role; cannot be combined with ping_role."));
+  return subcommand
     .addStringOption(option => option.setName("start_date").setDescription("First date YYYY-MM-DD; requires a publication time. Use none for rolling scheduling.").setMinLength(4).setMaxLength(10))
     .addStringOption(option => option.setName("generation_time").setDescription("Publication time HH:mm; none clears it only when no start_date is active.").setMinLength(4).setMaxLength(5))
     .addIntegerOption(option => option.setName("interval_days").setDescription("Repeat every 1-30 days; fixed schedules count from start_date.").setMinValue(1).setMaxValue(30))
@@ -161,7 +162,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const requestedDifficulty = interaction.options.getString("difficulty");
     const requestedChannel = interaction.options.getChannel("channel");
     const requestedPingRole = interaction.options.getRole("ping_role");
-    const clearPing = interaction.options.getBoolean("clear_ping") === true;
+    const clearPing = !creating && interaction.options.getBoolean("clear_ping") === true;
     if (requestedPingRole && clearPing) { await reply(text("quizPingConflict")); return; }
     if (!creating && !clearPing && [requestedDate, requestedTime, intervalDays, pollDurationHours, optionCount, requestedDifficulty, requestedChannel, requestedPingRole].every(value => value === null)) {
       await reply(text("settingsMissing")); return;

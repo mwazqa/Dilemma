@@ -86,8 +86,8 @@ try {
   const menu = dilemmaCommand.toJSON();
   const find = name => menu.options.find(option => option.name === name);
   const names = option => option.options.map(field => field.name);
-  assert.deepEqual(names(find("create")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
-  assert.deepEqual(names(find("create")), names(find("configure")));
+  assert.deepEqual(names(find("create")), ["name", "channel", "ping_role", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
+  assert.deepEqual(names(find("configure")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
   assert.equal(find("create").options[0].autocomplete, false);
   assert.equal(find("configure").options[0].autocomplete, true);
   assert.deepEqual(names(find("random")), ["options", "option_count", "difficulty", "duration_hours"]);
