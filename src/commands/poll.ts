@@ -5,6 +5,7 @@ import { openFeedback } from "../feedback.js";
 import { scheduleEvents } from "../services/schedule-events.js";
 import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
 import { canManageDilemma } from "../services/management-permissions.js";
+import { storedQuizOptions } from "../services/quiz-options.js";
 
 const closingPolls = new Set<string>();
 
@@ -47,10 +48,6 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
 
   try {
     const message = await channel.messages.fetch(messageId);
-    if (!message.poll) {
-      await reply(text("notPoll"));
-      return;
-    }
     const generatedPoll = await db.generatedPoll.findUnique({ where: { messageId } });
     const randomPoll = generatedPoll ? null : await db.randomPoll.findUnique({ where: { messageId } });
     if (!generatedPoll && !randomPoll) {
@@ -59,7 +56,7 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
     }
 
     const poll = generatedPoll ?? randomPoll!;
-    if (poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
+    if (!message.poll || poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
       await reply(text("notPoll"));
       return;
     }
@@ -78,7 +75,7 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
       const closedAt = new Date();
       await db.quizSettlement.updateMany({ where: { messageId, guildId: interaction.guildId, scoredAt: null }, data: { closedAt, nextCheckAt: closedAt } });
       scheduleEvents.emit("settlementClosed", messageId, closedAt);
-      const options = poll.options.split("||");
+      const options = storedQuizOptions(poll.options);
       const correctAnswer = options[poll.correctOption] ?? "Unknown";
       const resultEmojis = poll.optionEmojis.split("||");
       const claim = generatedPoll

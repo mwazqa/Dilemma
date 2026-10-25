@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 import { readFileSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 
@@ -52,9 +53,10 @@ db.$transaction = work => {
 };
 function request(subcommand, values, permitted = true) {
   const replies = [];
-  return { replies, guildId: "guild", channelId: "channel", channel: { isSendable: () => true }, locale: "pl", memberPermissions: { has: () => permitted },
-    options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
-    deferReply: async () => {}, editReply: async value => replies.push(typeof value === "string" ? value : value.content) };
+  return { user: { id: "100000000000000001" }, replies, guildId: "guild", guild: quizGuild(), channelId: "channel", channel: { isSendable: () => true }, locale: "pl", memberPermissions: { has: () => permitted },
+    options: { getSubcommand: () => subcommand, getRole: name => values[name] ?? null, getBoolean: name => values[name] ?? null, getChannel: name => values[name] ?? null, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
+    deferReply: async () => {}, editReply: async value => replies.push(typeof value === "string" ? value : value.content ?? value),
+    followUp: async value => replies.push(value.content) };
 }
 const calendar = { enabled: true, channelId: "channel", generationTime: "18:00", startDate: "2026-10-26", intervalDays: 7, lastGeneratedAt: null };
 try {
@@ -107,7 +109,7 @@ try {
   assert.deepEqual(first, before);
   const denied = request("configure", { name: first.name, start_date: "2026-10-30" }, false);
   await handleTopic(denied); assert.deepEqual(first, before);
-  const listing = request("list", {}); await handleTopic(listing); assert.ok(listing.replies[0].includes("2026-10-22"));
+  const listing = request("list", {}); await handleTopic(listing); assert.ok(listing.replies[0].embeds[0].toJSON().fields.some(field => field.name.includes("2026-10-22")));
   const blocked = request("run", { name: first.name });
   await handleTopic(blocked); assert.equal(blocked.replies.at(-1), message("pl", "topicScheduleUnavailable"));
   assert.equal(runs.size, 0);

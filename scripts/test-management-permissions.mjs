@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test",
   DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture" });
 const realFetch = globalThis.fetch;
@@ -31,12 +32,14 @@ db.topic.findUnique = async () => null;
 db.topic.create = async ({ data }) => { topicWrites++; return { id: "created", enabled: true, ...data }; };
 function interaction(action, { permission = 0n, memberRoles = [], guildId = "guild", group = "permissions", values = {}, selected } = {}) {
   const replies = [];
-  return { commandName: "dilemma", guildId, locale: "pl", member: { roles: memberRoles },
+  return { user: { id: "100000000000000001" }, commandName: "dilemma", guildId, locale: "pl", member: { roles: memberRoles },
     memberPermissions: new PermissionsBitField(permission), channelId: "channel",
-    guild: guildId ? { id: guildId, roles: { fetch: async id => roles.get(id) ?? null } } : null,
+    guild: guildId ? { ...quizGuild(guildId), roles: { fetch: async id => roles.get(id) ?? null } } : null,
     options: { getSubcommandGroup: () => group, getSubcommand: () => action,
       getString: name => values[name] ?? null, getInteger: name => values[name] ?? null,
-      getRole: () => selected ?? { id: roleId, managed: false } },
+      getChannel: name => values[name] ?? null,
+      getBoolean: name => values[name] ?? null,
+      getRole: name => name === "ping_role" ? values[name] ?? null : selected ?? { id: roleId, managed: false } },
     deferReply: async () => {}, editReply: async payload => {
       assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload);
     }, replies };

@@ -78,6 +78,7 @@ model Topic {
   optionCount    Int      @default(4)
   questionsGenerated Int   @default(0)
   channelId      String?
+  pingRoleId     String?
   enabled        Boolean  @default(true)
   nextGenerationAt DateTime?
   generationTime String?
@@ -88,6 +89,13 @@ model Topic {
 
   @@unique([guildId, name])
   @@index([guildId])
+}
+
+model QuizChannel {
+  guildId   String
+  channelId String
+
+  @@id([guildId, channelId])
 }
 
 model GuildSettings {

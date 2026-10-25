@@ -2,16 +2,18 @@ import type { SendableChannels } from "discord.js";
 import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
 import { AiGenerationError, generateQuestion } from "./question-generator.js";
-import { getVotePrompt } from "../brand.js";
 import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { message, normalizeLanguage } from "../messages.js";
+import { getVotePrompt } from "../brand.js";
 import { settlementData } from "./scoring.js";
 import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { pollControls } from "./poll-controls.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { guildTimezone } from "./timezone.js";
+import { requireQuizChannel } from "./quiz-channels.js";
+import { resolveQuizPingRole } from "./quiz-notifications.js";
 
 const questionHistoryLimit = 365;
 
@@ -26,6 +28,7 @@ export class QuizPublicationError extends Error {
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels, early = true): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
+  if (!topic.channelId || topic.channelId !== channel.id) throw new TopicChannelChangedError();
   const settings = await getGuildSettings(topic.guildId);
   let timezone = guildTimezone(settings);
   let run = await claimQuizRun(topic.guildId, topic.id, new Date(), early, timezone);
@@ -48,27 +51,34 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       timezone = currentTimezone;
       run = await claimQuizRun(topic.guildId, topic.id, new Date(), early, timezone);
     }
+    const latestTopic = await db.topic.findUnique({ where: { id: topic.id }, select: { channelId: true, guildId: true, pingRoleId: true } });
+    if (!latestTopic || latestTopic.guildId !== topic.guildId || latestTopic.channelId !== channel.id) throw new TopicChannelChangedError();
+    let pingRoleId: string | null = null;
+    if (latestTopic.pingRoleId && "guild" in channel && channel.guild.id === topic.guildId) {
+      try { pingRoleId = await resolveQuizPingRole(channel.guild, channel.id, latestTopic.pingRoleId); }
+      catch { console.warn("Quiz notification skipped: role-or-permission-unavailable"); }
+    }
+    if (pingRoleId) {
+      const beforeSend = await db.topic.findUnique({ where: { id: topic.id }, select: { channelId: true, guildId: true, pingRoleId: true } });
+      if (!beforeSend || beforeSend.guildId !== topic.guildId || beforeSend.channelId !== channel.id) throw new TopicChannelChangedError();
+      if (beforeSend.pingRoleId !== pingRoleId) pingRoleId = null;
+    }
     const questionNumber = topic.questionsGenerated + 1;
     sendAttempted = true;
     const sentPoll = await channel.send({
-      content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
-      allowedMentions: { parse: [] },
+      content: `${pingRoleId ? `<@&${pingRoleId}>\n` : ""}**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
+      allowedMentions: { parse: [], roles: pingRoleId ? [pingRoleId] : [], users: [], repliedUser: false },
       components: pollControls(language),
-      poll: {
-        question: { text: question.question },
-        answers: question.options.map((option, optionIndex) => {
-          const emoji = question.optionEmojis[optionIndex] ?? "";
-          return emoji ? { text: option, emoji } : { text: option };
-        }),
-        duration,
-        allowMultiselect: false
-      }
+      poll: { question: { text: question.question }, answers: question.options.map((text, index) => {
+        const emoji = question.optionEmojis[index] ?? "";
+        return emoji ? { text, emoji } : { text };
+      }), duration, allowMultiselect: false }
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = settlementData(sentPoll, topic.guildId, difficulty, question.options, question.correctOption);
     const updatedTopic = await db.$transaction(async tx => {
       const updated = await tx.topic.update({
         where: { id: topic.id },
-        data: { questionsGenerated: { increment: 1 }, channelId: channel.id, lastGeneratedAt: new Date() }
+        data: { questionsGenerated: { increment: 1 }, lastGeneratedAt: new Date() }
       });
       await tx.generatedPoll.create({
         data: {
@@ -78,7 +88,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
           messageId: sentPoll.id,
           channelId: channel.id,
           question: question.question,
-          options: question.options.join("||"),
+          options: JSON.stringify(question.options),
           correctOption: question.correctOption,
           explanation: question.explanation,
           topicEmoji: question.topicEmoji,
@@ -98,6 +108,10 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
   }
 }
 
+export class TopicChannelChangedError extends Error {
+  constructor() { super("Topic destination changed"); this.name = "TopicChannelChangedError"; }
+}
+
 export async function publishRandomQuestion(
   guildId: string,
   optionCount: number,
@@ -107,6 +121,7 @@ export async function publishRandomQuestion(
   options: string[] = []
 ): Promise<string> {
   const duration = validatePollDuration(durationHours);
+  await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
   let run = await claimQuizRun(guildId, undefined, new Date(), true, guildTimezone(settings));
   let sendAttempted = false;
@@ -127,20 +142,16 @@ export async function publishRandomQuestion(
       difficulty
     );
     run = await refreshRandomQuizRun(run, guildTimezone(await getGuildSettings(guildId)));
+    await requireQuizChannel(guildId, channel.id);
     sendAttempted = true;
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [] },
       components: pollControls(language),
-      poll: {
-        question: { text: question.question },
-        answers: question.options.map((option, optionIndex) => {
-          const emoji = question.optionEmojis[optionIndex] ?? "";
-          return emoji ? { text: option, emoji } : { text: option };
-        }),
-        duration,
-        allowMultiselect: false
-      }
+      poll: { question: { text: question.question }, answers: question.options.map((text, index) => {
+        const emoji = question.optionEmojis[index] ?? "";
+        return emoji ? { text, emoji } : { text };
+      }), duration, allowMultiselect: false }
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = settlementData(sentPoll, guildId, difficulty, question.options, question.correctOption);
     await db.$transaction(async tx => {
@@ -152,7 +163,7 @@ export async function publishRandomQuestion(
           messageId: sentPoll.id,
           channelId: channel.id,
           question: question.question,
-          options: question.options.join("||"),
+          options: JSON.stringify(question.options),
           correctOption: question.correctOption,
           explanation: question.explanation,
           optionEmojis: question.optionEmojis.join("||")

@@ -1,6 +1,7 @@
 import { MessageFlags, type ButtonInteraction, type ChatInputCommandInteraction, type InteractionEditReplyOptions } from "discord.js";
 import { getGuildSettings } from "./services/guild-settings.js";
 import { message, normalizeLanguage, type MessageKey } from "./messages.js";
+import { textPages } from "./formatting.js";
 
 const interactionLanguages = new WeakMap<object, string>();
 export function interactionLanguage(interaction: { locale: string }): string {
@@ -16,13 +17,22 @@ export async function openFeedback(interaction: ChatInputCommandInteraction | Bu
     : null;
   const language = normalizeLanguage(settings?.language ?? interaction.locale);
   rememberLanguage(interaction, language);
+  const reply = (payload: string | InteractionEditReplyOptions) => {
+    const options = typeof payload === "string" ? { content: payload } : payload;
+    return interaction.editReply({ ...options, content: options.content === null ? null : options.content?.slice(0, 2000), allowedMentions: { parse: [] } });
+  };
   return {
     language,
     settings,
     text: (key: MessageKey, values?: Record<string, string | number>) => message(language, key, values),
-    reply: (payload: string | InteractionEditReplyOptions) => {
-      const options = typeof payload === "string" ? { content: payload } : payload;
-      return interaction.editReply({ ...options, content: options.content === null ? null : options.content?.slice(0, 2000), allowedMentions: { parse: [] } });
+    reply,
+    replyBlocks: async (blocks: string[]) => {
+      const pages = textPages(blocks);
+      if (!pages.length) return;
+      await reply(pages[0]);
+      for (const content of pages.slice(1)) {
+        await interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+      }
     }
   };
 }

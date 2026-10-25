@@ -108,9 +108,9 @@ async function settleQuiz(client: Client, quiz: QuizSettlement): Promise<number 
     await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
     const final = await collectFinalVotes(client, quiz);
     if (final) {
+      const settings = await getGuildSettings(quiz.guildId);
       await applyFinalVotes(quiz, final.votes, final.finishedAt);
       settlementAttempts.delete(quiz.messageId);
-      const settings = await getGuildSettings(quiz.guildId);
       await disablePollControls(client, quiz.channelId, quiz.messageId, settings?.language ?? "en");
       return null;
     }

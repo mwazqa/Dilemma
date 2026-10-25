@@ -108,7 +108,8 @@ assert.match(emptyLeaderboard.payloads[0].embeds[0].toJSON().description, /Jeszc
 db.userScore.findMany = findPlayers;
 const dm = interaction("profile", false, null); await handleScore(dm); assert.equal(dm.replies[0], message("en", "serverOnly"));
 let deletions = 0;
-db.$transaction = async cb => cb({ quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
+db.$transaction = async cb => cb({
+  quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
   userScore: { deleteMany: async () => { deletions++; } } });
 const unconfirmed = interaction("forget");
 await routeCommand(unconfirmed); assert.equal(deletions, 0);

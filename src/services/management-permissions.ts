@@ -1,7 +1,7 @@
-import { PermissionFlagsBits, type AutocompleteInteraction, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { PermissionFlagsBits, type AutocompleteInteraction, type MessageComponentInteraction, type ChatInputCommandInteraction } from "discord.js";
 import type { GuildSettings } from "@prisma/client";
 
-type ManagementInteraction = AutocompleteInteraction | ButtonInteraction | ChatInputCommandInteraction;
+type ManagementInteraction = AutocompleteInteraction | MessageComponentInteraction | ChatInputCommandInteraction;
 
 export function canConfigureManagement(interaction: ManagementInteraction): boolean {
   return Boolean(interaction.guildId && interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));

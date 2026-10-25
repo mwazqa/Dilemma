@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { quizAnswers, quizDuration } from "./fixtures/native-quiz.mjs";
 import { Prisma } from "@prisma/client";
+import { quizGuild } from "./fixtures/quiz-channel.mjs";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
   DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test",
@@ -8,6 +10,7 @@ const realFetch = globalThis.fetch;
 let fetchFixture = async () => { throw new Error("Unexpected network request in UX test"); };
 globalThis.fetch = (...args) => fetchFixture(...args);
 const { db } = await import("../dist/db.js");
+db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
 const { dilemmaCommand } = await import("../dist/commands/dilemma.js");
 const { getHelpEmbed } = await import("../dist/commands/help.js");
@@ -62,12 +65,12 @@ fetchFixture = async (_, options) => {
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
   deliveries++; sent = payload;
   return { id: `message-${deliveries}`, channelId: "channel", poll: { expiresAt: new Date(Date.now() + 3600000),
-    answers: new Map(payload.poll.answers.map((answer, index) => [index + 7, { id: index + 7, text: answer.text }])) } };
+    answers: new Map(quizAnswers(payload).map((answer, index) => [index + 7, { id: index + 7, text: answer.text }])) } };
 } };
 function request(subcommand, values = {}, permitted = true) {
   const replies = [];
-  return { replies, guildId: "guild", channelId: "channel", channel, locale: "pl", memberPermissions: { has: () => permitted },
-    options: { getSubcommand: () => subcommand, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
+  return { user: { id: "actor" }, replies, guildId: "guild", guild: quizGuild("guild", [{ ...channel, guildId: "guild", type: 0, permissionsFor: () => ({ has: () => true }) }]), channelId: "channel", channel, locale: "pl", memberPermissions: { has: () => permitted },
+    options: { getSubcommand: () => subcommand, getRole: name => values[name] ?? null, getBoolean: name => values[name] ?? null, getChannel: name => values[name] ?? null, getString: name => values[name] ?? null, getInteger: name => values[name] ?? null },
     deferReply: async () => {}, editReply: async payload => replies.push(payload.content ?? payload) };
 }
 async function invoke(subcommand, values = {}, permitted = true) {
@@ -83,7 +86,7 @@ try {
   const menu = dilemmaCommand.toJSON();
   const find = name => menu.options.find(option => option.name === name);
   const names = option => option.options.map(field => field.name);
-  assert.deepEqual(names(find("create")), ["name", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
+  assert.deepEqual(names(find("create")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
   assert.deepEqual(names(find("create")), names(find("configure")));
   assert.equal(find("create").options[0].autocomplete, false);
   assert.equal(find("configure").options[0].autocomplete, true);
@@ -91,7 +94,7 @@ try {
   assert.ok(find("random").options.every(option => !option.required));
   assert.deepEqual(names(find("timezone")), ["value"]);
   assert.equal(find("defaults"), undefined);
-  assert.deepEqual(menu.options.map(option => option.name), ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "timezone", "permissions", "poll", "help", "ping", "delete"]);
+  assert.deepEqual(menu.options.map(option => option.name), ["random", "score", "create", "configure", "list", "run", "enable", "disable", "language", "timezone", "random-channels", "permissions", "poll", "help", "ping", "delete"]);
   function validateOptions(command) {
     if (command.description) {
       assert.ok(command.description.length <= 100);
@@ -113,6 +116,8 @@ try {
   assert.equal(topic.optionCount, 4); assert.equal(topic.options, "");
   assert.equal(topic.generationTime, "18:30"); assert.equal(topic.pollDurationHours, 12); assert.equal(topic.intervalDays, 7);
   assert.ok(created.replies[0].includes("12 h"));
+  assert.match(created.replies[0], /\n\n\*\*New\*\*\n\n- \*\*Status:\*\*/);
+  assert.equal(created.replies[0].split("\n").filter(line => line.startsWith("- ")).length, 9);
   const beforeDuplicate = { ...topic };
   const duplicate = await invoke("create", { name: "New", duration_hours: 1, option_count: 2 });
   assert.equal(duplicate.replies[0], message("pl", "topicExists", { name: "New" }));
@@ -165,15 +170,15 @@ try {
   await invalid("random", { duration_hours: 25 }, "durationInvalid");
   const random = await invoke("random", {}, false);
   assert.ok(random.replies.at(-1).includes("Quiz gotowy"));
-  assert.equal(sent.poll.answers.length, 4); assert.equal(sent.poll.duration, 12);
+  assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 12);
   generatedAnswers = ["Yes", "No"];
   await invoke("random", { options: " Yes, No ", duration_hours: 2 }, false);
   assert.match(prompt, /Use exactly these answer options: Yes, No/);
-  assert.deepEqual(sent.poll.answers.map(answer => answer.text), ["Yes", "No"]);
-  assert.equal(sent.poll.duration, 2); assert.equal(savedPoll.options, "Yes||No");
+  assert.deepEqual(quizAnswers(sent).map(answer => answer.text), ["Yes", "No"]);
+  assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), ["Yes", "No"]);
   await invoke("random", { options: "Yes,No", option_count: 2 });
   generatedAnswers = ["A", "B", "C"];
-  await invoke("random", { option_count: 3 }); assert.equal(sent.poll.answers.length, 3);
+  await invoke("random", { option_count: 3 }); assert.equal(quizAnswers(sent).length, 3);
   const beforeWrongAnswers = { deliveries, releases };
   const wrong = await invoke("random", { options: "Yes,No" });
   assert.equal(wrong.replies.at(-1), message("pl", "aiInvalidResponse"));
