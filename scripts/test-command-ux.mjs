@@ -13,7 +13,7 @@ const { db } = await import("../dist/db.js");
 db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
 const { dilemmaCommand } = await import("../dist/commands/dilemma.js");
-const { getHelpEmbed } = await import("../dist/commands/help.js");
+const { getHelpEmbed, getHelpContent } = await import("../dist/commands/help.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
 const topics = new Map();
 let settings = { guildId: "guild", language: "pl", defaultIntervalDays: 7, defaultPollDurationHours: 12,
@@ -26,6 +26,8 @@ db.guildSettings.findUnique = async () => settings;
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? [...topics.values()].find(topic =>
   topic.guildId === where.guildId_name?.guildId && topic.name === where.guildId_name?.name) ?? null;
 db.topic.findMany = async () => [...topics.values()];
+db.topic.count = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId).length;
+db.topic.delete = async ({ where }) => { const topic = topics.get(where.id); topics.delete(where.id); return topic; };
 db.topic.create = async ({ data }) => {
   if ([...topics.values()].some(topic => topic.name === data.name && topic.guildId === data.guildId)) {
     throw new Prisma.PrismaClientKnownRequestError("Fixture duplicate", { code: "P2002", clientVersion: "test" });
@@ -220,11 +222,52 @@ try {
   const race = await Promise.all([invoke("create", { name: "Concurrent" }), invoke("create", { name: "Concurrent" })]);
   assert.equal(writes, beforeRace + 1);
   assert.equal(race.filter(item => item.replies.at(-1) === message("pl", "topicExists", { name: "Concurrent" })).length, 1);
+  const previousTopics = new Map(topics);
+  topics.clear();
+  for (let index = 0; index < 30; index++) topics.set(`limit-${index}`, { id: `limit-${index}`, guildId: "guild", name: `Limit ${index}`, enabled: false });
+  for (let index = 0; index < 40; index++) topics.set(`other-${index}`, { id: `other-${index}`, guildId: "other", name: `Other ${index}` });
+  const beforeLimit = writes;
+  await invoke("create", { name: "Last slot" });
+  assert.equal(writes, beforeLimit + 1, "Other servers do not consume this server's slots");
+  const blocked = await invoke("create", { name: "Overflow" });
+  assert.equal(blocked.replies.at(-1), message("pl", "topicLimit", { limit: 31 }));
+  assert.equal(writes, beforeLimit + 1, "Disabled quizzes count toward the limit");
+  await invoke("configure", { name: "Last slot", duration_hours: 12 });
+  assert.equal([...topics.values()].find(topic => topic.name === "Last slot").pollDurationHours, 12, "Configuration works at the limit");
+  await invoke("delete", { name: "Last slot" });
+  await invoke("create", { name: "Replacement" });
+  assert.equal([...topics.values()].filter(topic => topic.guildId === "guild").length, 31, "Deleting a quiz frees a slot");
+  topics.set("legacy-extra", { id: "legacy-extra", guildId: "guild", name: "Legacy extra", enabled: false });
+  await invoke("configure", { name: "Replacement", duration_hours: 8 });
+  assert.equal([...topics.values()].find(topic => topic.name === "Replacement").pollDurationHours, 8, "Existing servers above the limit remain configurable");
+  const legacyBlocked = await invoke("create", { name: "Legacy overflow" });
+  assert.equal(legacyBlocked.replies.at(-1), message("pl", "topicLimit", { limit: 31 }));
+  topics.clear();
+  for (const [id, topic] of previousTopics) topics.set(id, topic);
+  const normalTransaction = db.$transaction;
+  let creationAttempts = 0;
+  db.$transaction = async (work, options) => {
+    assert.equal(options.isolationLevel, "Serializable");
+    if (creationAttempts++ === 0) throw Object.assign(new Error("Synthetic serialization failure"), { code: "P2034" });
+    return normalTransaction(work);
+  };
+  const beforeRetry = writes;
+  await invoke("create", { name: "Retry creation" });
+  assert.equal(creationAttempts, 2);
+  assert.equal(writes, beforeRetry + 1);
+  creationAttempts = 0;
+  db.$transaction = async () => { creationAttempts++; throw Object.assign(new Error("Synthetic serialization failure"), { code: "P2034" }); };
+  await assert.rejects(invoke("create", { name: "Busy creation" }), error => error.code === "P2034");
+  assert.equal(creationAttempts, 5, "Retries stay bounded");
+  assert.equal(writes, beforeRetry + 1, "Failed transactions do not create an extra topic");
+  db.$transaction = normalTransaction;
   for (const language of messageLanguages) {
     const help = getHelpEmbed(language).toJSON();
     assert.equal(help.description, undefined);
     assert.ok(help.fields.every(field => field.value.length < 1024));
     assert.ok(message(language, "languagePlaceholder").length <= 150);
+    assert.ok(message(language, "topicLimit", { limit: 31 }).includes("31"));
+    assert.ok(getHelpContent(language).includes("31"));
     for (const key of ["aiUnavailable", "aiInvalidResponse", "aiConfiguration", "publishPermission", "generationFailed"]) {
       assert.ok(message(language, key).includes("~") && message(language, key).length < 2000);
     }

@@ -1,5 +1,6 @@
 import { ChannelType, SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
+import { createTopic, MAX_TOPICS_PER_GUILD, TopicLimitError } from "../services/topic-creation.js";
 import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError, TopicChannelChangedError } from "../services/poll-publisher.js";
 import { getHelpEmbed } from "./help.js";
 import { AiGenerationError } from "../services/question-generator.js";
@@ -204,7 +205,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     }
     let topic;
     try {
-      topic = creating ? await db.topic.create({ data: {
+      topic = creating ? await createTopic({
         guildId: interaction.guildId,
         name,
         language: settings.language,
@@ -217,7 +218,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         optionCount: optionCount ?? 4,
         channelId,
         pingRoleId
-      } }) : await db.topic.update({ where: { id: existingTopic!.id,
+      }) : await db.topic.update({ where: { id: existingTopic!.id,
         startDate: existingTopic!.startDate ?? null, generationTime: existingTopic!.generationTime, channelId: existingTopic!.channelId }, data: {
         ...(requestedChannel === null ? {} : { channelId }),
         ...(requestedPingRole || clearPing ? { pingRoleId } : {}),
@@ -229,6 +230,9 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         ...(requestedDifficulty === null ? {} : { difficulty: parseDifficulty(requestedDifficulty) }) }
       });
     } catch (error) {
+      if (error instanceof TopicLimitError) {
+        await reply(text("topicLimit", { limit: MAX_TOPICS_PER_GUILD })); return;
+      }
       if (creating && error && typeof error === "object" && "code" in error && error.code === "P2002") {
         await reply(text("topicExists", { name })); return;
       }

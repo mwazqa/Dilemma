@@ -24,6 +24,7 @@ db.quizChannel.deleteMany = async ({ where }) => { writes++; return { count: Num
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? [...topics.values()].find(row =>
   row.guildId === where.guildId_name?.guildId && row.name === where.guildId_name?.name) ?? null;
 db.topic.findMany = async () => [...topics.values()];
+db.topic.count = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId).length;
 db.topic.create = async ({ data }) => {
   const row = { id: `topic-${topics.size}`, enabled: true, questionsGenerated: 0, lastGeneratedAt: null, ...data };
   topics.set(row.id, row); return { ...row };

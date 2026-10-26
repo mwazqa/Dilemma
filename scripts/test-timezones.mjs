@@ -75,6 +75,8 @@ try {
   }
   const created = [];
   db.topic.findUnique = async () => null;
+  db.topic.count = async ({ where }) => created.filter(topic => topic.guildId === where.guildId).length;
+  db.$transaction = async work => work(db);
   db.topic.create = async ({ data }) => { created.push(data); return { ...topic, ...data }; };
   const ny = { ...settings.get("ny"), defaultDifficulty: "medium", defaultIntervalDays: 1, defaultPollDurationHours: 24 };
   cacheGuildSettings(ny);

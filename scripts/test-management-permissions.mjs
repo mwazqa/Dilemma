@@ -29,6 +29,8 @@ db.guildSettings.upsert = async ({ where, create, update }) => {
 db.topic.findMany = async ({ where }) => { topicReads++; return [{ id: "topic", guildId: where.guildId, name: "Fixture",
   difficulty: "medium", intervalDays: 1, pollDurationHours: 2, enabled: true, options: "", optionCount: 4, generationTime: null }]; };
 db.topic.findUnique = async () => null;
+db.topic.count = async () => 0;
+db.$transaction = async work => work(db);
 db.topic.create = async ({ data }) => { topicWrites++; return { id: "created", enabled: true, ...data }; };
 function interaction(action, { permission = 0n, memberRoles = [], guildId = "guild", group = "permissions", values = {}, selected } = {}) {
   const replies = [];

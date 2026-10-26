@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.3.1 - 2026-10-27
+
+- Limit each server to 31 saved quiz topics, including disabled topics, with a serializable creation transaction and retries for concurrent writes. Keep random quizzes independent, free slots on deletion and preserve all existing topics. Add six-language limit feedback and update command help and README.
+
 ## v3.3.0 - 2026-10-26
 
 - Set the shared random cooldown to six hours and the daily server limit to four. Add `/dilemma random-reset` for the server owner or configured Dilemma manager role; resetting cooldown does not restore daily quota.

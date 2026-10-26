@@ -99,6 +99,7 @@ db.guildSettings.findUnique = async () => settings;
 db.guildSettings.upsert = async ({ create, update }) => settings = { ...settings, ...(settings ? update : create) };
 db.topic.findUnique = async () => topic ?? null;
 db.topic.findMany = async () => topic ? [topic] : [];
+db.topic.count = async ({ where }) => topic?.guildId === where.guildId ? 1 : 0;
 db.topic.create = async ({ data }) => topic = { id: "topic", enabled: true, generationTime: null, questionsGenerated: 0, ...data };
 db.topic.update = async ({ data }) => {
   topic = { ...topic, ...data, questionsGenerated: data.questionsGenerated?.increment ? topic.questionsGenerated + data.questionsGenerated.increment : topic.questionsGenerated };

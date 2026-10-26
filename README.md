@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Code version: `v3.3.0`, with a six-hour random cooldown, up to four random quizzes per server day, owner/manager cooldown reset, optional availability pings and improved protection against answer clues. See [CHANGELOG.md](CHANGELOG.md). Apply the additive `20261026180000_random_readiness` migration, regenerate the Prisma client and re-register Discord commands. Earlier upgrades must also include the preceding migrations. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.3.1`, with up to 31 saved quiz topics per server, including disabled topics. Concurrent creation respects the same limit; deleting a topic frees a slot, while random quizzes remain independent. See [CHANGELOG.md](CHANGELOG.md). Upgrading from v3.3.0 requires no new database migration or Discord command registration. Earlier upgrades must also include the preceding migrations, Prisma client generation and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -86,6 +86,8 @@ AI failures have separate localized feedback from Discord permission errors. A f
 See the current [OpenAI model documentation](https://developers.openai.com/api/docs/models/gpt-6-luna) and [API pricing](https://developers.openai.com/api/docs/pricing). Existing deployments must replace their old provider configuration with the OpenAI variables in `.env.example`. No database migration or Discord command registration change is required for this provider migration.
 
 ## Commands
+
+Each server can save up to 31 quiz topics in total, including disabled topics. Delete a topic to free a slot; disabling it does not free one. Random quizzes do not use these slots. Existing topics remain editable and are never removed automatically if a server already exceeds the limit. Creation checks the limit transactionally to prevent concurrent commands from exceeding it.
 
 - `/dilemma create name:...` - create a new topic only; optional settings in order: `channel`, `start_date`, `generation_time`, `interval_days:1-30`, `duration_hours:1-24`, `difficulty:easy|medium|hard`, `option_count:2-4`. The destination defaults to the current channel. Answers are AI-generated, with 4 by default. Existing names direct you to `configure` rather than overwriting a topic.
 - `/dilemma configure name:...` - update an existing topic using the same fields and order as `create`; provide at least one change. Omitted fields, channel, enabled state, history and quota remain unchanged. `start_date:none` removes the fixed anchor; `generation_time:none` removes automatic publication time only if there is no active start date.

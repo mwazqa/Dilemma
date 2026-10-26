@@ -38,6 +38,7 @@ roles.set(roleA, { id: roleA, guild, mentionable: true }); roles.set(roleB, { id
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? [...topics.values()].find(topic =>
   topic.guildId === where.guildId_name?.guildId && topic.name === where.guildId_name?.name) ?? null;
 db.topic.findMany = async () => [...topics.values()].filter(topic => topic.enabled);
+db.topic.count = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId).length;
 db.topic.create = async ({ data }) => {
   writes++; const topic = { id: `topic-${topics.size}`, enabled: true, lastGeneratedAt: null, questionsGenerated: 0, ...data };
   topics.set(topic.id, topic); return { ...topic };

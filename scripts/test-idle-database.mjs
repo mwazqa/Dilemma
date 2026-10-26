@@ -181,6 +181,7 @@ try {
     Object.assign(topic, { ...data, questionsGenerated: topic.questionsGenerated + (data.questionsGenerated?.increment ?? 0) });
     return { ...topic };
   };
+  db.topic.count = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId).length;
   db.topic.create = async ({ data }) => {
     const created = { id: "created", enabled: true, questionsGenerated: 0, lastGeneratedAt: null, ...data };
     topics.set(created.id, created);

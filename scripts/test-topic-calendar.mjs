@@ -26,6 +26,7 @@ const key = row => [row.guildId, row.scope, row.day, row.slot].join("|");
 db.topic.findUnique = async ({ where }) => topics.get(where.id) ?? [...topics.values()].find(topic =>
   topic.guildId === where.guildId_name?.guildId && topic.name === where.guildId_name?.name) ?? null;
 db.topic.findMany = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId);
+db.topic.count = async ({ where }) => [...topics.values()].filter(topic => topic.guildId === where.guildId).length;
 db.topic.create = async ({ data }) => {
   const topic = { id: `topic-${topics.size}`, enabled: true, lastGeneratedAt: null, questionsGenerated: 0, ...data };
   topics.set(topic.id, topic); return { ...topic };
