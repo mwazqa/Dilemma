@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 25, 2026
+Last updated: October 26, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -16,6 +16,11 @@ on the current server. Deleting the score also deletes this selection and the
 progress used for achievements.
 Server leaderboards and profiles can display these scores to other
 members of the same server. Usernames and avatars are not stored for scoring.
+
+For newly created random quizzes, Dilemma also stores the creator's Discord user
+ID with the quiz record so that person can close their own quiz, including after
+a bot restart. This ID is not sent to the AI provider. Deleting a score does not
+remove the creator ID attached to a published quiz; it follows quiz-record retention.
 
 When delegated bot management is configured, server configuration includes the
 selected management role's Discord ID. Topic configuration can separately store

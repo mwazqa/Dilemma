@@ -24,7 +24,7 @@ let managerRoleId = null;
 function reset() {
   managerRoleId = null;
   clearGuildSettingsCache();
-  stored = { messageId: "poll", guildId: "guild", channelId: "channel", endedAt: null,
+  stored = { messageId: "poll", guildId: "guild", channelId: "channel", creatorUserId: null, endedAt: null,
     options: "Alpha||Beta", correctOption: 0, optionEmojis: "||", explanation: "Test fact." };
   discordMessage = { id: "poll", author: { id: "bot" }, poll: {
     expiresTimestamp: Date.now() + 3_600_000,
@@ -71,10 +71,10 @@ db.quizSettlement.updateMany = async ({ where, data }) => {
 };
 db.quizSettlement.findMany = async () => [];
 db.dailyQuizRun.deleteMany = async () => { throw new Error("Closing must not reset quota"); };
-function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID, roles = [] } = {}) {
+function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID, roles = [], userId = "actor" } = {}) {
   const replies = [];
   let deferred = false;
-  return { commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client, member: { roles },
+  return { user: { id: userId }, commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client, member: { roles },
     memberPermissions: { has: permission => { assert.equal(permission, PermissionFlagsBits.ManageGuild); return permitted; } },
     options: { getSubcommandGroup: () => "poll", getSubcommand: () => "end", getString: () => "poll" },
     deferReply: async payload => { assert.equal(payload.flags, MessageFlags.Ephemeral); deferred = true; },
@@ -101,6 +101,33 @@ for (const useRandom of [false, true]) {
     else await routeCommand(request);
     assert.equal(ends, 1, "Delegated managers can close scheduled and random quizzes");
     assert.equal(results.length, 1);
+  }
+}
+reset(); managerRoleId = "fixture-manager";
+for (const handler of [handleEndPollButton, routeCommand]) {
+  reset(); random = true; stored.creatorUserId = "creator";
+  await handler(interaction({ permitted: false, userId: "someone-else" }));
+  assert.equal(ends, 0, "Other players cannot close someone else's random quiz");
+  await handler(interaction({ permitted: false, userId: "creator" }));
+  assert.equal(ends, 1, "The persisted creator can close their random quiz without a management role");
+  assert.equal(results.length, 1);
+  assert.equal(settlementUpdates, 1);
+  await handler(interaction({ permitted: false, userId: "creator" }));
+  assert.equal(ends, 1);
+  assert.equal(results.length, 1);
+  reset(); stored.creatorUserId = "creator";
+  await handler(interaction({ permitted: false, userId: "creator" }));
+  assert.equal(ends, 0, "Random ownership never grants access to scheduled quizzes");
+  for (const property of ["guildId", "channelId", "author", "poll"]) {
+    reset(); random = true; stored.creatorUserId = "creator";
+    if (property === "guildId") stored.guildId = "other";
+    if (property === "channelId") stored.channelId = "other";
+    if (property === "author") discordMessage.author.id = "other";
+    if (property === "poll") discordMessage.poll = null;
+    await handler(interaction({ permitted: false, userId: "creator" }));
+    assert.equal(ends, 0, "Creator access still checks server, channel and bot poll ownership");
+    assert.equal(results.length, 0);
+    assert.equal(settlementUpdates, 0);
   }
 }
 reset(); managerRoleId = "fixture-manager";

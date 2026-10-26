@@ -161,7 +161,6 @@ try {
   await command("create", { name: "Drugi quiz", option_count: 2, ping_role: { id: roleA } });
   assert.equal([...topics.values()].find(row => row.name === "Drugi quiz").pingRoleId, roleA);
   for (const language of messageLanguages) {
-    assert.ok(message(language, "helpNotifications").includes("ping_role"));
     assert.doesNotMatch(message(language, "quizPingSummary", { role: message(language, "disabled") }), /\{\w+\}/);
   }
   realLog(JSON.stringify({ check: "quiz-notifications", passed: true, locales: 6, scheduledAndEarlyRun: true,

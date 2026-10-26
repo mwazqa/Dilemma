@@ -20,7 +20,8 @@ try {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, timezone: null }
       : table === "UserScore" ? { selectedBadge: null }
-      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null } : { difficulty: "medium" };
+      : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null }
+      : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }
@@ -59,8 +60,26 @@ try {
   assert.equal(scheduled.intervalDays, 7);
   for (const difficulty of ["easy", "medium", "hard"]) assert.equal((await db.topic.update({ where: { id: topic.id }, data: { difficulty } })).difficulty, difficulty);
   await db.topic.delete({ where: { id: topic.id } });
+  const random = await db.randomPoll.create({ data: { guildId, language: "pl", messageId: "creator-migration-poll", channelId: "creator-migration-channel",
+    creatorUserId: "creator-migration-user", question: "Fixture question", options: JSON.stringify(["A", "B"]), correctOption: 0, explanation: "Fixture fact" } });
+  await db.$disconnect();
+  assert.equal((await db.randomPoll.findUnique({ where: { id: random.id } })).creatorUserId, "creator-migration-user");
+  const { handleEndPollButton } = await import("../dist/commands/poll.js");
+  let ends = 0, results = 0;
+  const client = { user: { id: "migration-bot" }, rest: { patch: async () => ({}) } };
+  const channel = { id: random.channelId, isTextBased: () => true, isSendable: () => true,
+    messages: { fetch: async () => ({ author: client.user, poll: { expiresTimestamp: Date.now() + 3600000, end: async () => { ends++; } } }) },
+    send: async () => { results++; } };
+  const close = userId => handleEndPollButton({ customId: "quiz:end", user: { id: userId }, guildId, channel, client,
+    message: { id: random.messageId }, member: { roles: [] }, memberPermissions: { has: () => false }, locale: "pl",
+    deferReply: async () => {}, editReply: async () => {} });
+  await close("another-migration-user"); assert.equal(ends, 0);
+  await close("creator-migration-user"); assert.equal(ends, 1); assert.equal(results, 1);
+  assert.ok((await db.randomPoll.findUnique({ where: { id: random.id } })).endedAt);
+  await close("creator-migration-user"); assert.equal(ends, 1); assert.equal(results, 1);
+  await db.randomPoll.delete({ where: { id: random.id } });
   await db.guildSettings.delete({ where: { guildId } });
-  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, startDatePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true }));
+  console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, startDatePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true, randomCreatorPersisted: true, creatorClosingVerified: true }));
 } catch (error) {
   console.error(`Migration verification failed (${error?.code ?? error?.name ?? "Error"}).`);
   process.exitCode = 1;
