@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v3.2.0 - 2026-10-26
+
+- Let the creator of a random quiz close it through the button or `/dilemma poll end`, without a management role. Persist the creator's Discord user ID with an additive nullable migration, retain management access to every quiz and restrict legacy random quizzes without a recorded creator to managers.
+- Remove the unused `@neon/env` dependency, obsolete help introduction translations and an identical avatar asset copy. Keep the existing security checks and update help and privacy documentation for creator closing.
+
 ## v3.1.2 - 2026-10-25
 
 - Keep `clear_ping` only in `/dilemma configure`; remove the redundant option from `/dilemma create` while retaining `ping_role` in both commands.

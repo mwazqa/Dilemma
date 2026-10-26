@@ -118,7 +118,8 @@ export async function publishRandomQuestion(
   channel: SendableChannels,
   difficulty: Difficulty = defaultDifficulty,
   durationHours = 24,
-  options: string[] = []
+  options: string[] = [],
+  creatorUserId: string | null = null
 ): Promise<string> {
   const duration = validatePollDuration(durationHours);
   await requireQuizChannel(guildId, channel.id);
@@ -158,6 +159,7 @@ export async function publishRandomQuestion(
       await tx.randomPoll.create({
         data: {
           guildId,
+          creatorUserId,
           difficulty,
           language,
           messageId: sentPoll.id,

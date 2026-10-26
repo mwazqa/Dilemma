@@ -21,7 +21,7 @@ const friendlyFeedbackKeys = [
   "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
   "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
   "timeInvalid", "configured", "languageSet", "timezoneSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
-  "helpIntro", "helpSchedule", "helpAnswers", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
+  "helpIntro", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
   "optionCountInvalid", "intervalInvalid", "durationInvalid", "timezoneInvalid", "manualPublication", "scoreEmpty", "partial"
 ];
 const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];

@@ -137,6 +137,7 @@ model RandomPoll {
   language      String
   messageId     String    @unique
   channelId     String
+  creatorUserId String?
   question      String
   options       String
   correctOption Int

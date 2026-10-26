@@ -170,6 +170,7 @@ try {
   await invalid("random", { duration_hours: 25 }, "durationInvalid");
   const random = await invoke("random", {}, false);
   assert.ok(random.replies.at(-1).includes("Quiz gotowy"));
+  assert.equal(savedPoll.creatorUserId, "actor");
   assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 12);
   generatedAnswers = ["Yes", "No"];
   await invoke("random", { options: " Yes, No ", duration_hours: 2 }, false);

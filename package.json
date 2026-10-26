@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "3.1.2",
+  "version": "3.2.0",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -48,7 +48,6 @@
   },
   "dependencies": {
     "@neon/config": "^1.8.4",
-    "@neon/env": "^1.5.1",
     "@prisma/client": "6.19.3",
     "discord.js": "^14.19.3",
     "dotenv": "^16.4.7",

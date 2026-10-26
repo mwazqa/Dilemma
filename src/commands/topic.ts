@@ -121,7 +121,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
       const generatedTopic = await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty,
-        duration ?? settings.defaultPollDurationHours, options);
+        duration ?? settings.defaultPollDurationHours, options, interaction.user.id);
       await reply(text("randomDone", { name: inlineText(generatedTopic), count: optionCount }));
     } catch (error) {
       if (error instanceof DailyQuizLimitError) {

@@ -14,7 +14,7 @@ export const pollCommand = new SlashCommandSubcommandGroupBuilder()
   .setDescription("Manage Dilemma polls.")
   .addSubcommand((subcommand) => subcommand
     .setName("end")
-    .setDescription("End a poll immediately.")
+    .setDescription("End a managed poll or your own random quiz immediately.")
     .addStringOption((option) => option
       .setName("message_id")
       .setDescription("ID of the poll message.")
@@ -35,10 +35,7 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
     await reply(text("serverOnly"));
     return;
   }
-  if (!canManageDilemma(interaction, settings)) {
-    await reply(text("permission"));
-    return;
-  }
+  const canManage = canManageDilemma(interaction, settings);
 
   const channel = interaction.channel;
   if (!channel?.isTextBased() || !channel.isSendable() || !("messages" in channel)) {
@@ -47,15 +44,21 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
   }
 
   try {
-    const message = await channel.messages.fetch(messageId);
     const generatedPoll = await db.generatedPoll.findUnique({ where: { messageId } });
     const randomPoll = generatedPoll ? null : await db.randomPoll.findUnique({ where: { messageId } });
+    const isRandomCreator = randomPoll?.guildId === interaction.guildId && randomPoll.channelId === channel.id &&
+      Boolean(randomPoll.creatorUserId && randomPoll.creatorUserId === interaction.user.id);
+    if (!canManage && !isRandomCreator) {
+      await reply(text("permission"));
+      return;
+    }
     if (!generatedPoll && !randomPoll) {
       await reply(text("notPoll"));
       return;
     }
 
     const poll = generatedPoll ?? randomPoll!;
+    const message = await channel.messages.fetch(messageId);
     if (!message.poll || poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
       await reply(text("notPoll"));
       return;

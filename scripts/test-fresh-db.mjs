@@ -23,6 +23,11 @@ try {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");
+  assert.equal(database.prepare('SELECT "creatorUserId" FROM "RandomPoll" WHERE id = ?').get("r").creatorUserId, null);
+  database.prepare('UPDATE "RandomPoll" SET "creatorUserId" = ? WHERE id = ?').run("creator", "r");
+  assert.equal(database.prepare('SELECT "creatorUserId" FROM "RandomPoll" WHERE id = ?').get("r").creatorUserId, "creator");
+  const creatorMigration = "20261026120000_random_quiz_creator/migration.sql";
+  assert.equal(readFileSync(`prisma/migrations/${creatorMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${creatorMigration}`, "utf8"));
   const channelMigration = "20261025120000_quiz_channels/migration.sql";
   assert.equal(readFileSync(`prisma/migrations/${channelMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${channelMigration}`, "utf8"));
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizChannel"').get().count, 0);
