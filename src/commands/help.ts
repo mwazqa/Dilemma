@@ -11,7 +11,8 @@ export function getHelpContent(language = "en"): string {
 export function getHelpEmbed(language = "en"): EmbedBuilder {
   const sections: { title: MessageKey; commands: [string, MessageKey][] }[] = [
     { title: "helpQuizzes", commands: [
-      ["/dilemma random", "helpRandom"], ["/dilemma run", "helpRun"], ["/dilemma poll end", "helpPoll"]
+      ["/dilemma random", "helpRandom"], ["/dilemma random-reset", "helpRandomReset"],
+      ["/dilemma run", "helpRun"], ["/dilemma poll end", "helpPoll"]
     ] },
     { title: "helpTopics", commands: [
       ["/dilemma create", "helpCreate"], ["/dilemma configure", "helpConfigure"],
@@ -24,7 +25,10 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
       ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },
     { title: "helpChannelsTitle", commands: [
       ["/dilemma random-channels add", "helpChannelsAdd"], ["/dilemma random-channels remove", "helpChannelsRemove"],
-      ["/dilemma random-channels list", "helpChannelsList"]
+      ["/dilemma random-channels list", "helpChannelsList"],
+      ["/dilemma random-notifications set", "helpRandomNotifications"],
+      ["/dilemma random-notifications clear", "helpRandomNotifications"],
+      ["/dilemma random-notifications show", "helpRandomNotifications"]
     ] },
     { title: "helpPermissionsTitle", commands: [
       ["/dilemma permissions show", "helpPermissionsShow"], ["/dilemma permissions set", "helpPermissionsSet"],

@@ -179,6 +179,7 @@ export async function publishRandomQuestion(
         if (!saved.count) throw new Error("Random quiz reservation changed before persistence");
       }
     });
+    scheduleEvents.emit("randomPollPublished", guildId);
     scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return question.topic;
   } finally {

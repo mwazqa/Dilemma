@@ -22,13 +22,13 @@ globalThis.fetch = async (url, options) => {
   lastInstructions = body.instructions;
   lastInput = body.input;
   assert.ok(lastInstructions.includes(`(${expectedLanguage})`));
-  assert.match(lastInstructions, /Omit unrelated clues/);
-  assert.match(lastInstructions, /distinctive anatomy, habitat, nationality/);
-  assert.match(lastInstructions, /same category, with parallel grammar and comparable detail/);
+  assert.match(lastInstructions, /Do not add secondary clues/);
+  assert.match(lastInstructions, /distinctive traits, nicknames, etymology, word roots, initials/);
+  assert.match(lastInstructions, /same category, with parallel grammar and comparable length and specificity/);
   assert.match(lastInstructions, /public topic title broad enough not to give away the answer/);
   assert.match(lastInstructions, /neutral emojis or empty strings/);
-  assert.match(lastInstructions, /The beak gives away the answer; electroreception is the fact being tested/);
-  assert.doesNotMatch(lastInput, /You are Dilemma|The beak gives away the answer/);
+  assert.match(lastInstructions, /no extra detail should independently point to one option/);
+  assert.doesNotMatch(lastInput, /You are Dilemma|secondary clues/);
   assert.match(lastInput, /Difficulty: (?:easy|medium|hard)\./);
   assert.equal(body.model, "gpt-6-luna");
   assert.equal(body.store, false);

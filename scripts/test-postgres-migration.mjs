@@ -18,10 +18,10 @@ try {
   const after = await snapshot();
   for (const table of tables) {
     const addedDefaults = table === "GuildSettings"
-      ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, timezone: null }
+      ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, randomPingRoleId: null, randomCooldownResetAt: null, timezone: null }
       : table === "UserScore" ? { selectedBadge: null }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null }
-      : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null } : { difficulty: "medium" };
+      : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null, readyPingSentAt: null } : { difficulty: "medium" };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }

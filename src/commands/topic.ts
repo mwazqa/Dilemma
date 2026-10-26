@@ -63,7 +63,7 @@ export const topicCommand = new SlashCommandBuilder()
     .setDescription("Show Dilemma commands."))
   .addSubcommand((subcommand) => subcommand
     .setName("random")
-    .setDescription("Generate a random quiz: two per server day, at least eight hours apart.")
+    .setDescription("Generate a random quiz: four per server day, at least six hours apart.")
     .addStringOption(option => option.setName("options").setDescription("Optional 2-4 comma-separated answers, each up to 55 characters; count is inferred.").setMinLength(1).setMaxLength(500))
     .addIntegerOption(option => option.setName("option_count").setDescription("AI answer count (2-4), default 4; with options it must match their count.").setMinValue(2).setMaxValue(4))
     .addStringOption(difficultyOption)

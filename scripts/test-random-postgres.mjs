@@ -24,8 +24,10 @@ async function main() {
   };
   await simultaneous(guilds[0], firstAt);
   await simultaneous(guilds[0], new Date(+firstAt + RANDOM_COOLDOWN_MS));
-  await assert.rejects(claimQuizRun(guilds[0], undefined, new Date(+firstAt + 2 * RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
-  assert.equal(await db.dailyQuizRun.count({ where: { guildId: guilds[0], scope: "random-daily" } }), 2);
+  await claimQuizRun(guilds[0], undefined, new Date(+firstAt + 2 * RANDOM_COOLDOWN_MS));
+  await claimQuizRun(guilds[0], undefined, new Date(+firstAt + 3 * RANDOM_COOLDOWN_MS));
+  await assert.rejects(claimQuizRun(guilds[0], undefined, new Date(+firstAt + 3 * RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
+  assert.equal(await db.dailyQuizRun.count({ where: { guildId: guilds[0], scope: "random-daily" } }), 4);
   const tomorrow = quizDayBounds(firstAt).end;
   await claimQuizRun(guilds[0], undefined, new Date(+tomorrow + 3_600_000));
   await claimQuizRun(guilds[1], undefined, firstAt);
@@ -57,8 +59,10 @@ async function main() {
 
   await db.dailyQuizRun.create({ data: { guildId: guilds[3], scope: "random", day: "cooldown", slot: 1, createdAt: firstAt } });
   await claimQuizRun(guilds[3], undefined, new Date(+firstAt + RANDOM_COOLDOWN_MS));
-  await assert.rejects(claimQuizRun(guilds[3], undefined, new Date(+firstAt + 2 * RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
-  for (let index = 0; index < 2; index++) {
+  await claimQuizRun(guilds[3], undefined, new Date(+firstAt + 2 * RANDOM_COOLDOWN_MS));
+  await claimQuizRun(guilds[3], undefined, new Date(+firstAt + 3 * RANDOM_COOLDOWN_MS));
+  await assert.rejects(claimQuizRun(guilds[3], undefined, new Date(+firstAt + 3 * RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
+  for (let index = 0; index < 4; index++) {
     await db.randomPoll.create({ data: { guildId: guilds[4], language: "en", messageId: `${prefix}-poll-${index}`,
       channelId: "test-only", question: "Test?", options: "A||B", correctOption: 0, explanation: "Test.", createdAt: firstAt } });
   }

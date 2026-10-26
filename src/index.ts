@@ -22,6 +22,7 @@ import { startScoreScheduler } from "./services/scoring.js";
 import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 import { cacheGuildSettings } from "./services/guild-settings.js";
 import { handleTopicListComponent, TOPIC_LIST_PREFIX } from "./commands/topic-list.js";
+import { startRandomNotificationScheduler } from "./services/random-notifications.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -31,7 +32,7 @@ client.on(Events.Error, error => {
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as Discord bot");
-  stopSchedulers.push(startScheduler(client), startScoreScheduler(client));
+  stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client));
 });
 
 client.on(Events.GuildCreate, async (guild) => {

@@ -26,7 +26,7 @@ const guild = { id: guildId, members: { me: { id: "bot" } }, roles: { fetch: asy
 } }, channels: { fetch: async id => channels.get(id) ?? null } };
 const permissions = () => new PermissionsBitField(mentionAll ? PermissionsBitField.All :
   PermissionsBitField.All & ~PermissionFlagsBits.Administrator & ~PermissionFlagsBits.MentionEveryone);
-const makeChannel = id => ({ id, guildId, guild, type: ChannelType.GuildText, isSendable: () => true,
+const makeChannel = id => ({ id, guildId, guild, type: ChannelType.GuildText, isSendable: () => true, isThread: () => false,
   permissionsFor: permissions, send: async payload => {
     sent.push(payload); return { id: `quiz-${sent.length}`, channelId: id,
       poll: { allowMultiselect: payload.poll.allowMultiselect, expiresAt: new Date(Date.now() + payload.poll.duration * 3_600_000),
@@ -51,6 +51,7 @@ db.topic.update = async ({ where, data }) => {
 db.generatedPoll.findMany = db.randomPoll.findMany = db.dailyQuizRun.findMany = async () => [];
 db.generatedPoll.count = db.randomPoll.count = async () => 0;
 db.randomPoll.findFirst = async () => null;
+db.guildSettings.findUnique = async () => null;
 db.dailyQuizRun.create = async ({ data }) => ({ ...data, createdAt: new Date(), messageId: null });
 db.dailyQuizRun.update = async ({ data }) => data;
 db.dailyQuizRun.updateMany = async () => ({ count: 1 });

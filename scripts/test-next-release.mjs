@@ -57,9 +57,9 @@ for (const [index, language] of messageLanguages.entries()) {
   assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
   assert.ok(message(language, "optionsMissing").includes("options") && message(language, "optionsMissing").includes("option_count"));
   assert.ok(message(language, "timeInvalid").includes("HH:mm") && message(language, "timeInvalid").includes("18:30"));
-  assert.ok(message(language, "randomCooldown").includes("8") && message(language, "randomCooldown").includes("{minutes}"));
-  assert.ok(message(language, "randomDailyLimit").includes("2") && message(language, "randomDailyLimit").includes("8"));
-  assert.ok(message(language, "helpRandom").includes("2") && message(language, "helpRandom").includes("8"));
+  assert.ok(message(language, "randomCooldown").includes("6") && message(language, "randomCooldown").includes("{minutes}"));
+  assert.ok(message(language, "randomDailyLimit").includes("4") && message(language, "randomDailyLimit").includes("6"));
+  assert.ok(message(language, "helpRandom").includes("4") && message(language, "helpRandom").includes("6"));
   assert.ok(message(language, "badgeSelectionInvalid").includes("3"));
 }
 for (const language of messageLanguages) {
@@ -144,7 +144,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "run", "language", "timezone", "random-channels", "permissions", "ping", "score", "poll"].sort());
+  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "random-reset", "run", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);

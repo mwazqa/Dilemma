@@ -61,7 +61,7 @@ try {
   assert.equal(isTopicDue(topic, new Date("2026-10-22T10:00:00Z"), false, "America/New_York"), false);
   assert.equal(nextTopicRunAt({ ...topic, startDate: "2026-03-08", generationTime: "02:30" }, new Date("2026-03-08T00:00:00Z"), "America/New_York"), Date.parse("2026-03-08T07:00:00Z"));
   assert.equal(nextTopicRunAt({ ...topic, startDate: "2026-11-01", generationTime: "01:30" }, new Date("2026-11-01T00:00:00Z"), "America/New_York"), Date.parse("2026-11-01T05:30:00Z"));
-  assert.equal(RANDOM_COOLDOWN_MS, 8 * 3600000);
+  assert.equal(RANDOM_COOLDOWN_MS, 6 * 3600000);
   const fallbackEnv = { ...process.env }; delete fallbackEnv.QUIZ_TIMEZONE;
   const fallback = spawnSync(process.execPath, ["--input-type=module", "-e", "import{env}from'./dist/config.js';process.stdout.write(env.QUIZ_TIMEZONE)"], { encoding: "utf8", env: { ...fallbackEnv, DOTENV_CONFIG_PATH: "fixture-does-not-exist" } });
   assert.equal(fallback.status, 0); assert.equal(fallback.stdout, "Europe/Warsaw");
@@ -100,10 +100,10 @@ try {
   const refreshed = await refreshRandomQuizRun(run);
   assert.equal(refreshed.timezone, "America/New_York");
   assert.equal(bounds.at(-1).gte.toISOString(), "2026-10-21T04:00:00.000Z");
-  db.randomPoll.count = async () => 2;
+  db.randomPoll.count = async () => 4;
   await assert.rejects(() => claimQuizRun("ny", undefined, new Date(), true, "Asia/Tokyo"), DailyQuizLimitError);
   db.randomPoll.count = async () => 0;
-  db.randomPoll.findFirst = async () => ({ createdAt: new Date(now - 7 * 3600000) });
+  db.randomPoll.findFirst = async () => ({ createdAt: new Date(now - 5 * 3600000) });
   for (const zone of ["Asia/Tokyo", "America/New_York"]) {
     await assert.rejects(() => claimQuizRun("ny", undefined, new Date(), true, zone), RandomQuizCooldownError);
   }

@@ -1,6 +1,7 @@
 import { Prisma, type DailyQuizRun } from "@prisma/client";
 import { db } from "../db.js";
 import { env } from "../config.js";
+import { scheduleEvents } from "./schedule-events.js";
 
 const formatters = new Map<string, { day: Intl.DateTimeFormat; time: Intl.DateTimeFormat }>();
 function zoneFormatters(timezone: string) {
@@ -27,8 +28,8 @@ export class TopicScheduleNotReadyError extends Error {
   constructor() { super("Topic schedule has no unconsumed publication slot"); this.name = "TopicScheduleNotReadyError"; }
 }
 
-export const RANDOM_COOLDOWN_MS = 8 * 60 * 60 * 1000;
-export const RANDOM_DAILY_LIMIT = 2;
+export const RANDOM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+export const RANDOM_DAILY_LIMIT = 4;
 const randomDailyScope = "random-daily";
 export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun; timezone?: string };
 
@@ -41,7 +42,9 @@ export class RandomQuizCooldownError extends Error {
 
 async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: Date, timezone: string, exclude: DailyQuizRun[] = []) {
   const { day, start, end } = quizDayBounds(now, timezone);
-  const cutoff = new Date(now.getTime() - RANDOM_COOLDOWN_MS);
+  const settings = await tx.guildSettings.findUnique({ where: { guildId }, select: { randomCooldownResetAt: true } });
+  const resetAt = settings?.randomCooldownResetAt?.getTime() ?? 0;
+  const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, resetAt));
   const [poll, stored] = await Promise.all([
     tx.randomPoll.findFirst({ where: { guildId, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
     tx.dailyQuizRun.findMany({ where: { guildId, scope: { in: ["random", randomDailyScope] },
@@ -56,17 +59,25 @@ async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: D
     ...(recorded.length ? { messageId: { notIn: recorded } } : {}) } });
   const pending = today.filter(row => row.scope === "random" && row.day === "cooldown" && !row.messageId &&
     !daily.some(item => !item.messageId && +item.createdAt === +row.createdAt));
-  return { day, daily, pending, used: daily.length + legacyCount + pending.length,
-    latest: Math.max(poll?.createdAt.getTime() ?? 0, ...rows.map(row => +row.createdAt)) };
+  return { day, daily, pending, used: daily.length + legacyCount + pending.length, resetAt,
+    latest: Math.max(poll?.createdAt.getTime() ?? 0, ...rows.filter(row => +row.createdAt >= resetAt).map(row => +row.createdAt)) };
+}
+
+export async function randomQuizReadyAt(guildId: string, now = new Date(), timezone = env.QUIZ_TIMEZONE): Promise<Date> {
+  const usage = await db.$transaction(tx => randomUsage(tx, guildId, now, timezone));
+  const { end } = quizDayBounds(now, timezone);
+  const cooldownAt = usage.latest ? usage.latest + RANDOM_COOLDOWN_MS : +now;
+  return new Date(Math.max(+now, cooldownAt, usage.used >= RANDOM_DAILY_LIMIT ? +end : +now));
 }
 
 async function claimRandomQuiz(guildId: string, now: Date, timezone: string): Promise<QuizRun> {
   const key = { guildId, scope: "random", day: "cooldown", slot: 1 };
+  let run: QuizRun;
   try {
-    return await db.$transaction(async tx => {
+    run = await db.$transaction(async tx => {
       const usage = await randomUsage(tx, guildId, now, timezone);
       if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError("random");
-      const cutoff = new Date(now.getTime() - RANDOM_COOLDOWN_MS);
+      const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, usage.resetAt));
       if (usage.latest > +cutoff) throw new RandomQuizCooldownError(new Date(usage.latest + RANDOM_COOLDOWN_MS));
       const updated = await tx.dailyQuizRun.updateMany({ where: { ...key, createdAt: { lte: cutoff } },
         data: { createdAt: now, messageId: null } });
@@ -91,13 +102,15 @@ async function claimRandomQuiz(guildId: string, now: Date, timezone: string): Pr
     const current = await db.dailyQuizRun.findUnique({ where: { guildId_scope_day_slot: key } });
     throw new RandomQuizCooldownError(new Date((current?.createdAt ?? now).getTime() + RANDOM_COOLDOWN_MS));
   }
+  scheduleEvents.emit("randomCooldownChanged", guildId);
+  return run;
 }
 
 export async function refreshRandomQuizRun(run: QuizRun, timezone = run.timezone ?? env.QUIZ_TIMEZONE): Promise<QuizRun> {
   const dailyRun = run.dailyRun;
   if (!dailyRun) throw new Error("Missing random daily reservation");
   const createdAt = new Date();
-  return db.$transaction(async tx => {
+  const refreshed = await db.$transaction(async tx => {
     const updated = await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot,
       createdAt: run.createdAt, messageId: null }, data: { createdAt } });
     if (!updated.count) throw new RandomQuizCooldownError(new Date(createdAt.getTime() + RANDOM_COOLDOWN_MS));
@@ -108,6 +121,8 @@ export async function refreshRandomQuizRun(run: QuizRun, timezone = run.timezone
     if (!refreshed.count) throw new Error("Random daily reservation changed");
     return { ...run, createdAt, timezone, dailyRun: { ...dailyRun, createdAt } };
   });
+  scheduleEvents.emit("randomCooldownChanged", run.guildId);
+  return refreshed;
 }
 
 export function quizDay(now: Date, timezone = env.QUIZ_TIMEZONE): string {
@@ -261,10 +276,15 @@ export function runKey(run: DailyQuizRun) {
 export async function releaseQuizRun(run: QuizRun) {
   const where = { ...runKey(run).guildId_scope_day_slot, createdAt: run.createdAt, messageId: null };
   const pairedRun = run.dailyRun ?? run.cycleRun;
-  if (!pairedRun) { await db.dailyQuizRun.deleteMany({ where }); return; }
+  if (!pairedRun) {
+    await db.dailyQuizRun.deleteMany({ where });
+    if (run.scope === "random") scheduleEvents.emit("randomCooldownChanged", run.guildId);
+    return;
+  }
   await db.$transaction(async tx => {
     const removed = await tx.dailyQuizRun.deleteMany({ where });
     if (removed.count) await tx.dailyQuizRun.deleteMany({ where: { ...runKey(pairedRun).guildId_scope_day_slot,
       createdAt: pairedRun.createdAt, messageId: null } });
   });
+  if (run.scope === "random") scheduleEvents.emit("randomCooldownChanged", run.guildId);
 }

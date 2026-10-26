@@ -53,7 +53,7 @@ async function withAiRateLimit<T>(operation: () => Promise<T>, signal: AbortSign
   requestQueue = previous.then(() => gate);
   try {
     await waitForQueue(previous, signal);
-    const waitMs = Math.max(0, env.AI_MIN_INTERVAL_MS - (Date.now() - lastRequestStartedAt));
+    const waitMs = env.AI_MIN_INTERVAL_MS > 0 ? Math.max(0, env.AI_MIN_INTERVAL_MS - (Date.now() - lastRequestStartedAt)) : 0;
     if (waitMs > 0) await delay(waitMs, undefined, { signal });
     signal.throwIfAborted();
     lastRequestStartedAt = Date.now();

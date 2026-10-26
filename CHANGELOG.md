@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v3.3.0 - 2026-10-26
+
+- Set the shared random cooldown to six hours and the daily server limit to four. Add `/dilemma random-reset` for the server owner or configured Dilemma manager role; resetting cooldown does not restore daily quota.
+- Add optional `/dilemma random-notifications` role pings when another random quiz is actually available. Schedule against the server timezone, cooldown and daily quota without periodic database polling; persist notification state.
+- Strengthen quiz generation guidance and its final fairness review to remove direct and indirect clues from question wording, context, grammar, topic, answer options and emojis. Keep the single-request generation flow.
+- Add matching additive SQLite and PostgreSQL migration fields for random cooldown reset, availability notification role and notification completion. Update localized feedback, command help and README.
+
 ## v3.2.0 - 2026-10-26
 
 - Let the creator of a random quiz close it through the button or `/dilemma poll end`, without a management role. Persist the creator's Discord user ID with an additive nullable migration, retain management access to every quiz and restrict legacy random quizzes without a recorded creator to managers.

@@ -8,6 +8,9 @@ export const scheduleEvents = new EventEmitter<{
   topicChanged: [topic: TopicSchedule];
   topicDeleted: [id: string];
   guildTimezoneChanged: [guildId: string, timezone: string];
+  randomPollPublished: [guildId: string];
+  randomCooldownChanged: [guildId: string];
+  randomNotificationsChanged: [guildId: string];
   settlementChanged: [quiz: SettlementSchedule];
   settlementClosed: [messageId: string, at: Date];
 }>();
