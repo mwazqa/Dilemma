@@ -14,11 +14,12 @@ const secondGuild = `${guildId}-other`;
 const originalTransaction = db.$transaction.bind(db);
 try {
   const before = await snapshot();
+  const settlementsBefore = await db.quizSettlement.count();
   await db.$disconnect();
   const migration = spawnSync(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy", "--schema", "prisma/postgresql/schema.prisma"], { env: process.env, encoding: "utf8" });
   assert.equal(migration.status, 0, "Isolated migration must succeed");
   assert.deepEqual(await snapshot(), before, "Scoring migration preserves all existing data");
-  assert.equal(await db.quizSettlement.count(), 0, "No retroactive scoring");
+  assert.equal(await db.quizSettlement.count(), settlementsBefore, "Migration does not create retroactive settlements");
   const createQuiz = (name, difficulty, guild = guildId) => db.quizSettlement.create({ data: {
     messageId: `${guildId}-${name}`, guildId: guild, channelId: "test-only", difficulty, answerIds: "17,93", correctAnswerId: 17, expiresAt: new Date(0) } });
   const late = await createQuiz("late", "hard");

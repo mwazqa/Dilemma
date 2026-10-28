@@ -43,3 +43,46 @@ jobs:
         run: npm run build
       - name: Test migrations and features
         run: npm run test:db:fresh && npm run test:ai && npm run test:features && npm run test:command-ux && npm run test:feedback-layout && npm run test:topic-list && npm run test:quiz-notifications && npm run test:quiz-channels && npm run test:native-polls && npm run test:permissions && npm run test:quiz-limits && npm run test:topic-calendar && npm run test:timezones && npm run test:idle-database && npm run test:poll-controls && npm run test:scoring && npm run test:experience && npm run test:achievements && npm run test:score-card && npm run test:privacy
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: dilemma_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d dilemma_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://test:test@127.0.0.1:5432/dilemma_test
+      TEST_DATABASE_CONFIRMED: "true"
+      EXPECTED_TEST_HOST: 127.0.0.1
+      EXPECTED_TEST_DATABASE: dilemma_test
+      DISCORD_TOKEN: test
+      DISCORD_CLIENT_ID: test
+      OPENAI_API_KEY: test
+      DOTENV_CONFIG_PATH: /tmp/nonexistent-dilemma-test-env
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate:postgres
+      - name: Build
+        run: npm run build
+      - name: Migrate disposable database
+        run: npm run db:migrate:postgres
+      - name: Test PostgreSQL migrations and concurrency
+        run: node scripts/test-postgres-migration.mjs && node scripts/test-scoring-postgres.mjs && npm run test:topic-calendar:postgres && npm run test:random:postgres && npm run test:topic-limit:postgres && npm run test:results:postgres

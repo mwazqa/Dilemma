@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 26, 2026
+Last updated: October 28, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -21,6 +21,12 @@ For newly created random quizzes, Dilemma also stores the creator's Discord user
 ID with the quiz record so that person can close their own quiz, including after
 a bot restart. This ID is not sent to the AI provider. Deleting a score does not
 remove the creator ID attached to a published quiz; it follows quiz-record retention.
+
+When a member closes a quiz through Dilemma, the quiz record stores that member's
+Discord user ID, the closing time and whether the button or command was used.
+The result message displays the member and time without sending a mention
+notification. This audit data is not sent to the AI provider. Deleting a score
+does not remove a quiz's closure audit; it follows quiz-record retention.
 
 When delegated bot management is configured, server configuration includes the
 selected management role's Discord ID. Topic configuration can separately store

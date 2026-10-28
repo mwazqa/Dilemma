@@ -40,6 +40,14 @@ try {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");
+  for (const table of ["GeneratedPoll", "RandomPoll"]) {
+    const legacy = database.prepare(`SELECT * FROM "${table}"`).get();
+    assert.equal(legacy.closedAt, null); assert.equal(legacy.closedByUserId, null); assert.equal(legacy.closeSource, null);
+    database.prepare(`UPDATE "${table}" SET closedAt = CURRENT_TIMESTAMP, closedByUserId = ?, closeSource = ?`)
+      .run("fixture-actor", "button");
+    const closed = database.prepare(`SELECT * FROM "${table}"`).get();
+    assert.ok(closed.closedAt); assert.equal(closed.closedByUserId, "fixture-actor"); assert.equal(closed.closeSource, "button");
+  }
   assert.equal(database.prepare('SELECT "creatorUserId" FROM "RandomPoll" WHERE id = ?').get("r").creatorUserId, null);
   database.prepare('UPDATE "RandomPoll" SET "creatorUserId" = ? WHERE id = ?').run("creator", "r");
   assert.equal(database.prepare('SELECT "creatorUserId" FROM "RandomPoll" WHERE id = ?').get("r").creatorUserId, "creator");

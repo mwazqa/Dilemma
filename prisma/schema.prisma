@@ -130,6 +130,9 @@ model GeneratedPoll {
   optionEmojis String    @default("")
   createdAt    DateTime  @default(now())
   endedAt      DateTime?
+  closedAt     DateTime?
+  closedByUserId String?
+  closeSource  String?
 
   @@index([guildId, createdAt])
 }
@@ -150,6 +153,9 @@ model RandomPoll {
   optionEmojis  String    @default("")
   createdAt     DateTime  @default(now())
   endedAt       DateTime?
+  closedAt      DateTime?
+  closedByUserId String?
+  closeSource   String?
 
   @@index([guildId, createdAt])
 }

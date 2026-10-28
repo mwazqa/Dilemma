@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.3.3 - 2026-10-28
+
+- Record who closes scheduled and random quizzes, when and through which control. Show the actor and time in localized results without pinging them, distinguish finalized automatic expiry from unknown closures, preserve the first successful actor during concurrent requests and retain the audit when result delivery needs a retry. Add nullable SQLite/PostgreSQL audit fields without attributing historical closures.
+
 ## v3.3.2 - 2026-10-28
 
 - Publish the saved correct answer and explanation after automatic expiry for scheduled and random quizzes, including polls without votes. Share result delivery with manual closing, persist pending delivery across restarts and keep finalized scoring independent from send failures. Add an additive results-delivery migration; completed historical settlements are excluded from automatic replay.

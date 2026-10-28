@@ -4,6 +4,7 @@ import { Routes, type Client, type MessageCreateOptions } from "discord.js";
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { storedQuizOptions } from "./quiz-options.js";
+import { quizClosureSummary } from "./quiz-closure.js";
 
 type ResultQuiz = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
@@ -15,12 +16,17 @@ export async function publishQuizResults(client: Client, quiz: ResultQuiz, langu
         const generated = await tx.generatedPoll.findUnique({ where: { messageId: quiz.messageId } });
         const poll = generated ?? await tx.randomPoll.findUnique({ where: { messageId: quiz.messageId } });
         if (!poll || poll.guildId !== quiz.guildId || poll.channelId !== quiz.channelId) throw new Error("Quiz result metadata mismatch");
-        const request = { where: { messageId: quiz.messageId, guildId: quiz.guildId, channelId: quiz.channelId, endedAt: null }, data: { endedAt: new Date() } };
+        const settlement = poll.closedAt ? null : await tx.quizSettlement.findUnique({ where: { messageId: quiz.messageId } });
+        const closure = poll.closedAt ? { closedAt: poll.closedAt, closedByUserId: poll.closedByUserId, closeSource: poll.closeSource }
+          : { closedAt: settlement?.closedAt ?? null, closedByUserId: null,
+            closeSource: settlement?.scoredAt && settlement.closedAt && settlement.closedAt >= settlement.expiresAt ? "automatic" : "unknown" };
+        const request = { where: { messageId: quiz.messageId, guildId: quiz.guildId, channelId: quiz.channelId, endedAt: null }, data: { endedAt: new Date(), ...closure } };
         const claim = generated ? await tx.generatedPoll.updateMany(request) : await tx.randomPoll.updateMany(request);
         if (claim.count) {
           const answer = storedQuizOptions(poll.options)[poll.correctOption];
           if (answer === undefined) throw new Error("Quiz result answer missing");
-          const content = getResultMessage(language, answer, poll.explanation, poll.optionEmojis.split("||")[poll.correctOption] ?? "");
+          const content = getResultMessage(language, answer, poll.explanation, poll.optionEmojis.split("||")[poll.correctOption] ?? "")
+            + `\n\n${quizClosureSummary(language, closure)}`;
           const nonce = createHash("sha256").update(`quiz-result:${quiz.messageId}`).digest("hex").slice(0, 25);
           if (send) await send({ content, allowedMentions: { parse: [] }, nonce, enforceNonce: true });
           else await client.rest.post(Routes.channelMessages(quiz.channelId), {

@@ -8,7 +8,8 @@ const { publishQuizResults } = await import("../dist/services/quiz-results.js");
 const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 const { settlementDeadline } = await import("../dist/services/schedule-events.js");
 const { getResultMessage } = await import("../dist/brand.js");
-const { messageLanguages } = await import("../dist/messages.js");
+const { message, messageLanguages } = await import("../dist/messages.js");
+const { quizClosureSummary } = await import("../dist/services/quiz-closure.js");
 
 let quiz, poll, answers, score, results, finalized, language, random, zeroVotes, failPost, failCommit, voterReads;
 let serial = Promise.resolve();
@@ -18,7 +19,8 @@ function reset() {
   quiz = { messageId: "poll", guildId: "guild", channelId: "channel", difficulty: "hard", correctAnswerId: 17, answerIds: "17,93",
     expiresAt: new Date(0), nextCheckAt: new Date(0), closedAt: null, scoredAt: null, resultsPending: true };
   poll = { messageId: "poll", guildId: "guild", channelId: "channel", difficulty: "hard", options: JSON.stringify(["Alpha||Beta", "Gamma"]),
-    correctOption: 0, explanation: "Saved fact.", optionEmojis: "||", endedAt: null };
+    correctOption: 0, explanation: "Saved fact.", optionEmojis: "||", endedAt: null,
+    closedAt: null, closedByUserId: null, closeSource: null };
   answers = []; score = null; results = []; delivered.clear();
   finalized = true; language = "pl"; random = false; zeroVotes = failPost = failCommit = false; voterReads = 0;
 }
@@ -75,13 +77,29 @@ try {
     finalized = false; await runDueSettlements(client);
     assert.equal(results.length, 0); assert.equal(quiz.scoredAt, null);
     finalized = true; await runDueSettlements(client);
-    assert.equal(results.length, 1); assert.equal(results[0], getResultMessage(language, "Alpha||Beta", "Saved fact.", ""));
+    assert.equal(results.length, 1); assert.equal(results[0], getResultMessage(language, "Alpha||Beta", "Saved fact.", "") + "\n\n"
+      + quizClosureSummary(language, { closedAt: new Date(0), closedByUserId: null, closeSource: "automatic" }));
+    assert.equal(poll.closeSource, "automatic"); assert.equal(poll.closedByUserId, null);
     assert.equal(score.points, 3, "Changing the topic difficulty does not change an active quiz");
     assert.equal(quiz.resultsPending, false); assert.ok(quiz.scoredAt); assert.ok(poll.endedAt);
     await runDueSettlements(client); assert.equal(results.length, 1); assert.equal(answers.length, 1);
   }
   reset(); zeroVotes = true; await runDueSettlements(client);
   assert.equal(results.length, 1); assert.equal(answers.length, 0);
+  for (const outputLanguage of messageLanguages) {
+    reset(); language = outputLanguage;
+    poll.closedAt = new Date(123_000); poll.closedByUserId = "original-actor"; poll.closeSource = "command";
+    await runDueSettlements(client);
+    assert.equal(poll.closedByUserId, "original-actor"); assert.equal(poll.closeSource, "command");
+    assert.equal(+poll.closedAt, 123_000);
+    assert.ok(results[0].includes(message(language, "quizClosedBy", { user: "<@original-actor>" })));
+    assert.match(results[0], /<t:123:f>/);
+  }
+  reset(); quiz.expiresAt = new Date(3_600_000);
+  await runDueSettlements(client);
+  assert.equal(poll.closeSource, "unknown", "Unattributed early closure is never labeled automatic");
+  assert.equal(poll.closedByUserId, null);
+  assert.ok(results[0].includes(message(language, "quizClosureUnknown")));
   reset(); failPost = true; await runDueSettlements(client);
   assert.ok(quiz.scoredAt, "A result send failure must not lose points"); assert.equal(score.points, 3);
   assert.equal(quiz.resultsPending, true); assert.equal(poll.endedAt, null);

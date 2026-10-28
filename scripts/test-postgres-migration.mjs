@@ -21,7 +21,8 @@ try {
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, randomPingRoleId: null, randomCooldownResetAt: null, timezone: null }
       : table === "UserScore" ? { selectedBadge: null }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null }
-      : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null, readyPingSentAt: null } : { difficulty: "medium" };
+      : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null, readyPingSentAt: null, closedAt: null, closedByUserId: null, closeSource: null }
+      : { difficulty: "medium", closedAt: null, closedByUserId: null, closeSource: null };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }
@@ -75,8 +76,11 @@ try {
     deferReply: async () => {}, editReply: async () => {} });
   await close("another-migration-user"); assert.equal(ends, 0);
   await close("creator-migration-user"); assert.equal(ends, 1); assert.equal(results, 1);
-  assert.ok((await db.randomPoll.findUnique({ where: { id: random.id } })).endedAt);
+  const closed = await db.randomPoll.findUnique({ where: { id: random.id } });
+  assert.ok(closed.endedAt); assert.ok(closed.closedAt);
+  assert.equal(closed.closedByUserId, "creator-migration-user"); assert.equal(closed.closeSource, "button");
   await close("creator-migration-user"); assert.equal(ends, 1); assert.equal(results, 1);
+  assert.equal((await db.randomPoll.findUnique({ where: { id: random.id } })).closedByUserId, "creator-migration-user");
   await db.randomPoll.delete({ where: { id: random.id } });
   await db.guildSettings.delete({ where: { guildId } });
   console.log(JSON.stringify({ ok: true, preservedRows: Object.fromEntries(tables.map(table => [table, before[table].length])), defaults: "medium", publicationTimePersisted: true, startDatePersisted: true, badgeSelectionPersisted: true, allLevelsPersisted: true, randomCreatorPersisted: true, creatorClosingVerified: true }));

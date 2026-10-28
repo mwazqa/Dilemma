@@ -356,7 +356,7 @@ try {
   const beforeBacklog = settlementReads;
   stopScore = startScoreScheduler(client);
   await advance(0);
-  assert.equal(settlementReads - beforeBacklog, 30, "Recover more than one old 25-row batch without polling");
+  assert.equal(settlementReads - beforeBacklog, 60, "Recover each poll and read its closure metadata once without polling");
   assert.ok([...quizzes.values()].every(quiz => quiz.scoredAt));
   const afterBacklog = settlementReads;
   await advance(86_400_000);

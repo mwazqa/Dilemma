@@ -18,13 +18,14 @@ for (const language of messageLanguages) {
   assert.equal(button.disabled, false);
   assert.equal(pollControls(language, true)[0].toJSON().components[0].disabled, true);
 }
-let stored, discordMessage, ends, patches, results, settlementUpdates, denyClaim, failEnd, failPatch, gate;
+let stored, discordMessage, ends, patches, results, settlementUpdates, denyClaim, failEnd, failPatch, failSend, gate;
 let random = false, recorded = true;
 let managerRoleId = null;
 function reset() {
   managerRoleId = null;
   clearGuildSettingsCache();
   stored = { messageId: "poll", guildId: "guild", channelId: "channel", creatorUserId: null, endedAt: null,
+    closedAt: null, closedByUserId: null, closeSource: null,
     options: "Alpha||Beta", correctOption: 0, optionEmojis: "||", explanation: "Test fact." };
   discordMessage = { id: "poll", author: { id: "bot" }, poll: {
     expiresTimestamp: Date.now() + 3_600_000,
@@ -37,7 +38,7 @@ function reset() {
   } };
   ends = patches = settlementUpdates = 0;
   results = [];
-  denyClaim = failEnd = failPatch = false;
+  denyClaim = failEnd = failPatch = failSend = false;
   gate = undefined;
   random = false; recorded = true;
 }
@@ -50,14 +51,18 @@ const client = { user: { id: "bot" }, rest: { patch: async (_, { body }) => {
 } } };
 const channel = { id: "channel", isTextBased: () => true, isSendable: () => true,
   messages: { fetch: async id => { assert.equal(id, "poll"); return discordMessage; } },
-  send: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); results.push(payload.content); } };
+  send: async payload => {
+    assert.deepEqual(payload.allowedMentions.parse, []);
+    if (failSend) throw new Error("Synthetic send failure");
+    results.push(payload.content);
+  } };
 db.guildSettings.findUnique = async () => ({ guildId: "guild", language: "pl", managerRoleId });
 db.generatedPoll.findUnique = async () => recorded && !random ? stored : null;
 db.randomPoll.findUnique = async () => recorded && random ? stored : null;
 const claim = async ({ where, data }) => {
   assert.equal(where.guildId, "guild");
-  assert.equal(where.endedAt, null);
-  if (denyClaim || stored.endedAt) return { count: 0 };
+  assert.equal(where.channelId, "channel");
+  if (denyClaim || (where.endedAt === null && stored.endedAt) || (where.closedAt === null && stored.closedAt)) return { count: 0 };
   Object.assign(stored, data);
   return { count: 1 };
 };
@@ -75,6 +80,7 @@ db.quizSettlement.updateMany = async ({ where, data }) => {
   return { count: 1 };
 };
 db.quizSettlement.findMany = async () => [];
+db.quizSettlement.findUnique = async () => null;
 db.dailyQuizRun.deleteMany = async () => { throw new Error("Closing must not reset quota"); };
 function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_BUTTON_ID, roles = [], userId = "actor" } = {}) {
   const replies = [];
@@ -106,6 +112,10 @@ for (const useRandom of [false, true]) {
     else await routeCommand(request);
     assert.equal(ends, 1, "Delegated managers can close scheduled and random quizzes");
     assert.equal(results.length, 1);
+    assert.equal(stored.closedByUserId, "actor");
+    assert.equal(stored.closeSource, button ? "button" : "command");
+    assert.ok(stored.closedAt);
+    assert.match(results[0], /<@actor>/);
   }
 }
 reset(); managerRoleId = "fixture-manager";
@@ -117,6 +127,7 @@ for (const handler of [handleEndPollButton, routeCommand]) {
   assert.equal(ends, 1, "The persisted creator can close their random quiz without a management role");
   assert.equal(results.length, 1);
   assert.equal(settlementUpdates, 1);
+  assert.equal(stored.closedByUserId, "creator");
   await handler(interaction({ permitted: false, userId: "creator" }));
   assert.equal(ends, 1);
   assert.equal(results.length, 1);
@@ -159,12 +170,15 @@ for (const useRandom of [false, true]) {
   assert.equal(results.length, 1);
   assert.match(results[0], /Alpha/);
   assert.ok(stored.endedAt);
+  assert.equal(stored.closedByUserId, "actor");
+  assert.equal(stored.closeSource, "button");
   assert.equal(settlementUpdates, 1);
   assert.equal(patches, 1);
   await handleEndPollButton(interaction());
-  await handlePoll(interaction());
+  await handlePoll(interaction({ userId: "later-manager" }));
   assert.equal(ends, 1);
   assert.equal(results.length, 1, "Repeated button and fallback command never duplicate results");
+  assert.equal(stored.closedByUserId, "actor", "Repeated requests preserve the original actor");
 }
 reset();
 await routeCommand(interaction());
@@ -192,43 +206,64 @@ let release;
 gate = new Promise(resolve => { release = resolve; });
 const first = handleEndPollButton(interaction());
 while (!ends) await new Promise(resolve => setImmediate(resolve));
-const second = interaction();
+const second = interaction({ userId: "second-actor" });
 await handlePoll(second);
 assert.equal(ends, 1);
 assert.equal(second.replies.at(-1), message("pl", "pollClosing"));
 release();
 await first;
 assert.equal(results.length, 1);
+assert.equal(stored.closedByUserId, "actor", "Concurrent controls preserve the successful actor");
 reset(); denyClaim = true;
 await handleEndPollButton(interaction());
 assert.equal(results.length, 0, "Database claim protects against another process publishing a duplicate result");
 reset(); failEnd = true;
 await handleEndPollButton(interaction());
 assert.equal(stored.endedAt, null);
+assert.equal(stored.closedByUserId, null, "Failed end requests do not name an actor");
+assert.equal(stored.closeSource, null);
+assert.equal(stored.closedAt, null);
 failEnd = false;
 await handleEndPollButton(interaction());
 assert.equal(results.length, 1, "Failed close releases the in-process lock for retry");
 reset(); failPatch = true;
 await handleEndPollButton(interaction());
 assert.equal(results.length, 1, "UI edit failure does not block results or scoring");
+reset(); failSend = true;
+await handleEndPollButton(interaction());
+assert.equal(stored.endedAt, null);
+assert.equal(stored.closedByUserId, "actor", "Result delivery failure preserves the confirmed closure");
+assert.equal(stored.closeSource, "button");
+const closedAt = +stored.closedAt;
+failSend = false;
+await handlePoll(interaction({ userId: "retry-actor" }));
+assert.equal(ends, 1);
+assert.equal(stored.closedByUserId, "actor");
+assert.equal(+stored.closedAt, closedAt);
+assert.match(results[0], /<@actor>/);
+assert.doesNotMatch(results[0], /retry-actor/);
 reset();
 discordMessage.poll.expiresTimestamp = Date.now() - 1;
 await handleEndPollButton(interaction());
 assert.equal(ends, 0, "Already expired Discord polls do not need another end request");
 assert.equal(results.length, 1);
+assert.equal(stored.closedByUserId, null, "Clicking an already expired poll never claims its closure");
+assert.equal(stored.closeSource, "unknown");
 
 reset();
 let finalized = false, scored = false;
-const quiz = { messageId: "poll", guildId: "guild", channelId: "channel", answerIds: "1,2", correctAnswerId: 1, difficulty: "easy" };
+const quiz = { messageId: "poll", guildId: "guild", channelId: "channel", answerIds: "1,2", correctAnswerId: 1, difficulty: "easy",
+  expiresAt: new Date(Date.now() - 1000), closedAt: null, scoredAt: null };
 db.quizSettlement.findMany = async () => scored ? [] : [quiz];
 db.quizSettlement.updateMany = async () => ({ count: 1 });
 db.$transaction = async callback => callback({ generatedPoll: db.generatedPoll, randomPoll: db.randomPoll,
-  quizSettlement: { updateMany: async ({ data }) => { if (data.scoredAt) scored = true; return { count: 1 }; } } });
+  quizSettlement: { findUnique: async () => ({ ...quiz }),
+    updateMany: async ({ data }) => { Object.assign(quiz, data); if (data.scoredAt) scored = true; return { count: 1 }; } } });
 client.rest.post = async (_, { body }) => { results.push(body.content); return { id: "result" }; };
 client.rest.get = async route => route.includes("/answers/")
   ? { users: [] }
   : { id: "poll", channel_id: "channel", author: { id: "bot" },
-    poll: { allow_multiselect: false, expiry: new Date(Date.now() - 1000).toISOString(),
+    poll: { allow_multiselect: false, expiry: quiz.expiresAt.toISOString(),
       answers: [{ answer_id: 1 }, { answer_id: 2 }], results: { is_finalized: finalized, answer_counts: [] } } };
 await runDueSettlements(client);
 assert.equal(scored, false, "Do not score before Discord finalizes votes");
@@ -237,5 +272,7 @@ finalized = true;
 await runDueSettlements(client);
 assert.equal(scored, true);
 assert.equal(patches, 1);
+assert.equal(results.length, 1);
+assert.equal(stored.closeSource, "automatic");
 await db.$disconnect();
 console.log("PASS: localized poll buttons, private feedback, permissions, ownership, duplicate/concurrent closes, fallback and automatic expiry");
