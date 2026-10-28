@@ -17,11 +17,13 @@ model QuizSettlement {
   expiresAt       DateTime
   closedAt        DateTime?
   scoredAt        DateTime?
+  resultsPending  Boolean   @default(true)
   nextCheckAt     DateTime  @default(now())
   createdAt       DateTime  @default(now())
   answers         QuizAnswer[]
 
   @@index([scoredAt, nextCheckAt])
+  @@index([resultsPending, nextCheckAt])
   @@index([guildId])
 }
 

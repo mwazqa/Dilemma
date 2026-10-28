@@ -13,10 +13,27 @@ try {
     INSERT INTO "GeneratedPoll" (id, guildId, topicId, messageId, channelId, question, options, correctOption, explanation) VALUES ('g', 'test', 'legacy', 'gmsg', 'channel', 'Question', 'A||B', 0, 'Fact');
     INSERT INTO "RandomPoll" (id, guildId, language, messageId, channelId, question, options, correctOption, explanation) VALUES ('r', 'test', 'pl', 'rmsg', 'channel', 'Question', 'A||B', 0, 'Fact');`);
   for (const migration of migrations.slice(1)) {
+    if (migration === "20261028120000_automatic_quiz_results") {
+      database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES
+        ('old-scored', 'test', 'channel', 'hard', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        ('gmsg', 'test', 'channel', 'easy', 1, '1,2', CURRENT_TIMESTAMP, NULL),
+        ('rmsg', 'test', 'channel', 'easy', 1, '1,2', CURRENT_TIMESTAMP, NULL),
+        ('active', 'test', 'channel', 'medium', 1, '1,2', CURRENT_TIMESTAMP, NULL);
+        UPDATE "GeneratedPoll" SET endedAt = CURRENT_TIMESTAMP WHERE messageId = 'gmsg';
+        UPDATE "RandomPoll" SET endedAt = CURRENT_TIMESTAMP WHERE messageId = 'rmsg';`);
+    }
     if (migration === "20261015120000_profile_badges") {
       database.exec(`INSERT INTO "UserScore" (guildId, userId, points, answered, correct, currentStreak, bestStreak, updatedAt) VALUES ('test', 'legacy-player', 10, 12, 10, 3, 4, CURRENT_TIMESTAMP)`);
     }
     database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+    if (migration === "20261028120000_automatic_quiz_results") {
+      assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("old-scored").resultsPending, 0);
+      assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("gmsg").resultsPending, 0);
+      assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("rmsg").resultsPending, 0);
+      assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("active").resultsPending, 1);
+      assert.equal(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"), readFileSync(`prisma/postgresql/migrations/${migration}/migration.sql`, "utf8"));
+      database.exec('DELETE FROM "QuizSettlement"; UPDATE "GeneratedPoll" SET endedAt = NULL; UPDATE "RandomPoll" SET endedAt = NULL;');
+    }
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
   for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "DailyQuizRun", "QuizChannel"]) {
@@ -93,6 +110,7 @@ try {
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizSettlement"').get().count, 0);
   database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt) VALUES ('score-test', 'test', 'channel', 'hard', 17, '17,93', CURRENT_TIMESTAMP);
     INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP);`);
+  assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("score-test").resultsPending, 1);
   assert.throws(() => database.exec(`INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP)`));
   database.exec('DELETE FROM "QuizSettlement" WHERE messageId = \'score-test\'');
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizAnswer"').get().count, 0);

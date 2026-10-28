@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import type { QuizSettlement, Topic } from "@prisma/client";
 
 export type TopicSchedule = Pick<Topic, "id" | "guildId" | "enabled" | "channelId" | "generationTime" | "startDate" | "lastGeneratedAt" | "intervalDays"> & { timezone?: string };
-export type SettlementSchedule = Pick<QuizSettlement, "messageId" | "expiresAt" | "closedAt" | "scoredAt" | "nextCheckAt">;
+export type SettlementSchedule = Pick<QuizSettlement, "messageId" | "expiresAt" | "closedAt" | "scoredAt" | "resultsPending" | "nextCheckAt">;
 
 export const scheduleEvents = new EventEmitter<{
   topicChanged: [topic: TopicSchedule];
@@ -16,6 +16,6 @@ export const scheduleEvents = new EventEmitter<{
 }>();
 
 export function settlementDeadline(quiz: SettlementSchedule): number | null {
-  if (quiz.scoredAt) return null;
+  if (quiz.scoredAt && !quiz.resultsPending) return null;
   return Math.max(quiz.closedAt ? 0 : +quiz.expiresAt, +quiz.nextCheckAt);
 }

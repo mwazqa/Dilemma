@@ -62,8 +62,13 @@ const claim = async ({ where, data }) => {
   return { count: 1 };
 };
 db.generatedPoll.updateMany = db.randomPoll.updateMany = claim;
+db.$transaction = async work => {
+  const before = { ...stored };
+  try { return await work(db); } catch (error) { Object.assign(stored, before); throw error; }
+};
 db.quizSettlement.updateMany = async ({ where, data }) => {
   assert.equal(where.guildId, "guild");
+  if (data.resultsPending === false) return { count: 1 };
   assert.equal(where.scoredAt, null);
   assert.ok(data.nextCheckAt);
   settlementUpdates++;
@@ -217,7 +222,9 @@ let finalized = false, scored = false;
 const quiz = { messageId: "poll", guildId: "guild", channelId: "channel", answerIds: "1,2", correctAnswerId: 1, difficulty: "easy" };
 db.quizSettlement.findMany = async () => scored ? [] : [quiz];
 db.quizSettlement.updateMany = async () => ({ count: 1 });
-db.$transaction = async callback => callback({ quizSettlement: { updateMany: async () => { scored = true; return { count: 1 }; } } });
+db.$transaction = async callback => callback({ generatedPoll: db.generatedPoll, randomPoll: db.randomPoll,
+  quizSettlement: { updateMany: async ({ data }) => { if (data.scoredAt) scored = true; return { count: 1 }; } } });
+client.rest.post = async (_, { body }) => { results.push(body.content); return { id: "result" }; };
 client.rest.get = async route => route.includes("/answers/")
   ? { users: [] }
   : { id: "poll", channel_id: "channel", author: { id: "bot" },

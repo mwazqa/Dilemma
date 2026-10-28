@@ -188,7 +188,7 @@ try {
     return { ...created };
   };
   db.topic.delete = async ({ where }) => { const topic = topics.get(where.id); topics.delete(where.id); return topic; };
-  db.quizSettlement.findMany = async () => { settlementLoads++; return [...quizzes.values()].filter(quiz => !quiz.scoredAt).map(quiz => ({ ...quiz })); };
+  db.quizSettlement.findMany = async () => { settlementLoads++; return [...quizzes.values()].filter(quiz => !quiz.scoredAt || quiz.resultsPending).map(quiz => ({ ...quiz })); };
   db.quizSettlement.findUnique = async ({ where }) => { settlementReads++; const quiz = quizzes.get(where.messageId); return quiz ? { ...quiz } : null; };
   db.quizSettlement.create = async ({ data }) => {
     const quiz = { nextCheckAt: new Date(), closedAt: null, scoredAt: null, ...data };
@@ -197,7 +197,7 @@ try {
   };
   db.quizSettlement.updateMany = async ({ where, data }) => {
     const quiz = quizzes.get(where.messageId);
-    if (!quiz || quiz.scoredAt || (where.guildId && quiz.guildId !== where.guildId)) return { count: 0 };
+    if (!quiz || (where.scoredAt === null && quiz.scoredAt) || (where.guildId && quiz.guildId !== where.guildId)) return { count: 0 };
     Object.assign(quiz, data);
     return { count: 1 };
   };
@@ -237,6 +237,7 @@ try {
         answers: new Map(quizAnswers(payload).map((answer, i) => [i + 1, { id: i + 1, text: answer.text }])) } };
     } };
   const client = { user: { id: "bot" }, ws: { ping: 1 }, channels: { fetch: async () => channel }, rest: {
+    post: async (_, { body }) => { assert.deepEqual(body.allowed_mentions.parse, []); return { id: "result" }; },
     patch: async () => { patches++; },
     get: async route => {
       if (route.includes("/answers/")) return { users: [] };
@@ -346,8 +347,12 @@ try {
 
   stage = "restart-backlog";
   topics.clear(); quizzes.clear();
-  for (let i = 0; i < 30; i++) quizzes.set(`backlog-${i}`, { messageId: `backlog-${i}`, guildId: "guild", channelId: "channel",
-    answerIds: "1,2", correctAnswerId: 1, difficulty: "easy", expiresAt: new Date(now - 60_000), closedAt: null, scoredAt: null, nextCheckAt: new Date(now - 60_000) });
+  for (let i = 0; i < 30; i++) {
+    const messageId = `backlog-${i}`;
+    quizzes.set(messageId, { messageId, guildId: "guild", channelId: "channel", resultsPending: true,
+      answerIds: "1,2", correctAnswerId: 1, difficulty: "easy", expiresAt: new Date(now - 60_000), closedAt: null, scoredAt: null, nextCheckAt: new Date(now - 60_000) });
+    polls.set(messageId, { messageId, guildId: "guild", channelId: "channel", options: "A||B", correctOption: 0, optionEmojis: "||", explanation: "Fixture fact", endedAt: null });
+  }
   const beforeBacklog = settlementReads;
   stopScore = startScoreScheduler(client);
   await advance(0);
@@ -361,7 +366,8 @@ try {
   stage = "pending-backoff";
   quizzes.clear();
   quizzes.set("pending", { messageId: "pending", guildId: "guild", channelId: "channel", answerIds: "1,2", correctAnswerId: 1,
-    difficulty: "easy", expiresAt: new Date(now - 60_000), closedAt: null, scoredAt: null, nextCheckAt: new Date(now - 60_000) });
+    difficulty: "easy", expiresAt: new Date(now - 60_000), closedAt: null, scoredAt: null, resultsPending: true, nextCheckAt: new Date(now - 60_000) });
+  polls.set("pending", { messageId: "pending", guildId: "guild", channelId: "channel", options: "A||B", correctOption: 0, optionEmojis: "||", explanation: "Fixture fact", endedAt: null });
   finalized = false;
   stopScore = startScoreScheduler(client);
   const beforePending = settlementReads;

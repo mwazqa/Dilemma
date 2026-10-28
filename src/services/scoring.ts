@@ -7,6 +7,7 @@ import { privateErrorSummary } from "../private-errors.js";
 import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { scheduleEvents, settlementDeadline, type SettlementSchedule } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
+import { publishQuizResults } from "./quiz-results.js";
 
 const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
@@ -22,7 +23,7 @@ export function settlementData(message: Message, guildId: string, difficulty: st
     return matches[0].id;
   });
   return { messageId: message.id, guildId, channelId: message.channelId, difficulty: parseDifficulty(difficulty),
-    correctAnswerId: mapped[correctOption], answerIds: mapped.join(","), expiresAt: poll.expiresAt };
+    correctAnswerId: mapped[correctOption], answerIds: mapped.join(","), expiresAt: poll.expiresAt, resultsPending: true };
 }
 
 export function scoreHistory(history: { correct: boolean; points: number }[]) {
@@ -100,26 +101,28 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
 }
 
 const settlementAttempts = new Map<string, number>();
+const pendingSettlement = { OR: [{ scoredAt: null }, { resultsPending: true }] };
 
 async function settleQuiz(client: Client, quiz: QuizSettlement): Promise<number | null> {
   const attempt = settlementAttempts.get(quiz.messageId) ?? 0;
   let next = Date.now() + retryDelay(attempt);
   try {
-    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
-    const final = await collectFinalVotes(client, quiz);
-    if (final) {
+    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, ...pendingSettlement }, data: { nextCheckAt: new Date(Date.now() + 300_000) } });
+    const final = quiz.scoredAt ? null : await collectFinalVotes(client, quiz);
+    if (quiz.scoredAt || final) {
       const settings = await getGuildSettings(quiz.guildId);
-      await applyFinalVotes(quiz, final.votes, final.finishedAt);
-      settlementAttempts.delete(quiz.messageId);
+      if (final) await applyFinalVotes(quiz, final.votes, final.finishedAt);
       await disablePollControls(client, quiz.channelId, quiz.messageId, settings?.language ?? "en");
+      await publishQuizResults(client, quiz, settings?.language ?? "en");
+      settlementAttempts.delete(quiz.messageId);
       return null;
     }
-    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } });
+    await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, ...pendingSettlement }, data: { nextCheckAt: new Date(next) } });
   } catch (error) {
     next = Date.now() + retryDelay(attempt, 300_000);
-    try { await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { nextCheckAt: new Date(next) } }); }
+    try { await db.quizSettlement.updateMany({ where: { messageId: quiz.messageId, ...pendingSettlement }, data: { nextCheckAt: new Date(next) } }); }
     catch { }
-    console.error("Quiz scoring pending:", privateErrorSummary(error));
+    console.error("Quiz completion pending:", privateErrorSummary(error));
   }
   settlementAttempts.set(quiz.messageId, attempt + 1);
   return next;
@@ -132,15 +135,15 @@ export function startScoreScheduler(client: Client) {
   const queue = new DeadlineQueue(async (id, current) => {
     try {
       if (id === "bootstrap") {
-        const quizzes = await db.quizSettlement.findMany({ where: { scoredAt: null },
-          select: { messageId: true, expiresAt: true, closedAt: true, scoredAt: true, nextCheckAt: true } });
+        const quizzes = await db.quizSettlement.findMany({ where: pendingSettlement,
+          select: { messageId: true, expiresAt: true, closedAt: true, scoredAt: true, resultsPending: true, nextCheckAt: true } });
         for (const quiz of quizzes) if (!changedDuringLoad.has(quiz.messageId)) schedule(quiz);
         loading = false;
         changedDuringLoad.clear();
       } else {
         const quiz = await db.quizSettlement.findUnique({ where: { messageId: id } });
         if (!current()) return;
-        if (!quiz || quiz.scoredAt) { settlementAttempts.delete(id); readAttempts.delete(id); return; }
+        if (!quiz || (quiz.scoredAt && !quiz.resultsPending)) { settlementAttempts.delete(id); readAttempts.delete(id); return; }
         const at = settlementDeadline(quiz)!;
         if (at > Date.now()) { queue.schedule(id, at); return; }
         const next = await settleQuiz(client, quiz);
@@ -186,11 +189,11 @@ export async function runDueSettlements(client: Client) {
   if (running) return;
   running = true;
   try {
-    const quizzes = await db.quizSettlement.findMany({ where: { scoredAt: null, nextCheckAt: { lte: new Date() }, OR: [{ expiresAt: { lte: new Date() } }, { closedAt: { not: null } }] },
+    const quizzes = await db.quizSettlement.findMany({ where: { AND: [pendingSettlement, { OR: [{ expiresAt: { lte: new Date() } }, { closedAt: { not: null } }] }], nextCheckAt: { lte: new Date() } },
       orderBy: [{ nextCheckAt: "asc" }, { messageId: "asc" }], take: 25 });
     for (const quiz of quizzes) {
       const next = await settleQuiz(client, quiz);
-      scheduleEvents.emit("settlementChanged", { ...quiz, scoredAt: next === null ? new Date() : null, nextCheckAt: new Date(next ?? Date.now()) });
+      scheduleEvents.emit("settlementChanged", { ...quiz, resultsPending: next !== null, scoredAt: next === null ? quiz.scoredAt ?? new Date() : quiz.scoredAt, nextCheckAt: new Date(next ?? Date.now()) });
     }
   } catch (error) { console.error("Quiz scoring check failed:", privateErrorSummary(error)); }
   finally { running = false; }

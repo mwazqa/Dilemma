@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -26,8 +26,9 @@
     "test:topic-calendar:postgres": "node scripts/test-topic-calendar-postgres.mjs",
     "test:random:postgres": "node scripts/test-random-postgres.mjs",
     "test:topic-limit:postgres": "node scripts/test-topic-limit-postgres.mjs",
+    "test:results:postgres": "node scripts/test-auto-results-postgres.mjs",
     "test:idle-database": "node scripts/test-idle-database.mjs",
-    "test:poll-controls": "node scripts/test-poll-controls.mjs",
+    "test:poll-controls": "node scripts/test-poll-controls.mjs && node scripts/test-auto-results.mjs",
     "test:scoring": "node scripts/test-scoring.mjs",
     "test:experience": "node scripts/test-experience.mjs",
     "test:achievements": "node scripts/test-achievements.mjs",

@@ -1,11 +1,10 @@
 import { SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
-import { getResultMessage } from "../brand.js";
 import { openFeedback } from "../feedback.js";
 import { scheduleEvents } from "../services/schedule-events.js";
 import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
 import { canManageDilemma } from "../services/management-permissions.js";
-import { storedQuizOptions } from "../services/quiz-options.js";
+import { publishQuizResults } from "../services/quiz-results.js";
 
 const closingPolls = new Set<string>();
 
@@ -78,18 +77,8 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
       const closedAt = new Date();
       await db.quizSettlement.updateMany({ where: { messageId, guildId: interaction.guildId, scoredAt: null }, data: { closedAt, nextCheckAt: closedAt } });
       scheduleEvents.emit("settlementClosed", messageId, closedAt);
-      const options = storedQuizOptions(poll.options);
-      const correctAnswer = options[poll.correctOption] ?? "Unknown";
-      const resultEmojis = poll.optionEmojis.split("||");
-      const claim = generatedPoll
-        ? await db.generatedPoll.updateMany({ where: { messageId, guildId: interaction.guildId, endedAt: null }, data: { endedAt: new Date() } })
-        : await db.randomPoll.updateMany({ where: { messageId, guildId: interaction.guildId, endedAt: null }, data: { endedAt: new Date() } });
       await disablePollControls(interaction.client, channel.id, messageId, language);
-      if (!claim.count) {
-        await reply(text("pollDone"));
-        return;
-      }
-      await channel.send({ content: getResultMessage(language, correctAnswer, poll.explanation, resultEmojis[poll.correctOption] ?? ""), allowedMentions: { parse: [] } });
+      await publishQuizResults(interaction.client, poll, language, payload => channel.send(payload));
       await reply(text("pollDone"));
     } finally { closingPolls.delete(messageId); }
   } catch {

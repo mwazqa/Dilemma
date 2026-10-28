@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.3.2 - 2026-10-28
+
+- Publish the saved correct answer and explanation after automatic expiry for scheduled and random quizzes, including polls without votes. Share result delivery with manual closing, persist pending delivery across restarts and keep finalized scoring independent from send failures. Add an additive results-delivery migration; completed historical settlements are excluded from automatic replay.
+
 ## v3.3.1 - 2026-10-27
 
 - Limit each server to 31 saved quiz topics, including disabled topics, with a serializable creation transaction and retries for concurrent writes. Keep random quizzes independent, free slots on deletion and preserve all existing topics. Add six-language limit feedback and update command help and README.

@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Code version: `v3.3.1`, with up to 31 saved quiz topics per server, including disabled topics. Concurrent creation respects the same limit; deleting a topic frees a slot, while random quizzes remain independent. See [CHANGELOG.md](CHANGELOG.md). Upgrading from v3.3.0 requires no new database migration or Discord command registration. Earlier upgrades must also include the preceding migrations, Prisma client generation and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.3.2`, with automatic correct-answer messages after scheduled and random quizzes expire, persistent delivery retries and independent finalized scoring. The server limit remains 31 saved topics, including disabled topics; random quizzes use their separate quota. See [CHANGELOG.md](CHANGELOG.md). Upgrading from v3.3.1 requires the additive `20261028120000_automatic_quiz_results` migration and Prisma client generation; Discord command definitions are unchanged. Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -86,6 +86,8 @@ AI failures have separate localized feedback from Discord permission errors. A f
 See the current [OpenAI model documentation](https://developers.openai.com/api/docs/models/gpt-6-luna) and [API pricing](https://developers.openai.com/api/docs/pricing). Existing deployments must replace their old provider configuration with the OpenAI variables in `.env.example`. No database migration or Discord command registration change is required for this provider migration.
 
 ## Commands
+
+After a quiz closes automatically or through the close button, Dilemma posts its saved correct answer and explanation in the quiz channel. Changing a topic's difficulty affects future quizzes; active quizzes keep their original answer and point value. Results wait for Discord's finalized poll data after automatic expiry. Failed result delivery is retried across restarts without awarding points again or polling the database while idle. Upgrades containing the `20261028120000_automatic_quiz_results` migration do not automatically replay results for previously settled quizzes.
 
 Each server can save up to 31 quiz topics in total, including disabled topics. Delete a topic to free a slot; disabling it does not free one. Random quizzes do not use these slots. Existing topics remain editable and are never removed automatically if a server already exceeds the limit. Creation checks the limit transactionally to prevent concurrent commands from exceeding it.
 
