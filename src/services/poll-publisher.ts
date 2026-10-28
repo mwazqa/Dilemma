@@ -7,7 +7,7 @@ import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficul
 import { message, normalizeLanguage } from "../messages.js";
 import { getVotePrompt } from "../brand.js";
 import { settlementData } from "./scoring.js";
-import { claimQuizRun, quizDay, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
+import { claimQuizRun, quizDay, RANDOM_DAILY_LIMIT, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { pollControls } from "./poll-controls.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
@@ -16,6 +16,7 @@ import { requireQuizChannel } from "./quiz-channels.js";
 import { resolveQuizPingRole } from "./quiz-notifications.js";
 
 const questionHistoryLimit = 365;
+const randomQuestionHistoryLimit = 365 * RANDOM_DAILY_LIMIT;
 
 export class QuizPublicationError extends Error {
   readonly permissionDenied: boolean;
@@ -132,7 +133,7 @@ export async function publishRandomQuestion(
       where: { guildId },
       select: { question: true },
       orderBy: { createdAt: "desc" },
-      take: questionHistoryLimit
+      take: randomQuestionHistoryLimit
     })).map((poll) => poll.question);
     const question = await generateUniqueQuestion(
       "a random, surprising and family-friendly general-knowledge topic",

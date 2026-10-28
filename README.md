@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Code version: `v3.3.2`, with automatic correct-answer messages after scheduled and random quizzes expire, persistent delivery retries and independent finalized scoring. The server limit remains 31 saved topics, including disabled topics; random quizzes use their separate quota. See [CHANGELOG.md](CHANGELOG.md). Upgrading from v3.3.1 requires the additive `20261028120000_automatic_quiz_results` migration and Prisma client generation; Discord command definitions are unchanged. Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.3.4`, with a 1460-question duplicate-check window for each server's random quizzes, recorded quiz closers and automatic result delivery. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Upgrading from v3.3.3 requires no database migration or command registration. Earlier upgrades must include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -162,7 +162,7 @@ The start message permits mentions only for that role; text from names or AI can
 
 ### Duplicate questions
 
-Duplicate-question checks compare against the latest 365 published questions within the same saved topic, or the latest 365 random questions on the same server. These histories remain separate; topics are not compared with each other or with random quizzes. Comparison normalizes letter case and whitespace, not meaning or paraphrases. The AI avoidance prompt still contains at most 20 historical questions per attempt; the larger comparison window stays local to the bot. Duplicate candidates can trigger up to three generation attempts within the existing overall timeout.
+Duplicate-question checks compare against the latest 365 published questions within the same saved topic, or the latest 1460 random questions on the same server (365 times the four-per-day limit). The random window counts questions, rather than filtering by calendar date. These histories remain separate; topics are not compared with each other or with random quizzes. Comparison normalizes letter case and whitespace, not meaning or paraphrases. The AI avoidance prompt still contains at most 20 historical questions per attempt; the larger comparison window stays local to the bot. Duplicate candidates can trigger up to three generation attempts within the existing overall timeout.
 
 ### Plan topics ahead by date
 

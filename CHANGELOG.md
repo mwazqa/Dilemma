@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.3.4 - 2026-10-28
+
+- Increase the per-server random duplicate-check history from 365 to 1460 questions, derived from 365 times the daily random limit. Keep saved topics at 365 questions, the AI avoidance prompt at 20 and the existing retry budget. Cover normalized duplicates beyond the old window, the new boundary and questions outside it; no migration or command registration is required.
+
 ## v3.3.3 - 2026-10-28
 
 - Record who closes scheduled and random quizzes, when and through which control. Show the actor and time in localized results without pinging them, distinguish finalized automatic expiry from unknown closures, preserve the first successful actor during concurrent requests and retain the audit when result delivery needs a retry. Add nullable SQLite/PostgreSQL audit fields without attributing historical closures.
