@@ -23,6 +23,9 @@ try{
   assert.ok(payload.files[0].description.includes(question));
   for(const option of options)assert.ok(payload.files[0].description.includes(option));
   assert.ok(payload.files[0].description.length<=1024);
+  const withoutAttachments=await quizVotingPayload({question,options,optionEmojis:[]},expiry,"pl",false);
+  assert.equal(withoutAttachments.files.length,0);assert.ok(withoutAttachments.embeds[0].toJSON().description.includes(question));
+  assert.equal(withoutAttachments.components[0].components.length,4);
   if(preview)writeFileSync(".tools/quiz-card-preview/long-question.png",payload.files[0].attachment);
   const japanese=await renderQuizCard("世界の歴史と科学について正しい説明を選んでください。".repeat(12).slice(0,300),["科学の説明についての回答".repeat(5).slice(0,55),"別の説明についての回答".repeat(5).slice(0,55)],24);
   assert.equal((await sharp(japanese).metadata()).width,1400);

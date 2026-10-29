@@ -1,4 +1,4 @@
-import type { SendableChannels } from "discord.js";
+import { PermissionFlagsBits, type SendableChannels } from "discord.js";
 import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
 import { AiGenerationError, generateQuestion } from "./question-generator.js";
@@ -70,7 +70,7 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
     const sentPoll = await channel.send({
       content: `${pingRoleId ? `<@&${pingRoleId}>\n` : ""}**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [], roles: pingRoleId ? [pingRoleId] : [], users: [], repliedUser: false },
-      ...await quizVotingPayload(question, expiresAt, language)
+      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel))
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId: topic.guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     const updatedTopic = await db.$transaction(async tx => {
@@ -150,7 +150,7 @@ export async function publishRandomQuestion(
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [] },
-      ...await quizVotingPayload(question, expiresAt, language)
+      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel))
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     await db.$transaction(async tx => {
@@ -204,6 +204,12 @@ async function generateUniqueQuestion(
     previousQuestions.push(question.question);
   }
   throw new AiGenerationError("invalid-response");
+}
+
+function canAttachQuizCard(channel: SendableChannels): boolean {
+  if (!("guild" in channel)) return true;
+  const member = channel.guild.members?.me;
+  return Boolean(member && channel.permissionsFor(member)?.has(PermissionFlagsBits.AttachFiles));
 }
 
 function normalizeQuestionText(value: string): string {

@@ -20,7 +20,7 @@ export const REVEAL_COST = 5;
 export const FIFTY_FIFTY_COST = 5;
 type Identity = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
-export async function quizVotingPayload(question: { question: string; options: string[]; optionEmojis: string[] }, expiresAt: Date, language: string) {
+export async function quizVotingPayload(question: { question: string; options: string[]; optionEmojis: string[] }, expiresAt: Date, language: string, imageAllowed = true) {
   if (question.options.length < 2 || question.options.length > 4) throw new Error("Invalid quiz answer count");
   const answers = new ActionRowBuilder<ButtonBuilder>().addComponents(question.options.map((option, index) => {
     const button = new ButtonBuilder().setCustomId(`${VOTE_PREFIX}${index + 1}`).setLabel(`${index + 1}. ${option}`).setStyle(ButtonStyle.Primary);
@@ -40,6 +40,7 @@ export async function quizVotingPayload(question: { question: string; options: s
   const description = question.question + "\n" + question.options.map((option, index) => `${index + 1}. ${option}`).join("\n")
     + `\n${message(language, "votingEnds", { time: expiresAt.toISOString() })}`;
   const embed = new EmbedBuilder().setColor(0xad94f3);
+  if (!imageAllowed) return { embeds: [embed.setDescription(description)], components: [answers, controls, finish], files: [] };
   try {
     const card = await renderQuizCard(question.question, question.options, Math.max(1, Math.min(24, Math.ceil((+expiresAt - Date.now()) / 3_600_000))));
     const attachment = new AttachmentBuilder(card, { name: "quiz.png", description });
