@@ -18,9 +18,14 @@ model QuizSettlement {
   closedAt        DateTime?
   scoredAt        DateTime?
   resultsPending  Boolean   @default(true)
+  votingMode      String    @default("native")
+  finalCounts     String?
   nextCheckAt     DateTime  @default(now())
   createdAt       DateTime  @default(now())
   answers         QuizAnswer[]
+  votes           QuizVote[]
+  supports        QuizSupport[]
+  wagers          QuizWager[]
 
   @@index([scoredAt, nextCheckAt])
   @@index([resultsPending, nextCheckAt])
@@ -50,6 +55,7 @@ model UserScore {
   currentStreak Int      @default(0)
   bestStreak    Int      @default(0)
   selectedBadge String?
+  sparks        Int      @default(0)
   updatedAt     DateTime @updatedAt
 
   @@id([guildId, userId])
@@ -142,6 +148,7 @@ model RandomPoll {
   id            String    @id @default(cuid())
   guildId       String
   language      String
+  category      String?
   messageId     String    @unique
   channelId     String
   creatorUserId String?
@@ -158,4 +165,40 @@ model RandomPoll {
   closeSource   String?
 
   @@index([guildId, createdAt])
+}
+
+model QuizVote {
+  messageId String
+  userId    String
+  guildId   String
+  answerId  Int
+  settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([guildId, userId])
+}
+
+model QuizSupport {
+  messageId String
+  userId    String
+  guildId   String
+  revealed Boolean @default(false)
+  hintAnswerIds String?
+  settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([guildId, userId])
+}
+
+model QuizWager {
+  messageId String
+  userId    String
+  guildId   String
+  answerId  Int
+  amount    Int
+  payout    Int?
+  settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([guildId, userId])
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {quizAnswers,quizDuration} from "./fixtures/native-quiz.mjs";
 import { ChannelType, MessageFlags, PermissionFlagsBits, PermissionsBitField } from "discord.js";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
@@ -29,8 +30,8 @@ const permissions = () => new PermissionsBitField(mentionAll ? PermissionsBitFie
 const makeChannel = id => ({ id, guildId, guild, type: ChannelType.GuildText, isSendable: () => true, isThread: () => false,
   permissionsFor: permissions, send: async payload => {
     sent.push(payload); return { id: `quiz-${sent.length}`, channelId: id,
-      poll: { allowMultiselect: payload.poll.allowMultiselect, expiresAt: new Date(Date.now() + payload.poll.duration * 3_600_000),
-        answers: new Map(payload.poll.answers.map((answer, index) => [index + 7, { id: index + 7, text: answer.text }])) } };
+      poll: { allowMultiselect: false, expiresAt: new Date(Date.now() + quizDuration(payload) * 3_600_000),
+        answers: new Map(quizAnswers(payload).map((answer, index) => [index + 7, { id: index + 7, text: answer.text }])) } };
   } });
 const channel = makeChannel(channelId), secondChannel = makeChannel(secondChannelId);
 const channels = new Map([[channelId, channel], [secondChannelId, secondChannel]]);
@@ -154,11 +155,11 @@ try {
   await publishTopicQuestions({ ...topic }, channel, false);
   assert.equal(roleReads, beforeNoPing); assert.deepEqual(sent.at(-1).allowedMentions.roles, []);
   for (const payload of sent) {
-    assert.equal(payload.poll.allowMultiselect, false);
-    assert.equal(payload.poll.answers.length, 2);
-    assert.equal(payload.embeds, undefined);
+    assert.equal(payload.poll, undefined);
+    assert.equal(quizAnswers(payload).length, 2);
+    assert.equal(payload.embeds.length, 1);
     const buttons = payload.components.flatMap(row => row.toJSON().components);
-    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:end"]);
+    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:vote:1", "quiz:vote:2", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"]);
   }
   await command("create", { name: "Drugi quiz", option_count: 2, ping_role: { id: roleA } });
   assert.equal([...topics.values()].find(row => row.name === "Drugi quiz").pingRoleId, roleA);

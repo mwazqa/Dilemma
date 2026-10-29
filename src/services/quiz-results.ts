@@ -5,6 +5,7 @@ import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { quizClosureSummary } from "./quiz-closure.js";
+import { voteBreakdown } from "./quiz-voting.js";
 
 type ResultQuiz = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
@@ -16,7 +17,8 @@ export async function publishQuizResults(client: Client, quiz: ResultQuiz, langu
         const generated = await tx.generatedPoll.findUnique({ where: { messageId: quiz.messageId } });
         const poll = generated ?? await tx.randomPoll.findUnique({ where: { messageId: quiz.messageId } });
         if (!poll || poll.guildId !== quiz.guildId || poll.channelId !== quiz.channelId) throw new Error("Quiz result metadata mismatch");
-        const settlement = poll.closedAt ? null : await tx.quizSettlement.findUnique({ where: { messageId: quiz.messageId } });
+        const settlement = await tx.quizSettlement.findUnique({ where: { messageId: quiz.messageId } });
+        if (settlement?.votingMode === "buttons" && !settlement.scoredAt) throw new Error("Quiz results are not finalized");
         const closure = poll.closedAt ? { closedAt: poll.closedAt, closedByUserId: poll.closedByUserId, closeSource: poll.closeSource }
           : { closedAt: settlement?.closedAt ?? null, closedByUserId: null,
             closeSource: settlement?.scoredAt && settlement.closedAt && settlement.closedAt >= settlement.expiresAt ? "automatic" : "unknown" };
@@ -25,7 +27,9 @@ export async function publishQuizResults(client: Client, quiz: ResultQuiz, langu
         if (claim.count) {
           const answer = storedQuizOptions(poll.options)[poll.correctOption];
           if (answer === undefined) throw new Error("Quiz result answer missing");
+          const counts: number[] | null = settlement?.finalCounts ? JSON.parse(settlement.finalCounts) : null;
           const content = getResultMessage(language, answer, poll.explanation, poll.optionEmojis.split("||")[poll.correctOption] ?? "")
+            + (counts ? `\n\n${voteBreakdown(language, storedQuizOptions(poll.options), counts)}` : "")
             + `\n\n${quizClosureSummary(language, closure)}`;
           const nonce = createHash("sha256").update(`quiz-result:${quiz.messageId}`).digest("hex").slice(0, 25);
           if (send) await send({ content, allowedMentions: { parse: [] }, nonce, enforceNonce: true });

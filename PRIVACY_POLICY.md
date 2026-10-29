@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 28, 2026
+Last updated: October 29, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -10,6 +10,16 @@ Dilemma stores Discord server IDs, channel IDs, topic configuration, generated
 questions, poll options, results, and timestamps. For quiz scoring, it stores
 Discord user IDs, final answer selections, points, accuracy and correct-answer
 streaks. Levels and EXP are calculated from settled points, without storing additional personal data.
+Dilemma also stores the player's server-specific Sparks balance and which quizzes
+have a purchased count preview or 50/50 hint, including its two remaining choices.
+For bets, it stores the player's answer, stake and final payout on the current server.
+Changing the vote moves the bet. Withdrawing refunds the stake with a 1-Spark
+withdrawal fee. Bet payouts are calculated only after closing.
+New quizzes store each member's current button
+vote before closing so members can change or withdraw it. Counts remain hidden
+until closing, except for private previews unlocked with Sparks. Final aggregate
+counts do not identify individual voters. Random quiz records also store a broad
+category to reduce repeated categories on the same server.
 Cosmetic achievements are calculated from these existing results. If a player
 chooses up to three profile badges, Dilemma stores their identifiers with that player's score
 on the current server. Deleting the score also deletes this selection and the
@@ -39,8 +49,9 @@ Server configuration can also store an administrator-selected timezone for
 schedules and daily limits. This value is not inferred from member locations.
 Random-channel configuration stores allowed channel IDs per server. These settings
 restrict where random quizzes can be started. They do not block individual voters.
-Voting takes place in Discord polls; Dilemma reads final answers after closure
-to calculate scores. Discord user IDs and votes are not sent to the AI provider.
+New quizzes use Discord buttons; Dilemma stores the current selection and settles
+it after closure. Legacy native Discord polls continue to use finalized answers
+from Discord. Discord user IDs and votes are not sent to the AI provider.
 
 Profile cards temporarily process the player's Discord display name, avatar and
 score in memory to render an image. Avatars are fetched only from Discord's CDN.
@@ -66,9 +77,12 @@ of quiz generation requests.
 Data is used to configure scheduled generation, publish polls, prevent duplicate
 questions, show results, and calculate server-specific scores and streaks.
 Use `/dilemma score forget confirm:true` to permanently delete your stored answers and
-score on the current server. Polls that have not yet been scored and future
-votes can create new records. Already scored polls are not scored again after
-deletion. This command does not remove a vote from a Discord poll.
+score on the current server, including Sparks, purchased tool unlocks and bets.
+This also withdraws stored button votes. Active bets are deleted together with the
+balance, without a refund or later payout. It cannot withdraw a vote from a legacy
+native Discord poll. Unscored legacy polls and future votes can create new
+records. Already scored polls are not scored again after deletion. Aggregate
+final count snapshots remain with the quiz record.
 User IDs and votes are not sent to the AI provider for quiz generation.
 The operator may delete stored server data by
 removing the bot and deleting its database records. Retention depends on the

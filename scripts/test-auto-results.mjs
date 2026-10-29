@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {voteBreakdown} from "../dist/services/quiz-voting.js";
 import { Prisma } from "@prisma/client";
 
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
@@ -78,6 +79,7 @@ try {
     assert.equal(results.length, 0); assert.equal(quiz.scoredAt, null);
     finalized = true; await runDueSettlements(client);
     assert.equal(results.length, 1); assert.equal(results[0], getResultMessage(language, "Alpha||Beta", "Saved fact.", "") + "\n\n"
+      + voteBreakdown(language,["Alpha||Beta","Gamma"],[1,0]) + "\n\n"
       + quizClosureSummary(language, { closedAt: new Date(0), closedByUserId: null, closeSource: "automatic" }));
     assert.equal(poll.closeSource, "automatic"); assert.equal(poll.closedByUserId, null);
     assert.equal(score.points, 3, "Changing the topic difficulty does not change an active quiz");

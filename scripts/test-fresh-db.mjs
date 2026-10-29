@@ -105,6 +105,8 @@ try {
   assert.deepEqual([legacyPlayer.points, legacyPlayer.answered, legacyPlayer.correct, legacyPlayer.currentStreak, legacyPlayer.bestStreak], [10, 12, 10, 3, 4]);
   database.exec(`UPDATE "UserScore" SET selectedBadge = 'first_answer' WHERE guildId = 'test' AND userId = 'legacy-player'`);
   assert.equal(database.prepare('SELECT selectedBadge FROM "UserScore" WHERE userId = ?').get("legacy-player").selectedBadge, "first_answer");
+  assert.equal(database.prepare('SELECT sparks FROM "UserScore" WHERE userId = ?').get("legacy-player").sparks, 0);
+  assert.throws(() => database.exec('UPDATE "UserScore" SET sparks = -1'));
   const badges = ["first_answer", "correct_10", "level_2"];
   database.prepare('UPDATE "UserScore" SET selectedBadge = ? WHERE guildId = ? AND userId = ?')
     .run(JSON.stringify(badges), "test", "legacy-player");
@@ -119,9 +121,15 @@ try {
   database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt) VALUES ('score-test', 'test', 'channel', 'hard', 17, '17,93', CURRENT_TIMESTAMP);
     INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP);`);
   assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("score-test").resultsPending, 1);
+  assert.equal(database.prepare('SELECT votingMode FROM "QuizSettlement" WHERE messageId = ?').get("score-test").votingMode, "native");
+  database.exec(`INSERT INTO "QuizVote" (messageId, userId, guildId, answerId) VALUES ('score-test', 'player', 'test', 17);
+    INSERT INTO "QuizSupport" (messageId, userId, guildId, revealed) VALUES ('score-test', 'player', 'test', true);
+    INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'player', 'test', 17, 20);`);
+  assert.throws(() => database.exec(`INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'invalid', 'test', 17, 21)`));
   assert.throws(() => database.exec(`INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP)`));
   database.exec('DELETE FROM "QuizSettlement" WHERE messageId = \'score-test\'');
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizAnswer"').get().count, 0);
+  for (const table of ["QuizVote", "QuizSupport", "QuizWager"]) assert.equal(database.prepare(`SELECT count(*) AS count FROM "${table}"`).get().count, 0);
   console.log("PASS: SQLite migrations preserve existing data, scoring uniqueness and cascade deletion");
 } finally {
   database.close();

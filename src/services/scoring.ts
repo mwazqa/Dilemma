@@ -8,6 +8,7 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { scheduleEvents, settlementDeadline, type SettlementSchedule } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { publishQuizResults } from "./quiz-results.js";
+import { earnedSparks } from "./sparks.js";
 
 const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
@@ -40,6 +41,13 @@ export function scoreHistory(history: { correct: boolean; points: number }[]) {
 }
 
 export async function collectFinalVotes(client: Client, quiz: QuizSettlement): Promise<{ votes: FinalVote[]; finishedAt: Date } | null> {
+  if (quiz.votingMode === "buttons") {
+    const current = await db.quizSettlement.findUnique({ where: { messageId: quiz.messageId } });
+    if (!current || current.guildId !== quiz.guildId || current.channelId !== quiz.channelId) throw new Error("Quiz ownership mismatch");
+    if (!current.closedAt && current.expiresAt.getTime() > Date.now()) return null;
+    const votes = await db.quizVote.findMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId }, select: { userId: true, answerId: true } });
+    return { votes, finishedAt: current.closedAt ?? current.expiresAt };
+  }
   const message = await client.rest.get(Routes.channelMessage(quiz.channelId, quiz.messageId)) as APIMessage;
   if (message.author.id !== client.user?.id || message.id !== quiz.messageId || message.channel_id !== quiz.channelId) throw new Error("Quiz ownership mismatch");
   const poll = message.poll;
@@ -79,17 +87,35 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await db.$transaction(async tx => {
-        const claim = await tx.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null }, data: { scoredAt: new Date(), closedAt: finishedAt } });
+        const finalVotes = quiz.votingMode === "buttons"
+          ? await tx.quizVote.findMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId }, select: { userId: true, answerId: true } }) : votes;
+        const counts = quiz.answerIds.split(",").map(Number).map(id => finalVotes.filter(vote => vote.answerId === id).length);
+        const claim = await tx.quizSettlement.updateMany({ where: { messageId: quiz.messageId, scoredAt: null,
+          ...(quiz.votingMode === "buttons" ? { OR: [{ expiresAt: { lte: new Date() } }, { closedAt: { not: null } }] } : {}) },
+          data: { scoredAt: new Date(), closedAt: finishedAt, finalCounts: JSON.stringify(counts) } });
         if (!claim.count) return false;
-        for (const vote of votes) {
+        for (const vote of finalVotes) {
           const correct = vote.answerId === quiz.correctAnswerId;
           await tx.quizAnswer.create({ data: { ...vote, guildId: quiz.guildId, messageId: quiz.messageId, correct,
             points: correct ? pointsByDifficulty[parseDifficulty(quiz.difficulty)] : 0, finishedAt } });
           const history = await tx.quizAnswer.findMany({ where: { guildId: quiz.guildId, userId: vote.userId },
             select: { correct: true, points: true }, orderBy: [{ finishedAt: "asc" }, { messageId: "asc" }] });
           const score = scoreHistory(history);
+          const earned = correct ? pointsByDifficulty[parseDifficulty(quiz.difficulty)] : 0;
+          const sparks = earnedSparks(score.points, earned);
           await tx.userScore.upsert({ where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } },
-            create: { guildId: quiz.guildId, userId: vote.userId, ...score }, update: score });
+            create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks }, update: { ...score, sparks: { increment: sparks } } });
+        }
+        if (quiz.votingMode === "buttons") {
+          const wagers = await tx.quizWager.findMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId, payout: null } });
+          for (const wager of wagers) {
+            const payout = wager.answerId === quiz.correctAnswerId ? wager.amount * 2 : 0;
+            if (payout) {
+              const paid = await tx.userScore.updateMany({ where: { guildId: quiz.guildId, userId: wager.userId }, data: { sparks: { increment: payout } } });
+              if (!paid.count) throw new Error("Wager wallet unavailable");
+            }
+            await tx.quizWager.update({ where: { messageId_userId: { messageId: quiz.messageId, userId: wager.userId } }, data: { payout } });
+          }
         }
         return true;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });

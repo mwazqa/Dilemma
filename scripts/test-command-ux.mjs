@@ -169,14 +169,16 @@ try {
   }
   await invalid("random", { options: "A,B", option_count: 4 }, "optionsMismatch");
   await invalid("random", { option_count: 1 }, "optionCountInvalid");
-  await invalid("random", { duration_hours: 25 }, "durationInvalid");
+  for (const duration of [0, 7, 24, 25, 1.5]) await invalid("random", { duration_hours: duration }, "randomDurationInvalid");
   const random = await invoke("random", {}, false);
   assert.ok(random.replies.at(-1).includes("Quiz gotowy"));
   assert.equal(savedPoll.creatorUserId, "actor");
-  assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 12);
+  assert.equal(typeof savedPoll.category, "string", "Random history stores the topic chosen by AI");
+  assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 6);
   generatedAnswers = ["Yes", "No"];
   await invoke("random", { options: " Yes, No ", duration_hours: 2 }, false);
   assert.match(prompt, /Use exactly these answer options: Yes, No/);
+  assert.equal(savedPoll.category, null, "Custom answers do not add a topic to the avoidance history");
   assert.deepEqual(quizAnswers(sent).map(answer => answer.text), ["Yes", "No"]);
   assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), ["Yes", "No"]);
   await invoke("random", { options: "Yes,No", option_count: 2 });

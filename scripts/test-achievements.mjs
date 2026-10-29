@@ -69,6 +69,9 @@ db.userScore.updateMany = async ({ where, data }) => {
 };
 db.userScore.deleteMany = async ({ where }) => ({ count: Number(players.delete(key(where.guildId, where.userId))) });
 db.quizAnswer.deleteMany = async ({ where }) => { assert.equal(where.guildId, "guild"); assert.equal(where.userId, "player"); return { count: 0 }; };
+db.quizVote.deleteMany = db.quizSupport.deleteMany = db.quizWager.deleteMany = async ({where}) => {
+  assert.equal(where.guildId,"guild"); assert.equal(where.userId,"player"); return {count:0};
+};
 db.$transaction = async callback => callback(db);
 function interaction(sub, values = {}, guildId = "guild", userId = "player") {
   const replies = [];

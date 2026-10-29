@@ -30,6 +30,7 @@ export class TopicScheduleNotReadyError extends Error {
 
 export const RANDOM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 export const RANDOM_DAILY_LIMIT = 4;
+export const RANDOM_MAX_DURATION_HOURS = 6;
 const randomDailyScope = "random-daily";
 export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun; timezone?: string };
 
@@ -227,8 +228,8 @@ export function nextTopicRunAt(topic: {
   return +dayStart(nextDay, timezone);
 }
 
-export function validatePollDuration(hours: number): number {
-  if (!Number.isInteger(hours) || hours < 1 || hours > 24) throw new Error("Invalid poll duration");
+export function validatePollDuration(hours: number, maximum = 24): number {
+  if (!Number.isInteger(hours) || hours < 1 || hours > maximum) throw new Error("Invalid poll duration");
   return hours;
 }
 

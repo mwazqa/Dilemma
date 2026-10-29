@@ -14,6 +14,8 @@ import { db } from "./db.js";
 import { supportedLanguages } from "./commands/settings.js";
 import { guildTimezone } from "./services/timezone.js";
 import { handleEndPollButton } from "./commands/poll.js";
+import { handleQuizVote, handleWagerButton, handleWagerModal } from "./commands/quiz-vote.js";
+import { VOTE_PREFIX, WITHDRAW_VOTE_ID, REVEAL_VOTES_ID, FIFTY_FIFTY_ID, WAGER_BUTTON_ID, WAGER_MODAL_PREFIX } from "./services/quiz-voting.js";
 import { routeAutocomplete, routeCommand } from "./commands/dilemma.js";
 import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
@@ -67,6 +69,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isAutocomplete()) {
       await routeAutocomplete(interaction);
       return;
+    }
+    if (interaction.isModalSubmit() && interaction.customId.startsWith(WAGER_MODAL_PREFIX)) {
+      await handleWagerModal(interaction); return;
+    }
+    if (interaction.isButton() && interaction.customId === WAGER_BUTTON_ID) {
+      await handleWagerButton(interaction); return;
+    }
+    if (interaction.isButton() && (interaction.customId.startsWith(VOTE_PREFIX) ||
+      [WITHDRAW_VOTE_ID, REVEAL_VOTES_ID, FIFTY_FIFTY_ID].includes(interaction.customId))) {
+      await handleQuizVote(interaction); return;
     }
     if (interaction.isMessageComponent() && interaction.customId.startsWith(TOPIC_LIST_PREFIX)) {
       await handleTopicListComponent(interaction); return;

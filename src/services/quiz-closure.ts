@@ -7,14 +7,19 @@ type QuizIdentity = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 type Closure = Pick<GeneratedPoll, "closedAt" | "closedByUserId" | "closeSource">;
 
 export async function closeQuiz(quiz: QuizIdentity, generated: boolean, userId: string, source: "button" | "command",
-  poll: Pick<Poll, "expiresTimestamp" | "end">) {
-  if (poll.expiresTimestamp && poll.expiresTimestamp <= Date.now()) return null;
+  poll: Pick<Poll, "expiresTimestamp" | "end"> | null) {
+  if (poll?.expiresTimestamp && poll.expiresTimestamp <= Date.now()) return null;
   return db.$transaction(async tx => {
     const identity = { messageId: quiz.messageId, guildId: quiz.guildId, channelId: quiz.channelId };
+    if (!poll) {
+      const active = await tx.quizSettlement.updateMany({ where: { ...identity, votingMode: "buttons", scoredAt: null,
+        closedAt: null, expiresAt: { gt: new Date() } }, data: { votingMode: "buttons" } });
+      if (!active.count) return null;
+    }
     const request = { where: { ...identity, endedAt: null, closedAt: null }, data: { closedByUserId: userId, closeSource: source } };
     const claim = generated ? await tx.generatedPoll.updateMany(request) : await tx.randomPoll.updateMany(request);
     if (!claim.count) return null;
-    await poll.end();
+    if (poll) await poll.end();
     const closedAt = new Date();
     const completion = { where: identity, data: { closedAt } };
     if (generated) await tx.generatedPoll.updateMany(completion);

@@ -69,7 +69,7 @@ function interaction(sub, confirm = false, guildId = "guild") {
     deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); payloads.push(payload); }, replies, payloads };
 }
 const profile = interaction("profile"); await routeCommand(profile);
-assert.equal(profile.replies[0], null, "No duplicate profile text above the card");
+assert.equal(profile.replies[0], message("pl", "sparksBalance", { count: player.sparks }), "Show wallet balance alongside the card");
 assert.equal(profile.payloads[0].embeds.length, 1);
 const profileEmbed = profile.payloads[0].embeds[0].toJSON();
 assert.equal(profileEmbed.image.url, "attachment://quiz-profile.png");
@@ -109,12 +109,15 @@ db.userScore.findMany = findPlayers;
 const dm = interaction("profile", false, null); await handleScore(dm); assert.equal(dm.replies[0], message("en", "serverOnly"));
 let deletions = 0;
 db.$transaction = async cb => cb({
+  quizVote: { deleteMany: async () => { deletions++; } },
+  quizSupport: { deleteMany: async () => { deletions++; } },
+  quizWager: { deleteMany: async () => { deletions++; } },
   quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
   userScore: { deleteMany: async () => { deletions++; } } });
 const unconfirmed = interaction("forget");
 await routeCommand(unconfirmed); assert.equal(deletions, 0);
 assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
-const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 2); assert.equal(forgotten.replies[0], message("pl", "scoreForgotten"));
+const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 5); assert.equal(forgotten.replies[0], message("pl", "scoreForgotten"));
 assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "badge", "forget"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };

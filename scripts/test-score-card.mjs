@@ -144,7 +144,7 @@ assert.equal(replies[0].embeds[0].toJSON().title, "Test");
 assert.ok(replies[0].embeds[0].toJSON().description.includes("#13"));
 assert.ok(!replies[0].embeds[0].toJSON().description.includes("w rankingu serwera"));
 assert.ok(!replies[0].embeds[0].toJSON().description.includes("Następny: poziom"));
-assert.equal(replies[0].embeds[0].toJSON().fields[1].value, "1 (100%)", "Text fallback uses the same compact correct-answer statistic");
+assert.equal(replies[0].embeds[0].toJSON().fields.find(field => field.name.includes("Poprawne")).value, "1 (100%)", "Text fallback uses the same compact correct-answer statistic");
 assert.deepEqual(replies[0].allowedMentions.parse, []);
 await db.$disconnect();
 if (process.argv.includes("--preview")) {

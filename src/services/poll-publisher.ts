@@ -6,9 +6,9 @@ import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { message, normalizeLanguage } from "../messages.js";
 import { getVotePrompt } from "../brand.js";
-import { settlementData } from "./scoring.js";
-import { claimQuizRun, quizDay, RANDOM_DAILY_LIMIT, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
-import { pollControls } from "./poll-controls.js";
+import { buttonSettlementData, quizVotingPayload } from "./quiz-voting.js";
+import { normalizeRandomCategory, recentRandomCategories } from "./random-categories.js";
+import { claimQuizRun, quizDay, RANDOM_DAILY_LIMIT, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { guildTimezone } from "./timezone.js";
@@ -65,17 +65,14 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
       if (beforeSend.pingRoleId !== pingRoleId) pingRoleId = null;
     }
     const questionNumber = topic.questionsGenerated + 1;
+    const expiresAt = new Date(Date.now() + duration * 3_600_000);
     sendAttempted = true;
     const sentPoll = await channel.send({
       content: `${pingRoleId ? `<@&${pingRoleId}>\n` : ""}**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [], roles: pingRoleId ? [pingRoleId] : [], users: [], repliedUser: false },
-      components: pollControls(language),
-      poll: { question: { text: question.question }, answers: question.options.map((text, index) => {
-        const emoji = question.optionEmojis[index] ?? "";
-        return emoji ? { text, emoji } : { text };
-      }), duration, allowMultiselect: false }
+      ...await quizVotingPayload(question, expiresAt, language)
     }).catch(error => { throw new QuizPublicationError(error); });
-    const settlement = settlementData(sentPoll, topic.guildId, difficulty, question.options, question.correctOption);
+    const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId: topic.guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     const updatedTopic = await db.$transaction(async tx => {
       const updated = await tx.topic.update({
         where: { id: topic.id },
@@ -118,44 +115,44 @@ export async function publishRandomQuestion(
   optionCount: number,
   channel: SendableChannels,
   difficulty: Difficulty = defaultDifficulty,
-  durationHours = 24,
+  durationHours = RANDOM_MAX_DURATION_HOURS,
   options: string[] = [],
   creatorUserId: string | null = null
 ): Promise<string> {
-  const duration = validatePollDuration(durationHours);
+  const duration = validatePollDuration(durationHours, RANDOM_MAX_DURATION_HOURS);
   await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
   let run = await claimQuizRun(guildId, undefined, new Date(), true, guildTimezone(settings));
   let sendAttempted = false;
   try {
     const language = normalizeLanguage(settings?.language ?? "en");
-    const previousQuestions = (await db.randomPoll.findMany({
+    const history = await db.randomPoll.findMany({
       where: { guildId },
-      select: { question: true },
+      select: { question: true, category: true },
       orderBy: { createdAt: "desc" },
       take: randomQuestionHistoryLimit
-    })).map((poll) => poll.question);
+    });
+    const previousQuestions = history.map(poll => poll.question);
+    const recentCategories = options.length ? [] : recentRandomCategories(history.map(poll => poll.category));
     const question = await generateUniqueQuestion(
-      "a random, surprising and family-friendly general-knowledge topic",
+      "a freely chosen, random, surprising and family-friendly general-knowledge topic" + (options.length ? " suited to the supplied answers" : ""),
       language,
       options,
       optionCount,
       previousQuestions,
-      difficulty
+      difficulty,
+      recentCategories
     );
     run = await refreshRandomQuizRun(run, guildTimezone(await getGuildSettings(guildId)));
     await requireQuizChannel(guildId, channel.id);
+    const expiresAt = new Date(Date.now() + duration * 3_600_000);
     sendAttempted = true;
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [] },
-      components: pollControls(language),
-      poll: { question: { text: question.question }, answers: question.options.map((text, index) => {
-        const emoji = question.optionEmojis[index] ?? "";
-        return emoji ? { text, emoji } : { text };
-      }), duration, allowMultiselect: false }
+      ...await quizVotingPayload(question, expiresAt, language)
     }).catch(error => { throw new QuizPublicationError(error); });
-    const settlement = settlementData(sentPoll, guildId, difficulty, question.options, question.correctOption);
+    const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     await db.$transaction(async tx => {
       await tx.randomPoll.create({
         data: {
@@ -163,6 +160,7 @@ export async function publishRandomQuestion(
           creatorUserId,
           difficulty,
           language,
+          category: options.length ? null : question.topic,
           messageId: sentPoll.id,
           channelId: channel.id,
           question: question.question,
@@ -194,13 +192,15 @@ async function generateUniqueQuestion(
   allowedOptions: string[],
   optionCount: number,
   previousQuestions: string[],
-  difficulty: Difficulty = defaultDifficulty
+  difficulty: Difficulty = defaultDifficulty,
+  avoidTopics: string[] = []
 ) {
   const normalizedPrevious = new Set(previousQuestions.map(normalizeQuestionText));
+  const recentCategories = new Set(avoidTopics.map(normalizeRandomCategory));
   const signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal, difficulty);
-    if (!normalizedPrevious.has(normalizeQuestionText(question.question))) return question;
+    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal, difficulty, avoidTopics);
+    if (!normalizedPrevious.has(normalizeQuestionText(question.question)) && !recentCategories.has(normalizeRandomCategory(question.topic))) return question;
     previousQuestions.push(question.question);
   }
   throw new AiGenerationError("invalid-response");

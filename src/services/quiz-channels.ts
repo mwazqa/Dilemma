@@ -18,7 +18,7 @@ export async function resolveQuizChannel(guild: Guild | null, channelId: string,
   if (checkPermissions) {
     const member = guild.members.me ?? await guild.members.fetchMe().catch(() => null);
     if (!member || !channel.permissionsFor(member)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages,
-      PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendPolls])) throw new QuizChannelAccessError("quizChannelPermissions");
+      PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory])) throw new QuizChannelAccessError("quizChannelPermissions");
   }
   return channel;
 }

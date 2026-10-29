@@ -1,4 +1,4 @@
-import { MessageFlags, type ButtonInteraction, type ChatInputCommandInteraction, type InteractionEditReplyOptions } from "discord.js";
+import { MessageFlags, type ButtonInteraction, type ChatInputCommandInteraction, type ModalSubmitInteraction, type InteractionEditReplyOptions } from "discord.js";
 import { getGuildSettings } from "./services/guild-settings.js";
 import { message, normalizeLanguage, type MessageKey } from "./messages.js";
 import { textPages } from "./formatting.js";
@@ -10,7 +10,7 @@ export function interactionLanguage(interaction: { locale: string }): string {
 export function rememberLanguage(interaction: object, language: string) {
   interactionLanguages.set(interaction, normalizeLanguage(language));
 }
-export async function openFeedback(interaction: ChatInputCommandInteraction | ButtonInteraction) {
+export async function openFeedback(interaction: ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const settings = interaction.guildId
     ? await getGuildSettings(interaction.guildId)

@@ -218,6 +218,7 @@ try {
   db.randomPoll.findUnique = async ({ where }) => { const poll = polls.get(where.messageId); return poll?.kind === "random" ? poll : null; };
   db.randomPoll.updateMany = db.generatedPoll.updateMany;
   db.$transaction = async work => work(db);
+  db.quizVote.findMany = db.quizWager.findMany = async () => [];
   fetchFixture = async () => {
     aiCalls++;
     const question = { language: settings.language, topic: "Test", question: `Question ${aiCalls}?`, options: ["A", "B"],
@@ -230,7 +231,7 @@ try {
       end: async () => { quizzes.get(id).expiresAt = new Date(now); }
     } }) },
     send: async payload => {
-      if (!payload.poll) return;
+      if (!payload.poll && !payload.embeds) return;
       const id = `poll-${++sent}`;
       return { id, channelId: "channel", poll: { allowMultiselect: false,
         expiresAt: new Date(now + quizDuration(payload) * 3_600_000),
@@ -258,6 +259,11 @@ try {
       memberPermissions: { has: () => true }, options: { getSubcommand: () => sub, getRole: key => values[key] ?? null, getBoolean: key => values[key] ?? null, getChannel: key => values[key] ?? null, getString: key => values[key] ?? null, getInteger: key => values[key] ?? null },
       deferReply: async () => {}, editReply: async () => {} };
   }
+  async function waitForPublication(expected) {
+    const deadline = performance.now() + 5_000;
+    while (!quizzes.has(`poll-${expected}`) && performance.now() < deadline) await new Promise(resolve => realSetTimeout(resolve, 10));
+    await flush();
+  }
 
   stage = "idle";
   now = Date.parse("2026-10-18T08:00:00Z");
@@ -280,6 +286,7 @@ try {
   assert.equal(topicReads, beforeDue);
   assert.equal(aiCalls, 0);
   await advance(1);
+  await waitForPublication(1);
   assert.equal(sent, 1);
   assert.equal(aiCalls, 1);
   assert.ok(quizzes.has("poll-1"), "Publication registers scoring only after commit");
@@ -300,6 +307,7 @@ try {
   assert.equal(topic.enabled, false, "Configuring a disabled topic must not enable it");
   await handleTopic(interaction("enable", { name: topic.name }));
   await advance(2 * 3_600_000);
+  await waitForPublication(2);
   assert.equal(sent, 2, "Changing a schedule immediately replaces its timer");
   await handleEndPollButton(interaction("end", { messageId: "poll-2" }));
   await advance(0);
@@ -436,6 +444,7 @@ try {
   assert.equal(topicReads, beforeDatedReads, "A future start date needs no periodic SQL");
   assert.equal(sent, beforeDated);
   await advance(1);
+  await waitForPublication(beforeDated + 1);
   assert.equal(sent, beforeDated + 1);
   const afterFirstReads = topicReads;
   await advance(6 * 86_400_000);
@@ -444,6 +453,7 @@ try {
   await advance(3 * 86_400_000);
   stopTopic = startScheduler(client);
   await advance(0);
+  await waitForPublication(beforeDated + 2);
   assert.equal(sent, beforeDated + 2, "Restart catches up one overdue fixed-date slot");
   assert.equal(nextTopicRunAt(dated), firstDue + 14 * 86_400_000, "Catch-up cannot move the next anchored date");
   stopTopic();

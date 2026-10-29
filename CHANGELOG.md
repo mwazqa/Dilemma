@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v3.4.0 - 2026-10-29
+
+- Render quiz cards locally in navy, lavender and gold, with adaptive layouts for 2-4 answers, complete alternative text and a text fallback. Keep only the question, answers and voting duration on the card, with Discord controls below it.
+- Limit random quiz voting to 1-6 hours, cap omitted saved defaults at 6 hours and retain the 1-24 hour range for saved topics. Let AI freely generate random topics, supplying the last 64 generated topics per server as subjects to avoid when custom answers are absent. Reject normalized topic-title repeats within the existing retry budget; no fixed category list is used.
+- Use persistent button voting for new quizzes so option counts stay hidden until closing. Preserve vote changes, withdrawal, manual closing, restart recovery, final result delivery and legacy native-poll settlement. Publish final counts for every answer, including zero votes.
+- Add localized Sparks wallets per player and server: 1/2/3 for a correct easy/medium/hard answer and 5 per gained level, awarded once at settlement. The first vote is free; withdrawal or changing an answer costs 1 Spark. Private counts and 50/50 each cost 5 once per quiz, with free reopening. The 50/50 hint keeps two choices privately and is unavailable for two-answer quizzes.
+- Add bets of 1-20 Sparks on the player's current answer. Deduct the stake when placed, move the bet with answer changes and refund it on withdrawal with the 1-Spark fee. Correct answers pay twice the stake in total; wrong answers lose the stake. Settle votes, rewards and payouts atomically once and preserve balances during concurrent requests and failures. Add privacy deletion, SQLite/PostgreSQL migrations and isolated integration tests. Apply migrations, regenerate Prisma and re-register commands before deployment; historical scores receive no backfill.
+
 ## v3.3.4 - 2026-10-28
 
 - Increase the per-server random duplicate-check history from 365 to 1460 questions, derived from 365 times the daily random limit. Keep saved topics at 365 questions, the AI avoidance prompt at 20 and the existing retry budget. Cover normalized duplicates beyond the old window, the new boundary and questions outside it; no migration or command registration is required.

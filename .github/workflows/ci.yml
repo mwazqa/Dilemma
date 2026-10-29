@@ -43,6 +43,8 @@ jobs:
         run: npm run build
       - name: Test migrations and features
         run: npm run test:db:fresh && npm run test:ai && npm run test:features && npm run test:command-ux && npm run test:feedback-layout && npm run test:topic-list && npm run test:quiz-notifications && npm run test:quiz-channels && npm run test:native-polls && npm run test:permissions && npm run test:quiz-limits && npm run test:topic-calendar && npm run test:timezones && npm run test:idle-database && npm run test:poll-controls && npm run test:scoring && npm run test:experience && npm run test:achievements && npm run test:score-card && npm run test:privacy
+      - name: Test quiz voting, tools and topic history
+        run: npm run test:quiz-updates && npm run test:quiz-card
   postgres:
     runs-on: ubuntu-latest
     services:
@@ -86,3 +88,5 @@ jobs:
         run: npm run db:migrate:postgres
       - name: Test PostgreSQL migrations and concurrency
         run: node scripts/test-postgres-migration.mjs && node scripts/test-scoring-postgres.mjs && npm run test:topic-calendar:postgres && npm run test:random:postgres && npm run test:topic-limit:postgres && npm run test:results:postgres
+      - name: Test paid quiz tools and bets
+        run: npm run test:quiz-tools:postgres

@@ -108,7 +108,7 @@ db.topic.update = async ({ data }) => {
 let randomHistory = [], topicHistory = [];
 db.randomPoll.findMany = async ({ where, select, orderBy, take }) => {
   assert.deepEqual(where, { guildId: "guild" });
-  assert.deepEqual(select, { question: true });
+  assert.deepEqual(select, { question: true, category: true });
   assert.deepEqual(orderBy, { createdAt: "desc" });
   assert.equal(take, 1460);
   return randomHistory.slice(0, take);
@@ -128,13 +128,14 @@ db.$transaction = async callback => callback(db);
 let lastPrompt;
 let counter = 0;
 let questionTexts = [];
+let topicTitles = [];
 globalThis.fetch = async (_, options) => {
   const body = JSON.parse(options.body);
   assert.ok(body.instructions.includes(`(${settings.language})`));
   lastPrompt = body.input;
   assert.equal(body.reasoning.effort, "low");
   counter++;
-  const q = { language: settings.language, topic: "Test", question: questionTexts.shift() ?? `Pytanie ${counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
+  const q = { language: settings.language, topic: topicTitles.shift() ?? "Test", question: questionTexts.shift() ?? `Pytanie ${counter}?`, options: ["A", "B", "C", "D"], topicEmoji: "", optionEmojis: ["", "", "", ""], correctOption: 0, explanation: "Fakt." };
   return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(q) }] }] }), { headers: { "content-type": "application/json" } });
 };
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
@@ -167,8 +168,8 @@ const { DailyQuizLimitError, RandomQuizCooldownError } = await import("../dist/s
 const { handlePing } = await import("../dist/commands/ping.js");
 let sent;
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
-  assert.equal(payload.components.at(-1).toJSON().components[0].custom_id, "quiz:end");
-  assert.equal(payload.components.at(-1).toJSON().components[0].disabled, false);
+  assert.equal(payload.components.at(-1).toJSON().components.at(-1).custom_id, "quiz:end");
+  assert.notEqual(payload.components.at(-1).toJSON().components.at(-1).disabled, true);
   assert.equal(payload.flags, undefined, "Polls use classic components, not Components V2");
   sent = payload; return { id: `message-${counter}`, channelId: "channel", poll: { allowMultiselect: false, expiresAt: new Date(Date.now() + 86400000), answers: new Map(quizAnswers(payload).map((answer, i) => [7 + i * 3, { id: 7 + i * 3, text: answer.text }])) } }; } };
 function interaction(subcommand, values = {}, permitted = true) {
@@ -329,7 +330,7 @@ for (const command of [dilemmaCommand.toJSON()]) {
   for (const sub of command.options) {
     assert.ok(!sub.options?.some(option => option.name === "questions_per_run"));
     const duration = sub.options?.find(option => option.name === "duration_hours");
-    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, 24); }
+    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, sub.name === "random" ? 6 : 24); }
   }
   for (const sub of command.options.filter(sub => ["create", "configure", "random"].includes(sub.name))) {
     const option = sub.options.find(option => option.name === "difficulty");
@@ -392,6 +393,27 @@ await handleTopic(interaction("random", { option_count: 4 }));
 assert.equal(counter, beforeOutsideRandomHistory + 1);
 assert.equal(randomPoll.question, randomHistory[1460].question, "Random questions outside the 1460-row window are not retained");
 randomHistory = []; topicHistory = [];
+const recentTopics = ["Astronomy", ...Array.from({ length: 63 }, (_, index) => `Open topic ${index + 2}`), "Robotics"];
+randomHistory = recentTopics.map((category, index) => ({ category, question: `Recent subject ${index}?` }));
+topicTitles = ["  ASTRONOMY!  ", recentTopics[63], "Urban planning"];
+const beforeCategoryRepeat = counter;
+await handleTopic(interaction("random", { option_count: 4 }));
+assert.equal(counter, beforeCategoryRepeat + 3, "The newest and 64th topics are retried even if their questions differ");
+assert.equal(randomPoll.category, "Urban planning", "Persist the AI-generated topic without restricting it to a list");
+assert.ok(lastPrompt.includes(JSON.stringify(recentTopics.slice(0, 64))));
+assert.ok(!lastPrompt.includes('"Robotics"'), "The 65th topic is outside the avoidance window");
+topicTitles = ["Robotics"];
+const beforeOutsideCategoryHistory = counter;
+await handleTopic(interaction("random", { option_count: 4 }));
+assert.equal(counter, beforeOutsideCategoryHistory + 1);
+assert.equal(randomPoll.category, "Robotics", "The 65th topic is eligible again");
+topicTitles = ["Astronomy", "astronomy", "ASTRONOMY!"];
+const previousPoll = randomPoll;
+const beforeCategoryFailure = counter;
+await handleTopic(interaction("random", { option_count: 4 }));
+assert.equal(counter, beforeCategoryFailure + 3, "Repeated categories keep the existing retry budget");
+assert.equal(randomPoll, previousPoll, "A repeated category is never published after retries are exhausted");
+randomHistory = [];
 const establishedSettings = settings;
 settings = undefined;
 const firstTimezone = interaction("timezone", { value: "UTC" });

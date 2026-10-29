@@ -10,7 +10,7 @@ import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSe
 import { message, normalizeLanguage } from "../messages.js";
 
 export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("score").setDescription("Your Dilemma score and server leaderboard.")
-  .addSubcommand(sub => sub.setName("profile").setDescription("Show quiz level, EXP, points, accuracy and correct-answer streaks.")
+  .addSubcommand(sub => sub.setName("profile").setDescription("Show quiz level, EXP, points, Sparks, accuracy and correct-answer streaks.")
     .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
   .addSubcommand(sub => sub.setName("leaderboard").setDescription("Show this server's top ten players."))
   .addSubcommand(sub => sub.setName("achievements").setDescription("Show unlocked quiz achievements and progress on this server.")
@@ -22,7 +22,7 @@ export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("sc
       .setAutocomplete(true).setMaxLength(32))
     .addStringOption(option => option.setName("achievement_3").setDescription("Third unlocked badge; omit to show fewer badges.")
       .setAutocomplete(true).setMaxLength(32)))
-  .addSubcommand(sub => sub.setName("forget").setDescription("Delete your stored quiz answers and score on this server.")
+  .addSubcommand(sub => sub.setName("forget").setDescription("Delete your answers, score, Sparks, tools and bets on this server.")
     .addBooleanOption(option => option.setName("confirm").setDescription("Confirm permanent deletion. Future votes can earn points again.").setRequired(true)));
 
 const rankIcons = ["🥇", "🥈", "🥉"];
@@ -64,6 +64,9 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   if (sub === "forget") {
     if (!interaction.options.getBoolean("confirm", true)) { await reply(text("forgetConfirm")); return; }
     await db.$transaction(async tx => {
+      await tx.quizVote.deleteMany({ where: { guildId, userId: interaction.user.id } });
+      await tx.quizSupport.deleteMany({ where: { guildId, userId: interaction.user.id } });
+      await tx.quizWager.deleteMany({ where: { guildId, userId: interaction.user.id } });
       await tx.quizAnswer.deleteMany({ where: { guildId, userId: interaction.user.id } });
       await tx.userScore.deleteMany({ where: { guildId, userId: interaction.user.id } });
     }, { isolationLevel: "Serializable" });
@@ -94,6 +97,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   const displayName = (interaction.guild?.members.cache.get(user.id)?.displayName
     ?? user.displayName ?? user.username ?? text("scorePlayer")).replace(/[\r\n]+/g, " ");
   const badges = selectedAchievements(player);
+  const balance = text("sparksBalance", { count: player?.sparks ?? 0 });
   if (sub === "achievements") {
     const progress = achievementProgress(player);
     const embed = new EmbedBuilder().setColor(0xad94f3)
@@ -132,7 +136,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   if (card) {
     const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.points}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
     const attachment = new AttachmentBuilder(card, { name: "quiz-profile.png", description: boundedText(alt, 1000) });
-    await reply({ content: null, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
+    await reply({ content: balance, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
     return;
   }
   const embed = new EmbedBuilder()
@@ -140,6 +144,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     .setTitle(boundedText(title, 250))
     .setDescription(`**${cardData.level}** · ${rank === null ? rankLabel : `#${rank}`}\n${text("scorePoints", { points: player?.points ?? 0 })}\n${cardData.experience}\n${progressBar(progress.percent)}`)
     .addFields(
+      { name: text("sparksName"), value: String(player?.sparks ?? 0), inline: true },
       { name: `📚 ${text("scoreAnswers")}`, value: String(answered), inline: true },
       { name: `✅ ${text("scoreCorrect")}`, value: cardData.correct, inline: true },
       { name: `🔥 ${text("scoreStreak")}`, value: `${player?.currentStreak ?? 0} / ${player?.bestStreak ?? 0}`, inline: true }

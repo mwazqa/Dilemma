@@ -1,0 +1,2 @@
+ALTER TABLE "RandomPoll" ADD COLUMN "category" TEXT;
+ALTER TABLE "UserScore" ADD COLUMN "sparks" INTEGER NOT NULL DEFAULT 0 CHECK ("sparks" >= 0);

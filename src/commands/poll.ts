@@ -6,6 +6,7 @@ import { disablePollControls, END_QUIZ_BUTTON_ID } from "../services/poll-contro
 import { canManageDilemma } from "../services/management-permissions.js";
 import { publishQuizResults } from "../services/quiz-results.js";
 import { closeQuiz } from "../services/quiz-closure.js";
+import { collectFinalVotes, applyFinalVotes } from "../services/scoring.js";
 
 const closingPolls = new Set<string>();
 
@@ -58,8 +59,10 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
     }
 
     const poll = generatedPoll ?? randomPoll!;
+    const settlement = await db.quizSettlement.findUnique({ where: { messageId } });
+    const buttons = settlement?.votingMode === "buttons";
     const message = await channel.messages.fetch(messageId);
-    if (!message.poll || poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
+    if ((!message.poll && !buttons) || poll.guildId !== interaction.guildId || poll.channelId !== channel.id || message.author.id !== interaction.client.user.id) {
       await reply(text("notPoll"));
       return;
     }
@@ -74,8 +77,13 @@ async function endQuiz(interaction: ChatInputCommandInteraction | ButtonInteract
     }
     closingPolls.add(messageId);
     try {
-      const closedAt = await closeQuiz({ messageId, guildId: interaction.guildId, channelId: channel.id }, Boolean(generatedPoll), interaction.user.id, source, message.poll);
+      const closedAt = await closeQuiz({ messageId, guildId: interaction.guildId, channelId: channel.id }, Boolean(generatedPoll), interaction.user.id, source, buttons ? null : message.poll);
       if (closedAt) scheduleEvents.emit("settlementClosed", messageId, closedAt);
+      if (buttons) {
+        const final = await collectFinalVotes(interaction.client, settlement);
+        if (!final) { await reply(text("pollClosing")); return; }
+        await applyFinalVotes(settlement, final.votes, final.finishedAt);
+      }
       await disablePollControls(interaction.client, channel.id, messageId, language);
       await publishQuizResults(interaction.client, poll, language, payload => channel.send(payload));
       await reply(text("pollDone"));
