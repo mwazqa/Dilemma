@@ -6,9 +6,11 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
+Version v3.4.1 restores Dilemma's voice and kaomoji in feedback, preserves quiz frame corners under rounded image clipping and places the Sparks icon and balance inside the profile card. Upgrading from v3.4.0 needs no migration or command registration.
+
 Version v3.4.0 requires the additive `20261029120000_random_topics_sparks` and `20261029130000_button_quiz_tools` migrations, Prisma client regeneration and Discord command registration. New random quizzes last 1-6 hours; omitted durations use the saved default capped at 6 hours. Saved topics keep their 1-24 hour range. New quizzes use persistent button votes; existing native Discord polls continue through the legacy finalized-results flow and retain Discord's visible counts and normal voting controls.
 
-Code version: `v3.4.0`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.4.1`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Quiz cards are rendered locally in navy, lavender and gold, with the question, answer choices and voting duration. Topic and difficulty stay above the card. Two answers use one row, three use a centered final answer and four use two rows. Discord buttons below the image handle voting, withdrawal, private counts, 50/50, bets and closing. The image includes full alternative text; rendering failures or missing Attach Files permission use a complete text fallback. The duration on the image is static, not a countdown.
 
@@ -295,7 +297,7 @@ The preview button spends 5 Sparks once to unlock counts for one quiz. The previ
 
 The betting button opens a private form for a whole-number stake of 1-20 Sparks on the player's current answer. The stake is deducted immediately. Only one active bet per player and quiz is allowed; repeated submissions do not charge again. Changing the vote moves the bet to the new answer and costs the normal 1-Spark withdrawal fee. Withdrawing refunds the stake and charges 1 Spark; the fee can come from the refunded stake when the free balance is zero. A correct answer pays twice the stake in total, while a wrong answer loses the stake. Bets change Sparks only, without increasing leaderboard points or EXP. Scoring, awards and bet payouts settle atomically once; result-delivery retries cannot repeat payouts.
 
-Insufficient balance and closed quizzes charge nothing. `/dilemma score profile` shows the balance. Deleting a score also deletes its Sparks, stored button votes, tool unlocks and bets; public final count snapshots remain intact. Deleting a profile does not refund its active bets or recreate a wallet after settlement.
+Insufficient balance and closed quizzes charge nothing. `/dilemma score profile` shows the balance beside a gold spark icon inside the profile card, including zero. The balance remains available in alternative text and the text fallback. Deleting a score also deletes its Sparks, stored button votes, tool unlocks and bets; public final count snapshots remain intact. Deleting a profile does not refund its active bets or recreate a wallet after settlement.
 
 The quiz supports 2-4 answers, with one answer button per option; one-answer quizzes remain invalid. Utility buttons appear below the answer row. Discord controls message and button backgrounds. An embed can use a colored accent or an image, but cannot set the chat background.
 

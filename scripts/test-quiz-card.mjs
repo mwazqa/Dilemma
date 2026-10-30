@@ -13,7 +13,19 @@ try{
     const card=await renderQuizCard("Ile wynosi 7 × 8?",options,6);
     const metadata=await sharp(card).metadata();
     assert.equal(metadata.format,"png");assert.equal(metadata.width,1400);assert.ok(metadata.height>=560&&metadata.height<=1200);
+    const mask=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="${metadata.height}"><rect width="1400" height="${metadata.height}" rx="100" fill="white"/></svg>`);
+    const rounded=await sharp(card).composite([{input:mask,blend:"dest-in"}]).png().toBuffer();
+    const countFrame=async(buffer,left,top)=>{
+      const {data,info}=await sharp(buffer).extract({left,top,width:90,height:90}).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+      let pixels=0;for(let i=0;i<data.length;i+=info.channels)if(data[i]>140&&data[i+1]>100&&data[i+2]>210&&data[i+3]>240)pixels++;
+      return pixels;
+    };
+    for(const[left,top]of [[0,0],[1310,0],[0,metadata.height-90],[1310,metadata.height-90]]){
+      const before=await countFrame(card,left,top),after=await countFrame(rounded,left,top);
+      assert.ok(before>200&&after>=before*0.99,"All four frame corners survive Discord-style rounded clipping");
+    }
     if(preview)writeFileSync(`.tools/quiz-card-preview/${count}-answers.png`,card);
+    if(preview)writeFileSync(`.tools/quiz-card-preview/${count}-answers-rounded.png`,rounded);
   }
   const question=("Które z podanych stwierdzeń opisuje poprawnie wskazane zjawisko? ".repeat(5)).slice(0,300);
   const options=["Odpowiedź pierwsza ","Odpowiedź druga ","Odpowiedź trzecia ","Odpowiedź czwarta "].map(value=>value.repeat(4).slice(0,55));

@@ -4,7 +4,7 @@ Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0
 const { MessageFlags } = await import("discord.js");
 const { inlineText, textPages } = await import("../dist/formatting.js");
 const { openFeedback } = await import("../dist/feedback.js");
-const { message, messageLanguages } = await import("../dist/messages.js");
+const { message, messageLanguages, feedbackKaomoji } = await import("../dist/messages.js");
 const { getHelpEmbed } = await import("../dist/commands/help.js");
 try {
   assert.equal(inlineText("**Quiz**\nNowy `temat`"), "\\*\\*Quiz\\*\\* Nowy \\`temat\\`");
@@ -27,6 +27,9 @@ try {
   assert.deepEqual(responses.map(item => item.content), pages);
   assert.ok(responses.every(item => item.allowedMentions.parse.length === 0));
   for (const language of messageLanguages) {
+    for(const key of ["randomResetPermission","randomCooldownReset","randomPingRoleInvalid","randomPingSet","randomPingCleared","randomPingCurrent","randomPingUnset","randomReadyPing","topicListNoMatches","topicListInvalid","topicChanged","topicExists","nameInvalid","optionCountInvalid","intervalInvalid","durationInvalid","achievementsSummary","badgeCleared","badgeLocked","badgeUnknown","badgeSelectionInvalid","topicScheduleUnavailable","serverOnly","channel","emptyTopics","optionsMissing","saved","deleted","settingsMissing","notPoll","partial"]){
+      assert.ok(feedbackKaomoji[key]&&message(language,key).includes(feedbackKaomoji[key]),`${key} keeps Dilemma's contextual kaomoji in ${language}`);
+    }
     const summary = message(language, "summary", { name: "Prawda czy absurd?", state: message(language, "enabled"), channel: "<#123>",
       start: "2026-11-01", time: "09:00 (Europe/Warsaw)", days: 7, hours: 15, difficulty: message(language, "hard"), answers: "AI: 2" });
     const created = message(language, "topicCreated", { summary });

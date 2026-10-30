@@ -69,12 +69,13 @@ function interaction(sub, confirm = false, guildId = "guild") {
     deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); payloads.push(payload); }, replies, payloads };
 }
 const profile = interaction("profile"); await routeCommand(profile);
-assert.equal(profile.replies[0], message("pl", "sparksBalance", { count: player.sparks }), "Show wallet balance alongside the card");
+assert.equal(profile.replies[0], null, "Keep the wallet balance inside the profile card");
 assert.equal(profile.payloads[0].embeds.length, 1);
 const profileEmbed = profile.payloads[0].embeds[0].toJSON();
 assert.equal(profileEmbed.image.url, "attachment://quiz-profile.png");
 assert.equal(profileEmbed.fields, undefined, "Do not repeat the image statistics in embed fields");
 const profileAlt = profile.payloads[0].files[0].description;
+assert.ok(profileAlt.includes(`Iskry: ${player.sparks}`));
 assert.match(profileAlt, /Testowy gracz/);
 assert.equal(profileAlt.split("\n")[0], "Testowy gracz", "No quiz-card title or bot-added decorations");
 assert.doesNotMatch(profileAlt, /<@/);

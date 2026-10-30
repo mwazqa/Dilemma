@@ -3,7 +3,7 @@ Object.assign(process.env, { DATABASE_URL: "postgresql://test:test@127.0.0.1:1/d
 const { quizVotingPayload, MAX_WAGER, WITHDRAW_COST, REVEAL_COST, FIFTY_FIFTY_COST } = await import("../dist/services/quiz-voting.js");
 const { recentRandomCategories, normalizeRandomCategory } = await import("../dist/services/random-categories.js");
 const { earnedSparks } = await import("../dist/services/sparks.js");
-const { message, messageLanguages } = await import("../dist/messages.js");
+const { message, messageLanguages, feedbackKaomoji } = await import("../dist/messages.js");
 const { handleWagerButton } = await import("../dist/commands/quiz-vote.js");
 const { dilemmaCommand } = await import("../dist/commands/dilemma.js");
 const { db } = await import("../dist/db.js");
@@ -16,6 +16,13 @@ try {
   assert.equal(earnedSparks(10, 0), 0);
   assert.equal(dilemmaCommand.toJSON().options.find(option => option.name === "random").options.find(option => option.name === "duration_hours").max_value, 6);
   assert.equal(MAX_WAGER, 20); assert.equal(WITHDRAW_COST, 1); assert.equal(REVEAL_COST, 5); assert.equal(FIFTY_FIFTY_COST, 5);
+  const feedbackKeys=["wagerRefunded","wagerExisting","wagerPlaced","wagerVoteFirst","wagerInvalid","fiftyResult","fiftyUnavailable","revealUnlocked","sparksCharged","sparksInsufficient","votingClosed","voteEliminated","voteMissing","voteWithdrawn","voteSaved","randomDurationInvalid"];
+  for(const language of messageLanguages)for(const key of feedbackKeys){
+    const reply=message(language,key,{amount:2,answer:2,payout:4,max:20,cost:5});
+    assert.ok(feedbackKaomoji[key]&&reply.includes(feedbackKaomoji[key]),`${language}: ${key} keeps Dilemma's kaomoji`);
+    assert.ok(reply.includes("~"),`${language}: ${key} keeps Dilemma's warm voice`);
+    assert.doesNotMatch(reply,/\{\w+\}/);assert.ok(reply.length<=2000);
+  }
   for (const language of messageLanguages) for (const count of [2, 3, 4]) {
     const options = ["Alpha", "Beta", "Gamma", "Delta"].slice(0, count);
     const payload = await quizVotingPayload({ question: "Question?", options, optionEmojis: options.map(() => "") }, new Date(Date.now() + 3_600_000), language);

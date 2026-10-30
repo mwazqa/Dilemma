@@ -97,7 +97,6 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   const displayName = (interaction.guild?.members.cache.get(user.id)?.displayName
     ?? user.displayName ?? user.username ?? text("scorePlayer")).replace(/[\r\n]+/g, " ");
   const badges = selectedAchievements(player);
-  const balance = text("sparksBalance", { count: player?.sparks ?? 0 });
   if (sub === "achievements") {
     const progress = achievementProgress(player);
     const embed = new EmbedBuilder().setColor(0xad94f3)
@@ -124,6 +123,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     rank,
     badges: badges.map(badge => ({ id: badge.id, name: text(badge.name) })),
     points: text("scorePoints", { points: player?.points ?? 0 }).replace(/\*\*/g, ""),
+    sparksLabel: text("sparksName"), sparks: String(player?.sparks ?? 0),
     experience: text("scoreExpProgress", { earned: progress.earned, required: progress.required }),
     percent: progress.percent,
     answersLabel: text("scoreAnswers"), answers: String(answered),
@@ -134,9 +134,9 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   try { card = await renderScoreCard(cardData, avatar); }
   catch { }
   if (card) {
-    const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.points}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
+    const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.points}\n${cardData.sparksLabel}: ${cardData.sparks}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
     const attachment = new AttachmentBuilder(card, { name: "quiz-profile.png", description: boundedText(alt, 1000) });
-    await reply({ content: balance, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
+    await reply({ content: null, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
     return;
   }
   const embed = new EmbedBuilder()
@@ -144,7 +144,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     .setTitle(boundedText(title, 250))
     .setDescription(`**${cardData.level}** · ${rank === null ? rankLabel : `#${rank}`}\n${text("scorePoints", { points: player?.points ?? 0 })}\n${cardData.experience}\n${progressBar(progress.percent)}`)
     .addFields(
-      { name: text("sparksName"), value: String(player?.sparks ?? 0), inline: true },
+      { name: `✦ ${cardData.sparksLabel}`, value: cardData.sparks, inline: true },
       { name: `📚 ${text("scoreAnswers")}`, value: String(answered), inline: true },
       { name: `✅ ${text("scoreCorrect")}`, value: cardData.correct, inline: true },
       { name: `🔥 ${text("scoreStreak")}`, value: `${player?.currentStreak ?? 0} / ${player?.bestStreak ?? 0}`, inline: true }

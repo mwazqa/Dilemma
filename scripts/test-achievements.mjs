@@ -110,6 +110,7 @@ for (const language of messageLanguages) {
   assert.ok(choices.replies[0].some(choice => choice.name === message(language, "badgeNone") && choice.value === "none"));
   assert.ok(!choices.replies[0].some(choice => choice.value === "level_5"));
   const card = { title: "Test", level: message(language, "scoreLevel", { level: 2 }), rank: 1,
+    sparksLabel: message(language, "sparksName"), sparks: "42",
     points: message(language, "scorePoints", { points: 10 }).replace(/\*\*/g, ""), experience: "0 / 200 EXP", percent: 0,
     answersLabel: message(language, "scoreAnswers"), answers: "100", correctLabel: message(language, "scoreCorrect"), correct: "10 (10%)",
     streakLabel: message(language, "scoreStreak"), streak: "0 / 10",

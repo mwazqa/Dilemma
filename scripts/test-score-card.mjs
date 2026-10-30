@@ -14,6 +14,7 @@ function data(locale = "pl", name = "Mehow", points = 3) {
     level: message(locale, "scoreLevel", { level: progress.level }),
     rank: 3,
     points: message(locale, "scorePoints", { points }).replace(/\*\*/g, ""),
+    sparksLabel: message(locale, "sparksName"), sparks: "42",
     experience: message(locale, "scoreExpProgress", { earned: progress.earned, required: progress.required }),
     percent: progress.percent, answersLabel: message(locale, "scoreAnswers"), answers: "1",
     correctLabel: message(locale, "scoreCorrect"), correct: "1 (100%)",
@@ -22,6 +23,9 @@ function data(locale = "pl", name = "Mehow", points = 3) {
 const svg = await scoreCardSvg(data());
 assert.ok(svg.includes('width="302.4"'), "30% EXP occupies exactly 30% of the track");
 assert.ok(svg.includes("1 (100%)"));
+assert.ok(svg.includes('id="sparks-wallet"') && svg.includes('<title>Iskry: 42</title>'));
+assert.ok((await scoreCardSvg({ ...data(), sparks: "0" })).includes('<title>Iskry: 0</title>'));
+assert.ok((await scoreCardSvg({ ...data(), sparks: "2147483647" })).includes('>2147483647</text>'));
 assert.ok(!svg.includes("1/1 (100%)"));
 assert.ok(svg.includes("Odpowiedzi"));
 assert.ok(svg.includes(">#3</text>"));
@@ -129,7 +133,7 @@ assert.equal(await serverRank("test", "new", { points: 0, correct: 0, answered: 
 assert.equal(rankCalls, beforeUnranked);
 db.userScore.count = async ({ where }) => { assert.equal(where.guildId, "test"); return 12; };
 assert.equal(await serverRank("test", "1", { points: 3, correct: 1, answered: 1 }), 13);
-db.userScore.findUnique = async () => ({ points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1 });
+db.userScore.findUnique = async () => ({ points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1, sparks: 42 });
 const replies = [];
 const interaction = { guildId: "test", locale: "pl", user: { id: "1", displayName: "Test" },
   options: { getSubcommand: () => "profile", getUser: () => null }, deferReply: async () => {}, editReply: async payload => replies.push(payload) };
@@ -145,6 +149,10 @@ assert.ok(replies[0].embeds[0].toJSON().description.includes("#13"));
 assert.ok(!replies[0].embeds[0].toJSON().description.includes("w rankingu serwera"));
 assert.ok(!replies[0].embeds[0].toJSON().description.includes("Następny: poziom"));
 assert.equal(replies[0].embeds[0].toJSON().fields.find(field => field.name.includes("Poprawne")).value, "1 (100%)", "Text fallback uses the same compact correct-answer statistic");
+assert.equal(replies[0].embeds[0].toJSON().fields.find(field => field.name === "✦ Iskry").value, "42");
+await handleScore(interaction);
+assert.equal(replies[1].content, null, "Wallet balance belongs inside the image, without a separate message above it");
+assert.match(replies[1].files[0].description, /Iskry: 42/);
 assert.deepEqual(replies[0].allowedMentions.parse, []);
 await db.$disconnect();
 if (process.argv.includes("--preview")) {
@@ -155,7 +163,7 @@ if (process.argv.includes("--preview")) {
   if (avatarOption >= 0 && process.argv[avatarOption + 1]) {
     previewAvatar = await sharp(await readFile(process.argv[avatarOption + 1])).resize(144, 144).png().toBuffer();
   }
-  for (const [name, card] of [["profile", data()], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 10)],
+  for (const [name, card] of [["profile", data("pl", "Gracz", 7)], ["zero-sparks", { ...data("pl", "Gracz", 7), sparks: "0" }], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 10)],
     ...[1, 2, 3, 4, null].map(rank => [`rank-${rank ?? "unranked"}`, { ...data(), rank }])]) {
     await writeFile(new URL(`${name}.png`, directory), await sharp(Buffer.from(await scoreCardSvg(card, previewAvatar))).png().toBuffer());
   }

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v3.4.1 - 2026-10-30
+
+- Restore Dilemma's warm voice and contextual kaomoji in voting, Sparks, hint and bet feedback in all six languages. Inset quiz frames so all corners survive rounded image clipping. Show Sparks as a gold spark icon and balance inside the score profile card, including zero, while retaining accessible text and the text fallback.
+
 ## v3.4.0 - 2026-10-29
 
 - Render quiz cards locally in navy, lavender and gold, with adaptive layouts for 2-4 answers, complete alternative text and a text fallback. Keep only the question, answers and voting duration on the card, with Discord controls below it.

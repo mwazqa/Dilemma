@@ -7,6 +7,8 @@ export interface ScoreCardData {
   level: string;
   rank: number | null;
   points: string;
+  sparksLabel: string;
+  sparks: string;
   experience: string;
   percent: number;
   answersLabel: string;
@@ -106,6 +108,7 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
   const badges = (data.badges ?? []).filter((badge, index, all) => isAchievementId(badge.id)
     && all.findIndex(item => item.id === badge.id) === index).slice(0, maxDisplayedBadges);
   const points = await fitText(data.points, badges.length ? 600 : 650, 26, 20, false);
+  const sparks = await fitText(data.sparks, 226, 28, 18);
   const ranked = Number.isSafeInteger(data.rank) && data.rank !== null && data.rank > 0;
   const podium = ranked && data.rank! <= 3;
   const rankStyle = podium ? [
@@ -148,6 +151,12 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
         <text x="823" y="100" text-anchor="middle" font-size="${rank.size}" font-weight="${podium ? "bold" : "normal"}" fill="${rankStyle.color}">${escapeXml(rank.text)}</text>
       </g>
       ${text(56, 207, points.text, points.size, "#b5a2ed")}
+      <g id="sparks-wallet" role="img">
+        <title>${escapeXml(data.sparksLabel)}: ${escapeXml(data.sparks)}</title>
+        <rect x="756" y="213" width="302" height="44" rx="14" fill="#20223e" stroke="#ad94f3" stroke-opacity="0.45"/>
+        <path d="M 783 220 Q 786 232 798 235 Q 786 238 783 250 Q 780 238 768 235 Q 780 232 783 220 Z" fill="#f2c879"/>
+        ${text(812, 245, sparks.text, sparks.size, "#f2c879", true)}
+      </g>
       ${avatarImage}<rect x="914" y="54" width="144" height="144" rx="20" fill="none" stroke="#ad94f3" stroke-width="2"/>
       <rect x="49" y="268" width="1022" height="44" rx="22" fill="none" stroke="#ad94f3" stroke-opacity="0.15" stroke-width="7"/>
       <rect x="49" y="268" width="1022" height="44" rx="22" fill="none" stroke="#ad94f3" stroke-width="1.5"/>
