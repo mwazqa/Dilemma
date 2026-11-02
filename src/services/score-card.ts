@@ -103,12 +103,13 @@ export async function loadAvatar(url?: string): Promise<Buffer | undefined> {
 }
 
 export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promise<string> {
-  const title = await fitText(data.title, 675);
   const level = await fitText(data.level, 340, 32, 24);
   const badges = (data.badges ?? []).filter((badge, index, all) => isAchievementId(badge.id)
     && all.findIndex(item => item.id === badge.id) === index).slice(0, maxDisplayedBadges);
   const points = await fitText(data.points, badges.length ? 600 : 650, 26, 20, false);
   const sparks = await fitText(data.sparks, 226, 28, 18);
+  const sparksWidth = Math.ceil(await textWidth(sparks.text, sparks.size, true)) + 76;
+  const sparksX = 1058 - sparksWidth;
   const ranked = Number.isSafeInteger(data.rank) && data.rank !== null && data.rank > 0;
   const podium = ranked && data.rank! <= 3;
   const rankStyle = podium ? [
@@ -116,7 +117,10 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
     { tier: "silver", color: "#d8e2f4", background: "#3d465d" },
     { tier: "bronze", color: "#dba477", background: "#4c342e" }
   ][data.rank! - 1] : { tier: ranked ? "standard" : "unranked", color: "#aaa0ce", background: "#20223e" };
-  const rank = await fitText(ranked ? `#${data.rank}` : "-", 102, podium ? 34 : 26, 18, podium);
+  const rank = await fitText(ranked ? `#${data.rank}` : "-", 260, podium ? 34 : 26, 18, podium);
+  const rankWidth = Math.ceil(await textWidth(rank.text, rank.size, podium)) + 32;
+  const rankX = 886 - rankWidth;
+  const title = await fitText(data.title, Math.min(675, rankX - 56 - 28));
   const experience = await fitText(data.experience, 790, 25, 18, false);
   const labels = await Promise.all([data.answersLabel, data.correctLabel, data.streakLabel].map(label => fitText(label, 225, 21, 15, false)));
   const values = await Promise.all([data.answers, data.correct, data.streak].map(value => fitText(value, 225, 32, 20)));
@@ -132,11 +136,24 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
       <linearGradient id="background" x2="1" y2="1"><stop stop-color="#0b1432"/><stop offset="1" stop-color="#141a39"/></linearGradient>
       <linearGradient id="exp"><stop stop-color="#a5a7ff"/><stop offset="1" stop-color="#9358f7"/></linearGradient>
       <linearGradient id="rank-fill" x2="1" y2="1"><stop stop-color="${rankStyle.background}"/><stop offset="1" stop-color="#151b38"/></linearGradient>
+      <clipPath id="card-frame"><rect x="19" y="19" width="1082" height="522" rx="24"/></clipPath>
       <clipPath id="avatar"><rect x="914" y="54" width="144" height="144" rx="20"/></clipPath>
       <clipPath id="track"><rect x="56" y="275" width="1008" height="30" rx="15"/></clipPath>
     </defs>
-    <rect width="1120" height="560" rx="24" fill="url(#background)"/>
-    <rect x="19" y="19" width="1082" height="522" rx="24" fill="none" stroke="#9f87ef" stroke-opacity="0.12" stroke-width="9"/>
+    <rect x="19" y="19" width="1082" height="522" rx="24" fill="url(#background)"/>
+    <g clip-path="url(#card-frame)">
+      <g fill="none" stroke="#ad94f3" stroke-opacity="0.25">
+        <path d="M -40 70 C 60 75 140 35 190 -25 M -40 50 C 40 60 95 20 130 -25"/>
+        <path d="M 880 590 C 950 520 1080 560 1160 395 M 945 590 C 1015 535 1100 535 1160 450"/>
+      </g>
+      <g fill="none" stroke="#f2c879" stroke-opacity="0.4">
+        <path d="M -35 65 C 20 68 70 45 100 23 M 930 580 C 1000 525 1090 550 1150 440"/>
+      </g>
+      <g fill="#f2c879" fill-opacity="0.7">
+        <path d="M 100 21 Q 100 29 108 29 Q 100 29 100 37 Q 100 29 92 29 Q 100 29 100 21"/>
+        <path d="M 1030 511 Q 1030 521 1040 521 Q 1030 521 1030 531 Q 1030 521 1020 521 Q 1030 521 1030 511"/>
+      </g>
+    </g>
     <rect x="19" y="19" width="1082" height="522" rx="24" fill="none" stroke="#ad94f3" stroke-width="2"/>
     <g font-family="${cardFont}, Noto Sans, sans-serif">
       ${text(56, 100, title.text, title.size, "#e1e2f7", true)}
@@ -146,16 +163,16 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
           <title>${escapeXml(badge.name)}</title>${achievementIcon(badge.id)}
         </g>`).join("")}</g>` : ""}
       <g id="rank-badge" data-rank-tier="${rankStyle.tier}">
-        ${podium ? `<rect x="756" y="56" width="134" height="64" rx="18" fill="none" stroke="${rankStyle.color}" stroke-opacity="0.18" stroke-width="5"/>` : ""}
-        <rect x="760" y="60" width="126" height="56" rx="14" fill="url(#rank-fill)" stroke="${rankStyle.color}" stroke-opacity="${podium ? 0.9 : 0.3}" stroke-width="${podium ? 2.5 : 1}"/>
-        <text x="823" y="100" text-anchor="middle" font-size="${rank.size}" font-weight="${podium ? "bold" : "normal"}" fill="${rankStyle.color}">${escapeXml(rank.text)}</text>
+        ${podium ? `<rect x="${rankX - 4}" y="56" width="${rankWidth + 8}" height="64" rx="18" fill="none" stroke="${rankStyle.color}" stroke-opacity="0.18" stroke-width="5"/>` : ""}
+        <rect x="${rankX}" y="60" width="${rankWidth}" height="56" rx="14" fill="url(#rank-fill)" stroke="${rankStyle.color}" stroke-opacity="${podium ? 0.9 : 0.3}" stroke-width="${podium ? 2.5 : 1}"/>
+        <text x="${rankX + rankWidth / 2}" y="100" text-anchor="middle" font-size="${rank.size}" font-weight="${podium ? "bold" : "normal"}" fill="${rankStyle.color}">${escapeXml(rank.text)}</text>
       </g>
       ${text(56, 207, points.text, points.size, "#b5a2ed")}
       <g id="sparks-wallet" role="img">
         <title>${escapeXml(data.sparksLabel)}: ${escapeXml(data.sparks)}</title>
-        <rect x="756" y="213" width="302" height="44" rx="14" fill="#20223e" stroke="#ad94f3" stroke-opacity="0.45"/>
-        <path d="M 783 220 Q 786 232 798 235 Q 786 238 783 250 Q 780 238 768 235 Q 780 232 783 220 Z" fill="#f2c879"/>
-        ${text(812, 245, sparks.text, sparks.size, "#f2c879", true)}
+        <rect x="${sparksX}" y="213" width="${sparksWidth}" height="44" rx="14" fill="#20223e" stroke="#ad94f3" stroke-opacity="0.45"/>
+        <path d="M ${sparksX + 27} 220 Q ${sparksX + 30} 232 ${sparksX + 42} 235 Q ${sparksX + 30} 238 ${sparksX + 27} 250 Q ${sparksX + 24} 238 ${sparksX + 12} 235 Q ${sparksX + 24} 232 ${sparksX + 27} 220 Z" fill="#f2c879"/>
+        ${text(sparksX + 56, 245, sparks.text, sparks.size, "#f2c879", true)}
       </g>
       ${avatarImage}<rect x="914" y="54" width="144" height="144" rx="20" fill="none" stroke="#ad94f3" stroke-width="2"/>
       <rect x="49" y="268" width="1022" height="44" rx="22" fill="none" stroke="#ad94f3" stroke-opacity="0.15" stroke-width="7"/>

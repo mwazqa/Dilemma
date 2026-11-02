@@ -28,7 +28,7 @@ try {
     const payload = await quizVotingPayload({ question: "Question?", options, optionEmojis: options.map(() => "") }, new Date(Date.now() + 3_600_000), language);
     assert.equal(payload.poll, undefined);
     const buttons = payload.components.flatMap(row => row.toJSON().components);
-    assert.deepEqual(buttons.map(button => button.custom_id), [...options.map((_, i) => `quiz:vote:${i + 1}`), "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"]);
+    assert.deepEqual(buttons.map(button => button.custom_id), [...options.map((_, i) => `quiz:vote:${i + 1}`), "quiz:me", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"]);
     assert.equal(buttons.find(button => button.custom_id === "quiz:fifty").disabled, count === 2);
     assert.ok(buttons.every(button => button.label.length <= 80));
     assert.ok(payload.components.every(row => row.toJSON().components.length <= 5));

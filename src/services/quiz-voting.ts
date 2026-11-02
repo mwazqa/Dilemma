@@ -4,7 +4,7 @@ import { Prisma, type QuizSettlement } from "@prisma/client";
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { db } from "../db.js";
 import { message } from "../messages.js";
-import { END_QUIZ_BUTTON_ID } from "./poll-controls.js";
+import { END_QUIZ_BUTTON_ID, myQuizButton } from "./poll-controls.js";
 import { renderQuizCard } from "./quiz-card.js";
 import { privateErrorSummary } from "../private-errors.js";
 
@@ -28,6 +28,7 @@ export async function quizVotingPayload(question: { question: string; options: s
     return button;
   }));
   const controls = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    myQuizButton(language),
     new ButtonBuilder().setCustomId(WITHDRAW_VOTE_ID).setLabel(message(language, "withdrawVoteButton", { cost: WITHDRAW_COST })).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(REVEAL_VOTES_ID).setLabel(message(language, "revealVotesButton", { cost: REVEAL_COST })).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(FIFTY_FIFTY_ID).setLabel(message(language, "fiftyFiftyButton", { cost: FIFTY_FIFTY_COST }))

@@ -34,8 +34,33 @@ assert.ok(svg.includes(">Mehow</text>"));
 assert.ok(!svg.includes("Karta quizowa") && !svg.includes("~ ♡"));
 assert.ok(!svg.includes("Następny: poziom"));
 assert.ok(svg.includes('id="rank-badge"'));
-assert.ok(svg.includes('x="823" y="100"'), "Rank sits between the name and avatar, on the name baseline");
+assert.match(svg, /y="100" text-anchor="middle"/, "Rank keeps the name baseline");
 assert.ok(svg.includes('data-rank-tier="bronze"'));
+const frameBounds = (svg, y) => {
+  const frame = svg.match(new RegExp(`<rect x="([\\d.]+)" y="${y}" width="([\\d.]+)"`));
+  assert.ok(frame);
+  return { x: Number(frame[1]), width: Number(frame[2]) };
+};
+const walletFrames = [];
+for (const sparks of ["0", "42", "2147483647"]) {
+  const walletSvg = await scoreCardSvg({ ...data(), sparks });
+  const frame = frameBounds(walletSvg, 213);
+  assert.equal(frame.x + frame.width, 1058, "Wallet stays aligned with the avatar's right edge");
+  assert.ok(walletSvg.includes(`>${sparks}</text>`), "Full balance remains visible");
+  walletFrames.push(frame);
+}
+assert.ok(walletFrames[0].width < walletFrames[1].width && walletFrames[1].width < walletFrames[2].width, "Wallet grows with the balance");
+assert.ok(walletFrames[1].width < 140, "Short balances keep a compact frame");
+const rankFrames = [];
+for (const rank of [null, 4, 1000000, Number.MAX_SAFE_INTEGER]) {
+  const rankedSvg = await scoreCardSvg({ ...data(), rank });
+  const frame = frameBounds(rankedSvg, 60);
+  assert.equal(frame.x + frame.width, 886, "Rank keeps a fixed gap before the avatar");
+  assert.ok(rankedSvg.includes(rank === null ? ">-</text>" : `>#${rank}</text>`), "Full rank remains visible");
+  rankFrames.push(frame);
+}
+assert.ok(rankFrames.every((frame, index) => index === 0 || frame.width > rankFrames[index - 1].width), "Rank frame grows with its value");
+assert.ok(rankFrames[1].width < 100, "Single-digit ranks keep a compact frame");
 for (const [rank, tier, color] of [[1, "gold", "#f2c879"], [2, "silver", "#d8e2f4"], [3, "bronze", "#dba477"], [4, "standard", "#aaa0ce"], [1000000, "standard", "#aaa0ce"], [null, "unranked", "#aaa0ce"]]) {
   const rankedSvg = await scoreCardSvg({ ...data(), rank });
   assert.ok(rankedSvg.includes(`data-rank-tier="${tier}"`));
@@ -59,6 +84,12 @@ const measured = await sharp({ text: { text: escapeXml(long.text), font: `${card
 assert.ok(measured.info.width <= 675);
 const longSvg = await scoreCardSvg(data("pl", longName));
 assert.ok(longSvg.includes(`>${escapeXml(long.text)}</text>`), "The card uses the measured name width, leaving a gap before the rank badge");
+const largeRankSvg = await scoreCardSvg({ ...data("pl", longName), rank: Number.MAX_SAFE_INTEGER });
+const largeRankFrame = frameBounds(largeRankSvg, 60);
+const largeRankTitle = largeRankSvg.match(/<text x="56" y="100" font-size="(\d+)"[^>]*>([^<]*)<\/text>/);
+assert.ok(largeRankTitle);
+const largeRankTitleImage = await sharp({ text: { text: largeRankTitle[2], font: `${cardFont} Bold ${largeRankTitle[1]}`, rgba: true } }).png().toBuffer({ resolveWithObject: true });
+assert.ok(56 + largeRankTitleImage.info.width + 28 <= largeRankFrame.x, "Long names leave space for wide ranks");
 const decoratedName = "Nick~ ♡ **test**";
 assert.ok((await scoreCardSvg(data("pl", decoratedName))).includes(`>${decoratedName}</text>`), "Keep decorations that actually belong to the player's display name");
 for (const locale of messageLanguages) {
@@ -73,6 +104,26 @@ for (const locale of messageLanguages) {
   assert.equal(metadata.height, 560);
   assert.equal(metadata.exif, undefined);
   assert.ok(png.length < 1024 * 1024);
+}
+const profile = await renderScoreCard(data("pl", "Gracz", 7));
+const roundedMask = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560"><rect width="1120" height="560" rx="80" fill="white"/></svg>');
+const roundedProfile = await sharp(profile).composite([{ input: roundedMask, blend: "dest-in" }]).png().toBuffer();
+const pixels = await sharp(profile).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+for (const [x, y] of [[0, 0], [12, 280], [1107, 280], [560, 12], [560, 547]]) {
+  assert.equal(pixels.data[(y * pixels.info.width + x) * pixels.info.channels + 3], 0, "No blue background extends beyond the purple frame");
+}
+const countCornerFrame = async (buffer, left, top) => {
+  const { data, info } = await sharp(buffer).extract({ left, top, width: 72, height: 72 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let count = 0;
+  for (let index = 0; index < data.length; index += info.channels) {
+    if (data[index] > 140 && data[index + 1] > 100 && data[index + 2] > 210 && data[index + 3] > 240) count++;
+  }
+  return count;
+};
+for (const [left, top] of [[0, 0], [1048, 0], [0, 488], [1048, 488]]) {
+  const before = await countCornerFrame(profile, left, top);
+  const after = await countCornerFrame(roundedProfile, left, top);
+  assert.ok(before > 100 && after >= before * 0.99, "All four purple corners survive Discord-style rounded clipping");
 }
 const zero = await scoreCardSvg(data("pl", "Mehow", 10));
 assert.ok(!zero.includes("Następny: poziom"));
@@ -163,9 +214,10 @@ if (process.argv.includes("--preview")) {
   if (avatarOption >= 0 && process.argv[avatarOption + 1]) {
     previewAvatar = await sharp(await readFile(process.argv[avatarOption + 1])).resize(144, 144).png().toBuffer();
   }
-  for (const [name, card] of [["profile", data("pl", "Gracz", 7)], ["zero-sparks", { ...data("pl", "Gracz", 7), sparks: "0" }], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 10)],
+  for (const [name, card] of [["profile", data("pl", "Gracz", 7)], ["zero-sparks", { ...data("pl", "Gracz", 7), sparks: "0" }], ["large-values", { ...data("pl", "Gracz", 7), sparks: "2147483647", rank: Number.MAX_SAFE_INTEGER }], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 10)],
     ...[1, 2, 3, 4, null].map(rank => [`rank-${rank ?? "unranked"}`, { ...data(), rank }])]) {
     await writeFile(new URL(`${name}.png`, directory), await sharp(Buffer.from(await scoreCardSvg(card, previewAvatar))).png().toBuffer());
   }
+  await writeFile(new URL("profile-rounded.png", directory), roundedProfile);
 }
-console.log("PASS: six-locale nickname-only PNG cards, compact podium and standard ranks, long-name spacing, exact progress and private fallback");
+console.log("PASS: six-locale PNG cards, content-sized balance and rank frames, purple card edge, rounded corners, long-name spacing, exact progress and private fallback");

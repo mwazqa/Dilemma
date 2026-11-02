@@ -10,8 +10,9 @@ export function interactionLanguage(interaction: { locale: string }): string {
 export function rememberLanguage(interaction: object, language: string) {
   interactionLanguages.set(interaction, normalizeLanguage(language));
 }
-export async function openFeedback(interaction: ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+export async function openFeedback(interaction: ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction, update = false) {
+  if (update && "deferUpdate" in interaction && interaction.message?.flags.has(MessageFlags.Ephemeral)) await interaction.deferUpdate();
+  else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const settings = interaction.guildId
     ? await getGuildSettings(interaction.guildId)
     : null;

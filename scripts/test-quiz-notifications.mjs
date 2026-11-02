@@ -159,7 +159,7 @@ try {
     assert.equal(quizAnswers(payload).length, 2);
     assert.equal(payload.embeds.length, 1);
     const buttons = payload.components.flatMap(row => row.toJSON().components);
-    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:vote:1", "quiz:vote:2", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"]);
+    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:vote:1", "quiz:vote:2", "quiz:me", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"]);
   }
   await command("create", { name: "Drugi quiz", option_count: 2, ping_role: { id: roleA } });
   assert.equal([...topics.values()].find(row => row.name === "Drugi quiz").pingRoleId, roleA);

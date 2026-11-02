@@ -89,4 +89,4 @@ jobs:
       - name: Test PostgreSQL migrations and concurrency
         run: node scripts/test-postgres-migration.mjs && node scripts/test-scoring-postgres.mjs && npm run test:topic-calendar:postgres && npm run test:random:postgres && npm run test:topic-limit:postgres && npm run test:results:postgres
       - name: Test paid quiz tools and bets
-        run: npm run test:quiz-tools:postgres
+        run: npm run test:quiz-tools:postgres && npm run test:quiz-personal:postgres

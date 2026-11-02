@@ -148,7 +148,7 @@ try{
   const manual=await createQuiz("manual"); await db.randomPoll.update({where:{messageId:manual.messageId},data:{creatorUserId:"starter"}});
   await castQuizVote(manual,"starter",1);
   const manualResults=[];
-  const buttonClient={...client,rest:{...client.rest,patch:async(_, {body})=>{assert.ok(body.components.every(row=>row.components.every(button=>button.disabled)));}}};
+  const buttonClient={...client,rest:{...client.rest,patch:async(_, {body})=>{assert.ok(body.components.every(row=>row.components.filter(button=>button.custom_id!=="quiz:me").every(button=>button.disabled)));assert.ok(body.components.some(row=>row.components.some(button=>button.custom_id==="quiz:me"&&!button.disabled)));}}};
   const channel={id:manual.channelId,isTextBased:()=>true,isSendable:()=>true,messages:{fetch:async()=>({author:{id:"bot"},poll:null})},send:async payload=>manualResults.push(payload)};
   const button={customId:"quiz:end",guildId,channel,client:buttonClient,message:{id:manual.messageId},user:{id:"starter"},member:{roles:[]},memberPermissions:{has:()=>false},locale:"en",deferReply:async()=>{},editReply:async()=>{}};
   await handleEndPollButton(button); await handleEndPollButton(button); assert.equal(manualResults.length,1); assert.equal(await balance("starter"),2);

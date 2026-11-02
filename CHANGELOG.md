@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v3.5.0 - 2026-11-02
+
+- Add a private quiz panel with the player's saved answer, a green selected-answer button, vote changes, withdrawal and refresh. Keep shared quiz buttons unchanged and validate the quiz, server, channel and player on every action.
+- Show only the two remaining answer buttons in the private panel after buying 50/50. Preserve the saved vote, the one-time 5-Spark purchase and free reopening. Keep the 1-Spark fee for changing or withdrawing a vote.
+- Add My result controls to closed quizzes and published results. Show the player's final choice, correct answer, awarded points, bet stake, total payout and bet profit or loss. Keep pending settlements private and prevent stale panels from changing settled votes or rewards.
+- Size score-profile rank and Sparks frames to their contents, reserve space for wide ranks and long names, remove the navy margin outside the lavender frame and add subtle decorations matching quiz cards. Preserve zero balances, accessible text and all four rounded frame corners.
+- Add isolated PostgreSQL coverage for private choices, personal panel updates, paid changes, 50/50 buttons, bet results, stale controls and player/server/channel isolation. No database migration or Discord command registration is required when upgrading from v3.4.1.
+
 ## v3.4.1 - 2026-10-30
 
 - Restore Dilemma's warm voice and contextual kaomoji in voting, Sparks, hint and bet feedback in all six languages. Inset quiz frames so all corners survive rounded image clipping. Show Sparks as a gold spark icon and balance inside the score profile card, including zero, while retaining accessible text and the text fallback.

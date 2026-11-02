@@ -6,7 +6,7 @@ Dilemma lets Discord communities configure quiz topics and schedules, then answe
 
 ## Current status
 
-Version v3.4.1 restores Dilemma's voice and kaomoji in feedback, preserves quiz frame corners under rounded image clipping and places the Sparks icon and balance inside the profile card. Upgrading from v3.4.0 needs no migration or command registration.
+Version v3.5.0 adds private My answer and My result panels, clickable 50/50 choices and profile frames sized to their contents. Upgrading from v3.4.1 needs no migration or command registration.
 
 Version v3.4.0 requires the additive `20261029120000_random_topics_sparks` and `20261029130000_button_quiz_tools` migrations, Prisma client regeneration and Discord command registration. New random quizzes last 1-6 hours; omitted durations use the saved default capped at 6 hours. Saved topics keep their 1-24 hour range. New quizzes use persistent button votes; existing native Discord polls continue through the legacy finalized-results flow and retain Discord's visible counts and normal voting controls.
 
@@ -286,6 +286,10 @@ The profile progress bar tracks EXP, not correct-answer accuracy. Accuracy is sh
 Correct answers earn 1 point on easy, 2 on medium and 3 on hard. Wrong answers earn zero and reset the correct-answer streak. Not voting does not affect a streak. Streak order follows poll finish times, not background retry order. Equal finish times use message ID order for a stable tie-break.
 
 New quizzes use buttons and store one current answer per member. A member can withdraw or change their answer until the deadline or early closing. Votes, closing and purchases use database transactions; counts are public only in the final result. Existing native Discord polls still wait for finalized Discord results and use actual Discord answer IDs. Both paths award points once for the final answer. A withdrawn vote produces no scored answer and does not reset a streak. No privileged Discord intent is required.
+
+My answer opens a private panel with the saved choice, answer buttons, withdrawal and refresh. The green button marks the player's saved answer, not correctness. Actions within the private panel update that panel; shared quiz buttons keep the same appearance for everyone. After 50/50, only the two remaining answer buttons appear in the private panel. If the saved choice was eliminated, it remains saved until the player changes or withdraws it, with the normal fee. Existing active button quizzes can open the panel after voting or using 50/50; newly published quizzes also include My answer.
+
+My result is available on closed quizzes and their published results. It privately shows the player's final answer, the correct answer, awarded points and bet settlement. Bet statistics show the stake, total payout and profit or loss separately; for example, a winning 10-Spark bet pays 20 Sparks in total for a bet profit of 10 Sparks. Pending settlements show a waiting state without revealing the correct answer. Stale answer buttons cannot change closed votes, charge fees or repeat payouts.
 
 ### Sparks
 

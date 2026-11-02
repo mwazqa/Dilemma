@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { Prisma, type QuizSettlement } from "@prisma/client";
-import { Routes, type Client, type MessageCreateOptions } from "discord.js";
+import { ActionRowBuilder, Routes, type ButtonBuilder, type Client, type MessageCreateOptions } from "discord.js";
 import { db } from "../db.js";
 import { getResultMessage } from "../brand.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { quizClosureSummary } from "./quiz-closure.js";
 import { voteBreakdown } from "./quiz-voting.js";
+import { myQuizButton } from "./poll-controls.js";
 
 type ResultQuiz = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
@@ -32,9 +33,10 @@ export async function publishQuizResults(client: Client, quiz: ResultQuiz, langu
             + (counts ? `\n\n${voteBreakdown(language, storedQuizOptions(poll.options), counts)}` : "")
             + `\n\n${quizClosureSummary(language, closure)}`;
           const nonce = createHash("sha256").update(`quiz-result:${quiz.messageId}`).digest("hex").slice(0, 25);
-          if (send) await send({ content, allowedMentions: { parse: [] }, nonce, enforceNonce: true });
+          const components = [new ActionRowBuilder<ButtonBuilder>().addComponents(myQuizButton(language, quiz.messageId, true))];
+          if (send) await send({ content, components, allowedMentions: { parse: [] }, nonce, enforceNonce: true });
           else await client.rest.post(Routes.channelMessages(quiz.channelId), {
-            body: { content, allowed_mentions: { parse: [] }, nonce, enforce_nonce: true }, signal: AbortSignal.timeout(10_000)
+            body: { content, components: components.map(row => row.toJSON()), allowed_mentions: { parse: [] }, nonce, enforce_nonce: true }, signal: AbortSignal.timeout(10_000)
           });
         }
         await tx.quizSettlement.updateMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId, channelId: quiz.channelId, resultsPending: true },

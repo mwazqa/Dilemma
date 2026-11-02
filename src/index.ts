@@ -21,7 +21,7 @@ import { startScheduler } from "./scheduler.js";
 import { interactionLanguage, rememberLanguage } from "./feedback.js";
 import { message } from "./messages.js";
 import { startScoreScheduler } from "./services/scoring.js";
-import { END_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
+import { END_QUIZ_BUTTON_ID, MY_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 import { cacheGuildSettings } from "./services/guild-settings.js";
 import { handleTopicListComponent, TOPIC_LIST_PREFIX } from "./commands/topic-list.js";
 import { startRandomNotificationScheduler } from "./services/random-notifications.js";
@@ -76,7 +76,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton() && interaction.customId === WAGER_BUTTON_ID) {
       await handleWagerButton(interaction); return;
     }
-    if (interaction.isButton() && (interaction.customId.startsWith(VOTE_PREFIX) ||
+    if (interaction.isButton() && (interaction.customId.startsWith(VOTE_PREFIX) || interaction.customId === MY_QUIZ_BUTTON_ID ||
+      interaction.customId.startsWith(`${MY_QUIZ_BUTTON_ID}:`) ||
       [WITHDRAW_VOTE_ID, REVEAL_VOTES_ID, FIFTY_FIFTY_ID].includes(interaction.customId))) {
       await handleQuizVote(interaction); return;
     }
