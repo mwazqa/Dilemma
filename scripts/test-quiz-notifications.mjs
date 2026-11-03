@@ -166,7 +166,7 @@ try {
   for (const language of messageLanguages) {
     assert.doesNotMatch(message(language, "quizPingSummary", { role: message(language, "disabled") }), /\{\w+\}/);
   }
-  realLog(JSON.stringify({ check: "quiz-notifications", passed: true, locales: 6, scheduledAndEarlyRun: true,
+  realLog(JSON.stringify({ check: "quiz-notifications", passed: true, locales: messageLanguages.length, scheduledAndEarlyRun: true,
     roleWhitelist: true, randomSilent: true, closeSilent: true, defaultsOff: true, currentSettings: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "quiz-notifications", passed: false,

@@ -165,7 +165,7 @@ try {
   console.log(JSON.stringify({ check: "management-permissions", passed: true, delegatedManagement: true,
     noServerPermissionsGranted: true, administratorOnlyConfiguration: true, crossServerIsolation: true,
     immediateRevocation: true, noRoleNameTrust: true, invalidRolesRejected: true, cachedAuthorization: true,
-    autocompleteProtected: true, sixLanguageHelp: true }));
+    autocompleteProtected: true, localizedHelp: true, locales: messageLanguages.length }));
 } catch (error) {
   console.error(JSON.stringify({ check: "management-permissions", passed: false,
     category: error instanceof assert.AssertionError ? "assertion" : "test-error",

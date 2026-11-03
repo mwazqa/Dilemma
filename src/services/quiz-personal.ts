@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, messageLink } from "discord.js";
 import { db } from "../db.js";
 import { inlineText } from "../formatting.js";
 import { message } from "../messages.js";
@@ -8,7 +8,7 @@ import { WITHDRAW_COST } from "./quiz-voting.js";
 
 export function personalQuizAction(customId: string, sourceMessageId: string) {
   if (customId === MY_QUIZ_BUTTON_ID) return { messageId: sourceMessageId, action: "view", answerId: null };
-  const match = /^quiz:me:([a-zA-Z0-9_-]{1,80}):(view|withdraw|vote:([1-4]))$/.exec(customId);
+  const match = /^quiz:me:([a-zA-Z0-9_-]{1,80}):(view|withdraw|wager|vote:([1-4]))$/.exec(customId);
   return match ? { messageId: match[1], action: match[2], answerId: match[3] ? Number(match[3]) : null } : null;
 }
 
@@ -57,10 +57,18 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
     } else lines.push(message(language, "quizNoWager"));
   }
   const controls = new ActionRowBuilder<ButtonBuilder>();
-  if (active) controls.addComponents(new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:withdraw`)
-    .setLabel(message(language, "withdrawVoteButton", { cost: WITHDRAW_COST })).setStyle(ButtonStyle.Secondary).setDisabled(selected === null));
-  controls.addComponents(new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:view`)
-    .setLabel(message(language, "quizRefreshButton")).setStyle(ButtonStyle.Secondary));
+  if (active) controls.addComponents(
+    new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:withdraw`)
+      .setLabel(message(language, "withdrawVoteButton", { cost: WITHDRAW_COST })).setStyle(ButtonStyle.Secondary).setDisabled(selected === null),
+    new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:wager`)
+      .setLabel(message(language, "wagerButton")).setStyle(ButtonStyle.Secondary).setDisabled(selected === null || Boolean(wager))
+  );
+  controls.addComponents(
+    new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:view`)
+      .setLabel(message(language, "quizRefreshButton")).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setLabel(message(language, "quizJumpButton")).setStyle(ButtonStyle.Link)
+      .setURL(messageLink(quiz.channelId, quiz.messageId, quiz.guildId))
+  );
   components.push(controls);
   return { content: lines.join("\n\n"), components };
 }

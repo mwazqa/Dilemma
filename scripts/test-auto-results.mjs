@@ -120,6 +120,6 @@ try {
   assert.equal(results.length, 1, "Manual and automatic closing share one result claim"); assert.equal(answers.length, 1);
   assert.equal(settlementDeadline({ ...quiz, scoredAt: new Date(), resultsPending: true, nextCheckAt: new Date(123) }), 123);
   assert.equal(settlementDeadline({ ...quiz, scoredAt: new Date(), resultsPending: false }), null);
-  console.log(JSON.stringify({ check: "automatic-quiz-results", passed: true, scheduledAndRandom: true, sixLanguages: true,
+  console.log(JSON.stringify({ check: "automatic-quiz-results", passed: true, scheduledAndRandom: true, locales: messageLanguages.length,
     zeroVotes: true, savedDifficulty: true, scoringIndependent: true, restartRecovery: true, concurrentClose: true, nonceRetry: true }));
 } finally { await db.$disconnect(); }

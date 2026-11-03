@@ -220,4 +220,4 @@ if (process.argv.includes("--preview")) {
   }
   await writeFile(new URL("profile-rounded.png", directory), roundedProfile);
 }
-console.log("PASS: six-locale PNG cards, content-sized balance and rank frames, purple card edge, rounded corners, long-name spacing, exact progress and private fallback");
+console.log("PASS: supported-locale PNG cards, content-sized balance and rank frames, purple card edge, rounded corners, long-name spacing, exact progress and private fallback");

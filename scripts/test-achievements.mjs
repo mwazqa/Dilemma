@@ -240,4 +240,4 @@ assert.equal(queries, beforeDm);
 const dmChoices = interaction("badge", {}, null); await routeAutocomplete(dmChoices);
 assert.deepEqual(dmChoices.replies[0], []);
 await db.$disconnect();
-console.log("PASS: six-locale achievements, up to three distinct icons, legacy selection, atomic eligibility, autocomplete, guild isolation, scoring preservation, PNG/fallback and privacy deletion");
+console.log("PASS: supported-locale achievements, up to three distinct icons, legacy selection, atomic eligibility, autocomplete, guild isolation, scoring preservation, PNG/fallback and privacy deletion");

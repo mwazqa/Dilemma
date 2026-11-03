@@ -13,6 +13,10 @@ try{
     const card=await renderQuizCard("Ile wynosi 7 × 8?",options,6);
     const metadata=await sharp(card).metadata();
     assert.equal(metadata.format,"png");assert.equal(metadata.width,1400);assert.ok(metadata.height>=560&&metadata.height<=1200);
+    const pixels=await sharp(card).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+    for(const[x,y]of [[0,0],[12,Math.floor(metadata.height/2)],[1388,Math.floor(metadata.height/2)],[700,12],[700,metadata.height-13]]){
+      assert.equal(pixels.data[(y*pixels.info.width+x)*pixels.info.channels+3],0,"No navy margin extends beyond the lavender frame");
+    }
     const mask=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="${metadata.height}"><rect width="1400" height="${metadata.height}" rx="100" fill="white"/></svg>`);
     const rounded=await sharp(card).composite([{input:mask,blend:"dest-in"}]).png().toBuffer();
     const countFrame=async(buffer,left,top)=>{

@@ -36,14 +36,21 @@ try {
   }
   await assert.rejects(quizVotingPayload({ question: "Question?", options: ["Only"], optionEmojis: [""] }, new Date(), "pl"));
   let modal;
-  await handleWagerButton({ guildId: "test-guild", locale: "pl", user: { id: "player", bot: false }, message: { id: "quiz", author: { id: "bot" } },
+  db.guildSettings.findUnique = async () => ({ language: "pl" });
+  await handleWagerButton({ customId: "quiz:wager", guildId: "test-guild", locale: "pl", user: { id: "player", bot: false }, message: { id: "quiz", author: { id: "bot" } },
     client: { user: { id: "bot" } }, showModal: async value => modal = value.toJSON() });
   assert.equal(modal.custom_id, "quiz:wager:quiz");
   assert.ok(modal.title.length <= 45);
   assert.equal(modal.components[0].components[0].custom_id, "amount");
   assert.equal(modal.components[0].components[0].max_length, 2);
+  let privateModal;
+  await handleWagerButton({ customId: "quiz:me:quiz:wager", guildId: "test-guild", locale: "en", user: { id: "player", bot: false },
+    message: { id: "private-panel", author: { id: "bot" }, flags: { has: () => true } }, client: { user: { id: "bot" } },
+    showModal: async value => privateModal = value.toJSON() });
+  assert.equal(privateModal.custom_id, "quiz:wager:quiz:private-panel");
+  assert.equal(privateModal.title, message("pl", "wagerTitle"), "The modal uses the server language even when the player's locale differs");
   assert.equal(message("pl", "sparksName"), "Iskry");
-  console.log(JSON.stringify({check:"quiz-updates",passed:true,layouts234:true,noLiveCounters:true,minimumTwo:true,privateWagerModal:true,topics64:true,sixLanguages:true}));
+  console.log(JSON.stringify({check:"quiz-updates",passed:true,layouts234:true,noLiveCounters:true,minimumTwo:true,privateWagerModal:true,topics64:true,locales:messageLanguages.length}));
 } catch (error) {
   console.error(JSON.stringify({check:"quiz-updates",passed:false,category:error instanceof assert.AssertionError?"assertion":"test-error",line:Number(error.stack?.match(/test-quiz-updates\.mjs:(\d+)/)?.[1]??0)}));
   process.exitCode=1;

@@ -25,6 +25,9 @@ import { END_QUIZ_BUTTON_ID, MY_QUIZ_BUTTON_ID } from "./services/poll-controls.
 import { cacheGuildSettings } from "./services/guild-settings.js";
 import { handleTopicListComponent, TOPIC_LIST_PREFIX } from "./commands/topic-list.js";
 import { startRandomNotificationScheduler } from "./services/random-notifications.js";
+import { personalQuizAction } from "./services/quiz-personal.js";
+import { handleGuideRefresh } from "./commands/guide.js";
+import { GUIDE_REFRESH_BUTTON_ID } from "./services/player-guide.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -70,10 +73,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await routeAutocomplete(interaction);
       return;
     }
+    if (interaction.isButton() && interaction.customId === GUIDE_REFRESH_BUTTON_ID) {
+      await handleGuideRefresh(interaction); return;
+    }
     if (interaction.isModalSubmit() && interaction.customId.startsWith(WAGER_MODAL_PREFIX)) {
       await handleWagerModal(interaction); return;
     }
-    if (interaction.isButton() && interaction.customId === WAGER_BUTTON_ID) {
+    if (interaction.isButton() && (interaction.customId === WAGER_BUTTON_ID ||
+      personalQuizAction(interaction.customId, interaction.message.id)?.action === "wager")) {
       await handleWagerButton(interaction); return;
     }
     if (interaction.isButton() && (interaction.customId.startsWith(VOTE_PREFIX) || interaction.customId === MY_QUIZ_BUTTON_ID ||
@@ -117,9 +124,13 @@ async function handleLanguageSelection(interaction: StringSelectMenuInteraction)
     await interaction.reply({ content: message(interactionLanguage(interaction), "permission"), flags: MessageFlags.Ephemeral });
     return;
   }
-  await interaction.deferUpdate();
   const language = interaction.values[0];
-  if (!supportedLanguages.some(item => item.value === language)) throw new Error("Unsupported language selection");
+  if (!supportedLanguages.some(item => item.value === language)) {
+    await interaction.reply({ content: message(interactionLanguage(interaction), "languageUnavailable"), flags: MessageFlags.Ephemeral,
+      allowedMentions: { parse: [] } });
+    return;
+  }
+  await interaction.deferUpdate();
   rememberLanguage(interaction, language);
   const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: interaction.guildId },

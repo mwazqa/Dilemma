@@ -1,5 +1,6 @@
 import type { AutocompleteInteraction, ChatInputCommandInteraction } from "discord.js";
 import { handleHelp } from "./help.js";
+import { guideCommand, handleGuide } from "./guide.js";
 import { handlePing, pingCommand } from "./ping.js";
 import { handlePoll, pollCommand } from "./poll.js";
 import { handleScore, handleScoreAutocomplete, scoreCommand } from "./score.js";
@@ -19,9 +20,10 @@ export const dilemmaCommand = topicCommand
   .addSubcommandGroup(permissionsCommand)
   .addSubcommandGroup(channelsCommand)
   .addSubcommandGroup(randomNotificationsCommand)
-  .addSubcommand(randomResetCommand);
+  .addSubcommand(randomResetCommand)
+  .addSubcommand(guideCommand);
 
-const commandOrder = ["random", "random-reset", "score", "create", "configure", "list", "run", "enable", "disable", "language", "timezone", "random-channels", "random-notifications", "permissions", "poll", "help", "ping", "delete"];
+const commandOrder = ["random", "random-reset", "score", "create", "configure", "list", "run", "enable", "disable", "language", "timezone", "random-channels", "random-notifications", "permissions", "poll", "guide", "help", "ping", "delete"];
 dilemmaCommand.options.sort((first, second) => commandOrder.indexOf(first.toJSON().name) - commandOrder.indexOf(second.toJSON().name));
 
 export async function routeCommand(interaction: ChatInputCommandInteraction) {
@@ -34,6 +36,7 @@ export async function routeCommand(interaction: ChatInputCommandInteraction) {
   if (group === "random-notifications") { await handleRandomNotifications(interaction); return; }
   if (group !== null) { await handleHelp(interaction); return; }
   const subcommand = interaction.options.getSubcommand();
+  if (subcommand === "guide") { await handleGuide(interaction); return; }
   if (subcommand === "random-reset") { await handleRandomReset(interaction); return; }
   if (subcommand === "language" || subcommand === "timezone") { await handleSettings(interaction); return; }
   if (subcommand === "ping") { await handlePing(interaction); return; }

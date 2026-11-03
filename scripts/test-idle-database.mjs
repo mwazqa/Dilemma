@@ -136,17 +136,17 @@ try {
   assert.equal(settingReads, 1, "Concurrent settings reads share one query");
   assert.equal((await ensureGuildSettings("guild")).language, "pl");
   assert.equal(settingWrites, 0, "Existing settings do not need an upsert");
-  cacheGuildSettings({ ...settings, language: "de" });
-  assert.equal((await getGuildSettings("guild")).language, "de");
+  cacheGuildSettings({ ...settings, language: "en" });
+  assert.equal((await getGuildSettings("guild")).language, "en");
   let releaseRead;
   clearGuildSettingsCache();
   const readSettings = db.guildSettings.findUnique;
   db.guildSettings.findUnique = () => new Promise(resolve => { releaseRead = resolve; });
   const oldRead = getGuildSettings("guild");
-  cacheGuildSettings({ ...settings, language: "ja" });
-  releaseRead({ ...settings, language: "pl" });
+  cacheGuildSettings({ ...settings, language: "pl" });
+  releaseRead({ ...settings, language: "en" });
   await oldRead;
-  assert.equal((await getGuildSettings("guild")).language, "ja", "A slow read cannot overwrite a newer saved language");
+  assert.equal((await getGuildSettings("guild")).language, "pl", "A slow read cannot overwrite a newer saved language");
   db.guildSettings.findUnique = readSettings;
   clearGuildSettingsCache();
   settings = null;
@@ -328,9 +328,9 @@ try {
   assert.equal(topicReads, afterDelete);
 
   stage = "settings-commands";
-  await handleSettings(interaction("language", { value: "de" }));
+  await handleSettings(interaction("language", { value: "en" }));
   const readsAfterLanguage = settingReads;
-  assert.equal((await getGuildSettings("guild")).language, "de");
+  assert.equal((await getGuildSettings("guild")).language, "en");
   await handleHelp(interaction("help"));
   await handlePing(interaction("ping"));
   assert.equal(settingReads, readsAfterLanguage, "Help/ping reuse the saved language without SQL");

@@ -66,29 +66,33 @@ mode = "success";
 responseLanguage = "en";
 await generateQuestion("after timeout", "en", [], 2);
 answerOptions = ["Yes", "No"];
-for (const language of ["en", "pl", "de", "es", "fr", "ja"]) {
+const { messageLanguages } = await import("../dist/messages.js");
+for (const language of messageLanguages) {
   expectedLanguage = responseLanguage = language;
   const result = await generateQuestion("Historia Polski", language, ["Yes", "No"], 2, ["Stolica Polski?"]);
   assert.equal(result.language, language);
   assert.match(lastInstructions, /Their language must never change the output language/);
   assert.match(lastInstructions, /custom answer options must remain unchanged/);
 }
-expectedLanguage = responseLanguage = "ja";
+expectedLanguage = responseLanguage = "en";
+assert.equal((await generateQuestion("Legacy language", "ja-JP", ["Yes", "No"], 2)).language, "en");
+assert.match(lastInstructions, /Required output language: English \(en\)/);
+expectedLanguage = responseLanguage = "en";
 mode = "wrong-once";
 const beforeRetry = calls;
-assert.equal((await generateQuestion("Polish topic", "ja", [], 2)).language, "ja");
+assert.equal((await generateQuestion("Polish topic", "en", [], 2)).language, "en");
 assert.equal(calls, beforeRetry + 2, "Wrong response language is retried");
 responseLanguage = "pl";
 const beforeFailure = calls;
-await assert.rejects(generateQuestion("Polish topic", "ja", [], 2), AiLanguageMismatchError);
+await assert.rejects(generateQuestion("Polish topic", "en", [], 2), AiLanguageMismatchError);
 assert.equal(calls, beforeFailure + 2, "Repeated wrong language fails within retry budget");
-responseLanguage = "ja";
+responseLanguage = "en";
 const beforeCountFailure = calls;
-await assert.rejects(generateQuestion("Topic", "ja", [], 4), AiAnswerOptionsMismatchError);
+await assert.rejects(generateQuestion("Topic", "en", [], 4), AiAnswerOptionsMismatchError);
 assert.equal(calls, beforeCountFailure + 2);
-await assert.rejects(generateQuestion("Topic", "ja", ["No", "Yes"], 2), AiAnswerOptionsMismatchError);
+await assert.rejects(generateQuestion("Topic", "en", ["No", "Yes"], 2), AiAnswerOptionsMismatchError);
 answerOptions = ["🍎 Apple", "Pear"];
-assert.deepEqual((await generateQuestion("Fruit", "ja", answerOptions, 2)).options, answerOptions);
+assert.deepEqual((await generateQuestion("Fruit", "en", answerOptions, 2)).options, answerOptions);
 expectedLanguage = responseLanguage = "pl";
 responseQuestion = { ...question, topic: "Zwierzęta", question: "Który ssak wykrywa ofiarę dzięki elektrorecepcji?", correctOption: 1 };
 answerOptions = ["Jeżozwierz", "Dziobak"];
@@ -105,4 +109,4 @@ await generateQuestion("a freely chosen random topic", "pl", [], 2, [], undefine
 assert.match(lastInstructions, /freely generate a new broad topic without using a fixed topic list/);
 assert.match(lastInstructions, /synonyms, translations and closely related subtopics/);
 assert.ok(lastInput.includes(JSON.stringify(avoidedTopics)));
-console.log("PASS: OpenAI strict schema, six locales, anti-clue instructions, single-request quality guidance, language and answer validation, JSON normalization, timeout, queue recovery and free random topics");
+console.log("PASS: OpenAI strict schema, supported locales, anti-clue instructions, single-request quality guidance, language and answer validation, JSON normalization, timeout, queue recovery and free random topics");

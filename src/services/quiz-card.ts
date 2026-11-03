@@ -28,7 +28,7 @@ export async function renderQuizCard(question: string, options: string[], hours:
   const background = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
     <defs><linearGradient id="navy" x2="1" y2="1"><stop stop-color="#0b1432"/><stop offset="1" stop-color="#141a39"/></linearGradient>
     <clipPath id="frame"><rect x="28" y="28" width="1344" height="${height - 56}" rx="36"/></clipPath></defs>
-    <rect width="${width}" height="${height}" fill="url(#navy)"/>
+    <rect x="28" y="28" width="1344" height="${height - 56}" rx="36" fill="url(#navy)"/>
     <g clip-path="url(#frame)">
     <g fill="none" stroke="#ad94f3" stroke-opacity="0.5">
       <path d="M -60 210 C 210 220 350 110 430 -30 M -60 170 C 150 210 310 70 355 -30"/>

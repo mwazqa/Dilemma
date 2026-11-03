@@ -63,7 +63,7 @@ for (const locale of messageLanguages) {
   const command = interaction();
   await handleScore(command);
   const card = command.replies[0].files[0].description;
-  assert.equal(card.split("\n")[0], "Test", "Use only the player name in all six locales");
+  assert.equal(card.split("\n")[0], "Test", "Use only the player name in all supported locales");
   assert.ok(card.includes(message(locale, "scoreLevel", { level: 1 })));
   assert.ok(card.includes(message(locale, "scoreRank", { rank: 3 })));
   assert.ok(card.includes(message(locale, "scoreExpProgress", { earned: 30, required: 100 })));
@@ -101,4 +101,4 @@ for (const locale of messageLanguages) {
   assert.ok(!ranking.includes("2/4"), "Leaderboard statistics do not repeat the total answer count");
 }
 await db.$disconnect();
-console.log("PASS: EXP awards, level thresholds, surplus, existing points, server isolation and six-locale cards separating accuracy from progress");
+console.log("PASS: EXP awards, level thresholds, surplus, existing points, server isolation and supported-locale cards separating accuracy from progress");

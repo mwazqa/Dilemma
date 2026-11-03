@@ -4,15 +4,21 @@ International AI-powered Discord quiz bot.
 
 Dilemma lets Discord communities configure quiz topics and schedules, then answer AI-generated multiple-choice questions using Discord buttons. Members can withdraw or change their answer until the quiz closes. Counts stay hidden until closing unless a player unlocks a private preview with Sparks.
 
+Supported languages are English and Polish. Onboarding, `/dilemma language`, quiz generation, feedback and results use the same two-language catalog. Unsupported saved languages and Discord locales fall back to English without changing stored quiz history. Old language selections are rejected without overwriting settings. Updating this command menu requires Discord command registration when deploying the change; no database migration is needed.
+
 ## Current status
+
+Version v3.6.0 adds `/dilemma guide` with in-place refresh, Place bet and Go to quiz in private quiz panels, hours-and-minutes random cooldowns and transparent quiz-card margins. Supported languages are now English and Polish. Upgrading from v3.5.0 requires Discord command re-registration; no database migration is needed.
 
 Version v3.5.0 adds private My answer and My result panels, clickable 50/50 choices and profile frames sized to their contents. Upgrading from v3.4.1 needs no migration or command registration.
 
 Version v3.4.0 requires the additive `20261029120000_random_topics_sparks` and `20261029130000_button_quiz_tools` migrations, Prisma client regeneration and Discord command registration. New random quizzes last 1-6 hours; omitted durations use the saved default capped at 6 hours. Saved topics keep their 1-24 hour range. New quizzes use persistent button votes; existing native Discord polls continue through the legacy finalized-results flow and retain Discord's visible counts and normal voting controls.
 
-Code version: `v3.4.1`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.6.0`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Quiz cards are rendered locally in navy, lavender and gold, with the question, answer choices and voting duration. Topic and difficulty stay above the card. Two answers use one row, three use a centered final answer and four use two rows. Discord buttons below the image handle voting, withdrawal, private counts, 50/50, bets and closing. The image includes full alternative text; rendering failures or missing Attach Files permission use a complete text fallback. The duration on the image is static, not a countdown.
+
+Random-cooldown replies show the remaining time in hours and minutes, for example `3 h 12 min`, rounded up to the next minute. Quiz artwork ends at the lavender frame, with transparency outside it. See [Generated graphics](docs/generated-graphics.md) for every runtime image, component and local preview tool, including where and when each is rendered.
 
 Version v3.0.2 strengthens question-writing instructions against unintended hints and removes duplicate shared prompt text. The model, request limits and custom answer order are unchanged. No database migration or command re-registration is required when upgrading from v3.0.1.
 
@@ -22,7 +28,7 @@ Version v3.0.0 replaces `/dilemma defaults` with `/dilemma timezone`. Set topic 
 
 Version v2.0.0 also adds delegated management roles. Apply the additive `20261022160000_manager_role` migration and re-register commands before using this feature. Existing servers keep administrator-only management until a role is explicitly selected.
 
-Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking configuration change: provision `OPENAI_API_KEY` and replace the old provider settings using `.env.example`. Inference is paid; the default model is `gpt-6-luna`, with strict JSON output, low reasoning effort and bounded output/retries. Quiz schedules, points, EXP, levels, rankings, achievements and six-language feedback remain unchanged. Upgrading from v1.0.1 requires the management-role migration and command registration refresh noted above. Older deployments must also apply the earlier migrations described below. Stable release status does not guarantee external AI availability or factual accuracy.
+Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking configuration change: provision `OPENAI_API_KEY` and replace the old provider settings using `.env.example`. Inference is paid; the default model is `gpt-6-luna`, with strict JSON output, low reasoning effort and bounded output/retries. Quiz schedules, points, EXP, levels, rankings, achievements and localized feedback remain unchanged. Upgrading from v1.0.1 requires the management-role migration and command registration refresh noted above. Older deployments must also apply the earlier migrations described below. Stable release status does not guarantee external AI availability or factual accuracy.
 
 - TypeScript + Node.js 22
 - Discord bot with all commands under `/dilemma`
@@ -36,11 +42,11 @@ Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking c
 - PostgreSQL + Neon persistence for production
 - Server language onboarding when bot joins a guild
 - Easy, medium and hard question difficulty for random quizzes, saved topics and scheduled generation
-- Localized help and Dilemma-style command feedback in English, Polish, German, Spanish, French and Japanese
+- Localized help and Dilemma-style command feedback in English and Polish
 - Server-specific points, answer accuracy, correct-answer streaks and leaderboards
 - Server-specific cosmetic achievements and up to three selected profile badge icons, derived from settled scores
 
-Command replies, onboarding, language selection, help and quiz controls use the same warm voice across all six languages, including badge selection, cooldowns and validation. Success, waiting, guidance and recoverable failures use varied, contextual kaomoji, chosen consistently by message rather than randomly. Styling is applied before user values are inserted, so names and custom text stay intact. Short statistic labels stay concise; permanent-deletion warnings speak in Dilemma's voice but stay explicit and undecorated. Profile names have no added decorations. Native Discord command and option descriptions intentionally remain neutral English text.
+Command replies, onboarding, language selection, help and quiz controls use the same warm voice in English and Polish, including badge selection, cooldowns and validation. Success, waiting, guidance and recoverable failures use varied, contextual kaomoji, chosen consistently by message rather than randomly. Styling is applied before user values are inserted, so names and custom text stay intact. Short statistic labels stay concise; permanent-deletion warnings speak in Dilemma's voice but stay explicit and undecorated. Profile names have no added decorations. Native Discord command and option descriptions intentionally remain neutral English text.
 
 ## Setup
 
@@ -87,7 +93,7 @@ Quiz-writing instructions target one fact at a time and ask the model to audit d
 
 `AI_REQUEST_TIMEOUT_MS` defaults to 20000 per request. `AI_GENERATION_TIMEOUT_MS` defaults to 60000 overall, including queue waits, retries and duplicate-question attempts. `AI_MIN_INTERVAL_MS` defaults to 1000 between request starts. AI is called only when a quiz needs generation; there is no model-catalog polling or background AI traffic.
 
-AI failures have separate localized feedback from Discord permission errors. A failure before sending releases the quiz reservation. An uncertain Discord send is never retried automatically. `npm run test:ai` uses synthetic fixtures for the OpenAI request contract, six languages, answer validation, retries, quota handling, refusals, incomplete output, interrupted response bodies and queue deadlines. It does not spend API credits.
+AI failures have separate localized feedback from Discord permission errors. A failure before sending releases the quiz reservation. An uncertain Discord send is never retried automatically. `npm run test:ai` uses synthetic fixtures for the OpenAI request contract, both supported languages, answer validation, retries, quota handling, refusals, incomplete output, interrupted response bodies and queue deadlines. It does not spend API credits.
 
 See the current [OpenAI model documentation](https://developers.openai.com/api/docs/models/gpt-6-luna) and [API pricing](https://developers.openai.com/api/docs/pricing). Existing deployments must replace their old provider configuration with the OpenAI variables in `.env.example`. No database migration or Discord command registration change is required for this provider migration.
 
@@ -106,6 +112,7 @@ Each server can save up to 31 quiz topics in total, including disabled topics. D
 - `/dilemma random-notifications set role:...`, `/dilemma random-notifications clear`, `/dilemma random-notifications show` - configure an optional role ping when another random quiz becomes available; requires Manage Server or the configured management role
 - `/dilemma list` - browse all saved topics in a private card, ordered by configured start date and then name A-Z; topics without a start date come last. Filter by status, difficulty or channel, move between pages, refresh the list or clear filters. Includes disabled topics, saved destinations and the notification role.
 - `/dilemma enable`, `/dilemma disable`, `/dilemma delete`
+- `/dilemma guide` - publish the player guide on this channel as Dilemma. Requires Manage Server or the configured Dilemma manager role; Refresh updates the same message from the running bot version and current server language.
 - `/dilemma help` - show the grouped command guide without parameter examples or a self-referential help entry
 - `/dilemma language value:en|pl|de|es|fr|ja` - set the server language
 - `/dilemma timezone` - show the server timezone; optional `value` selects an IANA timezone, with autocomplete
@@ -152,7 +159,7 @@ Without assigned random channels, everyone can use `/dilemma random` wherever Di
 
 Each saved topic has its own destination. Use `/dilemma create name:Science channel:#science` to choose it, or `/dilemma configure name:Science channel:#another-channel` to change it. Omitting `channel` during creation uses the current channel; omitting it during configuration preserves the saved destination. Both scheduled publication and `/dilemma run` use that destination. Choosing a topic destination never changes the independent random-channel restrictions; configure those separately with `random-channels add` and `remove`. Only text and announcement channels on the same server are accepted as topic destinations. The bot needs View Channel, Send Messages, Embed Links, Read Message History there. Unavailable destinations are rejected without falling back to the invoking channel. Changes during AI generation are checked again before publication, and publication does not overwrite a newer destination.
 
-Topic confirmations, topic lists and other detailed replies use Markdown bullet lists. Setup instructions use ordered steps where appropriate. Long lists continue in private messages instead of silently dropping topics; generated replies suppress mentions. All six languages share this layout, while Discord's native menu descriptions remain neutral.
+Topic confirmations, topic lists and other detailed replies use Markdown bullet lists. Setup instructions use ordered steps where appropriate. Long lists continue in private messages instead of silently dropping topics; generated replies suppress mentions. Both supported languages share this layout, while Discord's native menu descriptions remain neutral.
 
 Before upgrading, test the additive `20261025120000_quiz_channels` migration on isolated PostgreSQL, back up production, apply the migration, then re-register commands. Existing topic destinations and player data are preserved. The new random-channel list starts empty, so existing servers retain unrestricted random-channel access until a manager assigns a channel. Run `npm run test:quiz-channels`, `npm run test:feedback-layout`, `npm run test:db:fresh` and the existing command, scheduling and quota regressions before release.
 
@@ -188,7 +195,7 @@ For a different topic every weekday, create these seven topics before the first 
 
 The Monday topic starts on October 26, then repeats on November 2, November 9 and so on. The other topics keep their own dates. Use real subject names rather than weekday names if you want AI to generate questions about a particular subject. Creation saves topic configuration, not a batch of ready questions; AI generates a new question at each publication.
 
-To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. The list uses the configured first date, not the next repeat or creation date, and sorts names alphabetically within each date. Its native Discord menus filter status, difficulty and destination; page buttons keep every saved topic accessible without sending a separate message per page. Each click refreshes the current server's data and checks management access; no background polling or schema change is needed for this view. Help lists the related commands in all six supported languages, without an explanatory introduction or parameter examples.
+To change a saved topic, use `/dilemma configure name:Monday start_date:2026-11-02 interval_days:14 generation_time:19:00`. `/dilemma list` and dated-topic confirmations show the start date, interval, local publication time and timezone. The list uses the configured first date, not the next repeat or creation date, and sorts names alphabetically within each date. Its native Discord menus filter status, difficulty and destination; page buttons keep every saved topic accessible without sending a separate message per page. Each click refreshes the current server's data and checks management access; no background polling or schema change is needed for this view. Help lists the related commands in both supported languages, without an explanatory introduction or parameter examples.
 
 Repeats are anchored to the first date, not the actual time of a late run. After downtime, the bot publishes at most the latest overdue slot rather than replaying every missed quiz; the next planned date stays unchanged. Calendar-day intervals retain the local hour across daylight-saving changes. A missing local hour runs at the first later local minute; a repeated hour uses its first occurrence. Choosing today with an already-passed publication time makes the quiz due immediately.
 
@@ -215,6 +222,14 @@ The v0.3.0-beta migration only adds duration fields and quota storage. Legacy qu
 Direct deployment normally rejects pending migrations. After creating a backup and testing the migration on an isolated copy, explicitly use `npm run deploy:prod -- -ApplyMigrations` to apply it through the direct database connection before switching containers. Migration logs remain private on the host.
 
 `/dilemma language` sets one global language for the server. It applies to existing and new topics, manual runs, random quizzes, scheduled generation and command feedback. The generator must use this language for the question, generated answers, explanation and generated topic title, irrespective of the input topic's or previous questions' language. Responses declaring another language are retried within the existing retry and timeout limits, then rejected rather than published. Previously published questions and explanations are not retroactively translated. Saved topic names and custom answer options remain as provided.
+
+## Player guide
+
+`/dilemma guide` publishes one public text embed on the current channel, using the server's Polish or English language setting. The full guide includes answer previews, 50/50, points, Sparks, bets, personal results, random limits, permissions and notifications. It uses bold section titles and stays below 4000 characters, including a CRLF copy of the text. See the saved [Polish guide](docs/player-guide.pl.md) and [English guide](docs/player-guide.en.md).
+
+The Refresh button replaces that same message with the guide from the currently running bot version and current server language. It sends no new public message or role ping. Publishing and refreshing both require Manage Server, including Administrator, or the configured Dilemma manager role. Source-message validation prevents a refresh from editing a different bot's message, another channel/server or a private message. Access and delivery errors remain private.
+
+Before every GitHub or production release, review both guide translations against the final changes and implemented behavior. Update commands, labels, mechanics, costs, rewards, limits and permissions when needed. Run `npm run guide:sync` to regenerate the saved documents, inspect both complete texts and run `npm run test:guide`. CI and the deployment checks include this test. Refresh existing published guides after deploying the updated bot; publishing or automatically editing Discord messages still requires task authorization. Adding `/dilemma guide` requires command re-registration when deploying, without a database migration.
 
 ## Database idle behavior
 
@@ -287,13 +302,13 @@ Correct answers earn 1 point on easy, 2 on medium and 3 on hard. Wrong answers e
 
 New quizzes use buttons and store one current answer per member. A member can withdraw or change their answer until the deadline or early closing. Votes, closing and purchases use database transactions; counts are public only in the final result. Existing native Discord polls still wait for finalized Discord results and use actual Discord answer IDs. Both paths award points once for the final answer. A withdrawn vote produces no scored answer and does not reset a streak. No privileged Discord intent is required.
 
-My answer opens a private panel with the saved choice, answer buttons, withdrawal and refresh. The green button marks the player's saved answer, not correctness. Actions within the private panel update that panel; shared quiz buttons keep the same appearance for everyone. After 50/50, only the two remaining answer buttons appear in the private panel. If the saved choice was eliminated, it remains saved until the player changes or withdraws it, with the normal fee. Existing active button quizzes can open the panel after voting or using 50/50; newly published quizzes also include My answer.
+My answer opens a private panel with the saved choice, answer buttons, withdrawal, Place bet and refresh. The green button marks the player's saved answer, not correctness. Place bet opens the stake form for that quiz and updates the same panel after submission, showing the stake and possible payout. It is disabled without a saved answer or when a bet is already active, and is absent from closed panels. Go to quiz links directly to the original quiz message from the private answer, 50/50 and result panels; opening the link spends no Sparks and sends no bot interaction. Actions within the private panel update that panel; shared quiz buttons keep the same appearance for everyone. After 50/50, only the two remaining answer buttons appear in the private panel. If the saved choice was eliminated, it remains saved until the player changes or withdraws it, with the normal fee. Existing active button quizzes can open the panel after voting or using 50/50; newly published quizzes also include My answer.
 
 My result is available on closed quizzes and their published results. It privately shows the player's final answer, the correct answer, awarded points and bet settlement. Bet statistics show the stake, total payout and profit or loss separately; for example, a winning 10-Spark bet pays 20 Sparks in total for a bet profit of 10 Sparks. Pending settlements show a waiting state without revealing the correct answer. Stale answer buttons cannot change closed votes, charge fees or repeat payouts.
 
 ### Sparks
 
-Sparks are separate from leaderboard points and belong to one player on one server. The localized names are Sparks (EN), Iskry (PL), Funken (DE), Chispas (ES), Étincelles (FR) and スパーク (JA). A correct easy/medium/hard answer earns 1/2/3 Sparks, and each newly gained level earns 5 more. Awards happen once when the quiz settles. Existing historical scores do not receive a backfill.
+Sparks are separate from leaderboard points and belong to one player on one server. The localized names are Sparks (EN) and Iskry (PL). A correct easy/medium/hard answer earns 1/2/3 Sparks, and each newly gained level earns 5 more. Awards happen once when the quiz settles. Existing historical scores do not receive a backfill.
 
 The first vote is free. Withdrawing a vote costs 1 Spark. Selecting another answer withdraws the previous choice and records the new choice as one transaction, charging 1 Spark in total. Clicking the current answer or withdrawing without a vote charges nothing. Insufficient balance leaves the vote unchanged.
 

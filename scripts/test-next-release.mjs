@@ -6,7 +6,7 @@ const { messages, messageLanguages, message, normalizeLanguage, feedbackKaomoji 
 const { getHelpContent, getHelpEmbed, handleHelp } = await import("../dist/commands/help.js");
 const { difficultySchema } = await import("../dist/difficulty.js");
 for (const [key, translations] of Object.entries(messages)) {
-  assert.equal(translations.length, 6, key);
+  assert.equal(translations.length, messageLanguages.length, key);
   const placeholders = text => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
   for (const text of translations) {
     assert.ok(text.length > 0, key);
@@ -24,10 +24,10 @@ const friendlyFeedbackKeys = [
   "helpIntro", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
   "optionCountInvalid", "intervalInvalid", "durationInvalid", "timezoneInvalid", "manualPublication", "scoreEmpty", "partial"
 ];
-const permanentDeletionWords = [/permanent/i, /trwale/i, /dauerhaft/i, /definitiv/i, /définitiv/i, /完全/];
+const permanentDeletionWords = { en: /permanent/i, pl: /trwale/i };
 assert.ok(Object.keys(feedbackKaomoji).length >= 20);
 assert.ok(new Set(Object.values(feedbackKaomoji)).size >= 12);
-for (const [index, language] of messageLanguages.entries()) {
+for (const language of messageLanguages) {
   for (const [key, kaomoji] of Object.entries(feedbackKaomoji)) {
     const rendered = message(language, key);
     assert.ok(rendered.includes(kaomoji), `${key} uses its contextual kaomoji in ${language}`);
@@ -47,7 +47,7 @@ for (const [index, language] of messageLanguages.entries()) {
   for (const key of ["forgetConfirm", "scoreForgotten"]) {
     assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Permanent-deletion warnings are not decorated");
-    assert.match(message(language, key), permanentDeletionWords[index]);
+    assert.match(message(language, key), permanentDeletionWords[language]);
   }
   assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
   for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scorePoints", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
@@ -57,7 +57,7 @@ for (const [index, language] of messageLanguages.entries()) {
   assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
   assert.ok(message(language, "optionsMissing").includes("options") && message(language, "optionsMissing").includes("option_count"));
   assert.ok(message(language, "timeInvalid").includes("HH:mm") && message(language, "timeInvalid").includes("18:30"));
-  assert.ok(message(language, "randomCooldown").includes("6") && message(language, "randomCooldown").includes("{minutes}"));
+  assert.ok(message(language, "randomCooldown").includes("6") && message(language, "randomCooldown").includes("{hours}") && message(language, "randomCooldown").includes("{minutes}"));
   assert.ok(message(language, "randomDailyLimit").includes("4") && message(language, "randomDailyLimit").includes("6"));
   assert.ok(message(language, "helpRandom").includes("4") && message(language, "helpRandom").includes("6"));
   assert.ok(message(language, "badgeSelectionInvalid").includes("3"));
@@ -79,7 +79,8 @@ for (const language of messageLanguages) {
   assert.doesNotMatch(commands, /`\/(?:settings|help|score|poll|ping)(?: |`)/);
   for (const sub of ["profile", "leaderboard", "achievements", "badge", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
 }
-assert.equal(normalizeLanguage("es-ES"), "es");
+assert.equal(normalizeLanguage("pl-PL"), "pl");
+assert.equal(normalizeLanguage("en-GB"), "en");
 assert.equal(normalizeLanguage("unknown"), "en");
 assert.throws(() => difficultySchema.parse("expert"));
 const { db } = await import("../dist/db.js");
@@ -96,7 +97,7 @@ db.dailyQuizRun.deleteMany = async () => ({ count: 1 });
 db.generatedPoll.count = db.randomPoll.count = async () => 0;
 function resetTopicDay() { if (topic) topic.lastGeneratedAt = null; }
 db.guildSettings.findUnique = async () => settings;
-db.guildSettings.upsert = async ({ create, update }) => settings = { ...settings, ...(settings ? update : create) };
+db.guildSettings.upsert = async ({ create, update }) => settings = { language: "en", ...settings, ...(settings ? update : create) };
 db.topic.findUnique = async () => topic ?? null;
 db.topic.findMany = async () => topic ? [topic] : [];
 db.topic.count = async ({ where }) => topic?.guildId === where.guildId ? 1 : 0;
@@ -146,7 +147,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "help", "random", "random-reset", "run", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "score", "poll"].sort());
+  ["create", "configure", "enable", "disable", "delete", "list", "guide", "help", "random", "random-reset", "run", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "score", "poll"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);
@@ -282,50 +283,61 @@ assert.equal(isTopicDue(topic, new Date("2026-10-12T16:30:00Z")), true);
 await routeCommand(interaction("configure", { name: "Scheduled", generation_time: "19:45" }));
 assert.equal(topic.generationTime, "19:45");
 topic = existingTopic;
-await handleSettings(interaction("language", { value: "ja" }));
-topic.language = "en";
+await handleSettings(interaction("language", { value: "en" }));
+topic.language = "pl";
 const savedDuration = topic.pollDurationHours;
 const savedDifficulty = topic.difficulty;
 resetTopicDay();
 await handleTopic(interaction("run", { name: "Test" }));
-assert.match(lastPrompt, / in ja\./, "Run uses global language, not stale topic language");
-assert.match(sent.content, new RegExp(message("ja", "difficulty", { difficulty: message("ja", savedDifficulty) })));
+assert.match(lastPrompt, / in en\./, "Run uses global language, not stale topic language");
+assert.match(sent.content, new RegExp(message("en", "difficulty", { difficulty: message("en", savedDifficulty) })));
 resetTopicDay();
 await publishTopicQuestions(topic, channel);
-assert.match(lastPrompt, / in ja\./, "Scheduled publisher uses global language");
+assert.match(lastPrompt, / in en\./, "Scheduled publisher uses global language");
 assert.equal(topic.pollDurationHours, savedDuration);
 assert.equal(topic.difficulty, savedDifficulty);
 const createRun = db.dailyQuizRun.create;
 const updateRuns = db.dailyQuizRun.updateMany;
-db.dailyQuizRun.updateMany = async () => { throw new RandomQuizCooldownError(new Date(Date.now() + 480 * 60_000)); };
-const randomLimited = interaction("random", { option_count: 4 });
 const callsAtLimit = counter;
-await handleTopic(randomLimited);
-assert.match(randomLimited.replies.at(-1), /480/);
+const realDateNow = Date.now;
+try {
+  Date.now = () => 1_800_000_000_000;
+  for (const language of messageLanguages) {
+    await handleSettings(interaction("language", { value: language }));
+    for (const [remaining, hours, minutes] of [[360 * 60_000, 6, 0], [192 * 60_000, 3, 12], [60 * 60_000, 1, 0], [59 * 60_000 + 1, 1, 0], [59 * 60_000, 0, 59], [1, 0, 1], [0, 0, 1]]) {
+      db.dailyQuizRun.updateMany = async () => { throw new RandomQuizCooldownError(new Date(Date.now() + remaining)); };
+      const randomLimited = interaction("random", { option_count: 4 });
+      await handleTopic(randomLimited);
+      assert.equal(randomLimited.replies.at(-1), message(language, "randomCooldown", { hours, minutes }), "Cooldown replies split rounded-up time into hours and minutes");
+      assert.equal(counter, callsAtLimit, "A cooldown response never calls AI");
+    }
+  }
+  await handleSettings(interaction("language", { value: "en" }));
+} finally { Date.now = realDateNow; }
 db.dailyQuizRun.updateMany = updateRuns;
 db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("random"); };
 const randomDailyLimited = interaction("random", { option_count: 4 }, false);
 await routeCommand(randomDailyLimited);
-assert.equal(randomDailyLimited.replies.at(-1), message("ja", "randomDailyLimit"));
+assert.equal(randomDailyLimited.replies.at(-1), message("en", "randomDailyLimit"));
 assert.equal(counter, callsAtLimit);
 db.dailyQuizRun.create = createRun;
 resetTopicDay();
 db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("topic"); };
 const topicLimited = interaction("run", { name: "Test" });
 await handleTopic(topicLimited);
-assert.match(topicLimited.replies.at(-1), /明日/);
+assert.equal(topicLimited.replies.at(-1), message("en", "topicDailyLimit"));
 assert.equal(counter, callsAtLimit);
 db.dailyQuizRun.create = createRun;
 await handleTopic(interaction("random", { option_count: 4 }));
-assert.match(lastPrompt, / in ja\./, "Random uses global language");
+assert.match(lastPrompt, / in en\./, "Random uses global language");
 await handleSettings(interaction("language", { value: "pl" }));
 resetTopicDay();
 await publishTopicQuestions(topic, channel);
 assert.match(lastPrompt, / in pl\./, "Changing global language takes effect without recreating topic");
-await handleSettings(interaction("language", { value: "ja" }));
+await handleSettings(interaction("language", { value: "en" }));
 const ping = interaction("ping");
 await handlePing(ping);
-assert.match(ping.replies[0], /ここにいる/);
+assert.equal(ping.replies[0], message("en", "ping"));
 for (const command of [dilemmaCommand.toJSON()]) {
   for (const sub of command.options) {
     assert.ok(!sub.options?.some(option => option.name === "questions_per_run"));
@@ -341,16 +353,16 @@ for (const command of [dilemmaCommand.toJSON()]) {
 assert.equal(dilemmaCommand.toJSON().default_member_permissions, undefined, "The root must remain available to ordinary players");
 const routedHelp = interaction("help", {}, false);
 await routeCommand(routedHelp);
-assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("ja").toJSON());
+assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("en").toJSON());
 const routedPing = interaction("ping", {}, false);
 await routeCommand(routedPing);
-assert.equal(routedPing.replies[0], message("ja", "ping"));
+assert.equal(routedPing.replies[0], message("en", "ping"));
 for (const sub of ["language", "timezone", "create", "configure", "enable", "disable", "delete", "run", "list"]) {
   const deniedRoute = interaction(sub, { value: "en", name: "Test" }, false);
   const topicBefore = { ...topic };
   const settingsBefore = { ...settings };
   await routeCommand(deniedRoute);
-  assert.equal(deniedRoute.replies[0], message("ja", "permission"));
+  assert.equal(deniedRoute.replies[0], message("en", "permission"));
   assert.deepEqual(topic, topicBefore);
   assert.deepEqual(settings, settingsBefore);
 }
@@ -421,4 +433,4 @@ await routeCommand(firstTimezone);
 assert.equal(settings.timezone, "UTC", "A new server can set its timezone independently");
 settings = establishedSettings;
 await db.$disconnect();
-console.log("PASS: six-locale help, standalone timezone, retired defaults, preserved schedules and permissions");
+console.log("PASS: supported-locale help, standalone timezone, retired defaults, preserved schedules and permissions");

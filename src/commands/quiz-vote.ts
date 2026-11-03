@@ -1,12 +1,13 @@
 import { ActionRowBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, type ButtonInteraction, type ModalSubmitInteraction } from "discord.js";
 import { interactionLanguage, openFeedback } from "../feedback.js";
-import { message } from "../messages.js";
+import { message, normalizeLanguage } from "../messages.js";
 import { db } from "../db.js";
 import { castQuizVote, useQuizTool, VOTE_PREFIX, WITHDRAW_VOTE_ID, REVEAL_VOTES_ID, FIFTY_FIFTY_ID,
-  WITHDRAW_COST, REVEAL_COST, FIFTY_FIFTY_COST, MAX_WAGER, WAGER_MODAL_PREFIX, placeQuizWager, voteBreakdown } from "../services/quiz-voting.js";
+  WITHDRAW_COST, REVEAL_COST, FIFTY_FIFTY_COST, MAX_WAGER, WAGER_BUTTON_ID, WAGER_MODAL_PREFIX, placeQuizWager, voteBreakdown } from "../services/quiz-voting.js";
 import { storedQuizOptions } from "../services/quiz-options.js";
 import { MY_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
 import { personalQuizAction, quizPersonalPayload } from "../services/quiz-personal.js";
+import { getGuildSettings } from "../services/guild-settings.js";
 
 export async function handleQuizVote(interaction: ButtonInteraction) {
   const personal = personalQuizAction(interaction.customId, interaction.message.id);
@@ -46,32 +47,44 @@ export async function handleQuizVote(interaction: ButtonInteraction) {
 }
 
 export async function handleWagerButton(interaction: ButtonInteraction) {
-  const language = interactionLanguage(interaction);
-  if (!interaction.guildId || interaction.user.bot || interaction.message.author.id !== interaction.client.user.id) {
-    await interaction.reply({ content: message(language, "notPoll"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }); return;
+  const fallbackLanguage = interactionLanguage(interaction);
+  const personal = personalQuizAction(interaction.customId, interaction.message.id);
+  const fromPanel = personal?.action === "wager";
+  if (!interaction.guildId || interaction.user.bot || interaction.message.author.id !== interaction.client.user.id ||
+      (!fromPanel && interaction.customId !== WAGER_BUTTON_ID) || (fromPanel && !interaction.message.flags.has(MessageFlags.Ephemeral))) {
+    await interaction.reply({ content: message(fallbackLanguage, "notPoll"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }); return;
   }
+  const language = normalizeLanguage((await getGuildSettings(interaction.guildId))?.language ?? fallbackLanguage);
   const amount = new TextInputBuilder().setCustomId("amount").setLabel(message(language, "wagerAmount", { max: MAX_WAGER }))
     .setPlaceholder(message(language, "wagerPlaceholder")).setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(String(MAX_WAGER).length).setRequired(true);
-  await interaction.showModal(new ModalBuilder().setCustomId(`${WAGER_MODAL_PREFIX}${interaction.message.id}`)
+  const target = fromPanel ? `${personal.messageId}:${interaction.message.id}` : interaction.message.id;
+  await interaction.showModal(new ModalBuilder().setCustomId(`${WAGER_MODAL_PREFIX}${target}`)
     .setTitle(message(language, "wagerTitle")).addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(amount)));
 }
 
 export async function handleWagerModal(interaction: ModalSubmitInteraction) {
-  const { text, reply } = await openFeedback(interaction);
-  if (!interaction.guildId || !interaction.channelId || interaction.user.bot || !interaction.customId.startsWith(WAGER_MODAL_PREFIX)) { await reply(text("notPoll")); return; }
-  const messageId = interaction.customId.slice(WAGER_MODAL_PREFIX.length);
-  if (!messageId || (interaction.message && (interaction.message.id !== messageId || interaction.message.author.id !== interaction.client.user.id))) {
+  const target = /^quiz:wager:([a-zA-Z0-9_-]{1,80})(?::([a-zA-Z0-9_-]{1,80}))?$/.exec(interaction.customId);
+  const source = interaction.message;
+  const fromPanel = Boolean(target?.[2] && source?.id === target[2] && source.flags.has(MessageFlags.Ephemeral)
+    && source.author.id === interaction.client.user.id);
+  const { language, text, reply } = await openFeedback(interaction, fromPanel);
+  if (!interaction.guildId || !interaction.channelId || interaction.user.bot || !target) { await reply(text("notPoll")); return; }
+  const messageId = target[1];
+  if ((target[2] && !fromPanel) || (source && (source.author.id !== interaction.client.user.id || (!target[2] && source.id !== messageId)))) {
     await reply(text("notPoll")); return;
   }
+  const identity = { messageId, guildId: interaction.guildId, channelId: interaction.channelId };
+  const respond = async (content: string) => reply(fromPanel
+    ? await quizPersonalPayload(identity, interaction.user.id, language, content) ?? text("notPoll") : content);
   const input = interaction.fields.getTextInputValue("amount").trim();
-  if (!/^\d{1,2}$/.test(input)) { await reply(text("wagerInvalid", { max: MAX_WAGER })); return; }
+  if (!/^\d{1,2}$/.test(input)) { await respond(text("wagerInvalid", { max: MAX_WAGER })); return; }
   const amount = Number(input);
-  const result = await placeQuizWager({ messageId, guildId: interaction.guildId, channelId: interaction.channelId }, interaction.user.id, amount);
-  if (result.status === "invalid") { await reply(text("wagerInvalid", { max: MAX_WAGER })); return; }
-  if (result.status === "closed") { await reply(text("votingClosed")); return; }
-  if (result.status === "missing") { await reply(text("wagerVoteFirst")); return; }
-  if (result.status === "insufficient") { await reply(text("sparksInsufficient", { cost: amount })); return; }
-  await reply(text(result.status === "existing" ? "wagerExisting" : "wagerPlaced", {
+  const result = await placeQuizWager(identity, interaction.user.id, amount);
+  if (result.status === "invalid") { await respond(text("wagerInvalid", { max: MAX_WAGER })); return; }
+  if (result.status === "closed") { await respond(text("votingClosed")); return; }
+  if (result.status === "missing") { await respond(text("wagerVoteFirst")); return; }
+  if (result.status === "insufficient") { await respond(text("sparksInsufficient", { cost: amount })); return; }
+  await respond(text(result.status === "existing" ? "wagerExisting" : "wagerPlaced", {
     amount: result.amount, answer: result.answerId, payout: result.amount * 2
   }));
 }

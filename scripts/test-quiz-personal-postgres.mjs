@@ -7,7 +7,7 @@ const { db } = await import("../dist/db.js");
 const { ButtonStyle, MessageFlags } = await import("discord.js");
 const { buttonSettlementData, placeQuizWager, quizVotingPayload } = await import("../dist/services/quiz-voting.js");
 const { quizPersonalPayload } = await import("../dist/services/quiz-personal.js");
-const { handleQuizVote } = await import("../dist/commands/quiz-vote.js");
+const { handleQuizVote, handleWagerButton, handleWagerModal } = await import("../dist/commands/quiz-vote.js");
 const { closeQuiz } = await import("../dist/services/quiz-closure.js");
 const { applyFinalVotes } = await import("../dist/services/scoring.js");
 const { message, messageLanguages, feedbackKaomoji } = await import("../dist/messages.js");
@@ -25,7 +25,15 @@ const request = (customId, userId = "alice", privateMessage = false, overrides =
 });
 const press = async (...args) => { deferred = updated = 0; await handleQuizVote(request(...args)); return replies.at(-1); };
 const buttons = payload => payload.components.flatMap(row => row.toJSON().components);
-const choices = payload => buttons(payload).filter(button => button.custom_id.includes(":vote:"));
+const choices = payload => buttons(payload).filter(button => button.custom_id?.includes(":vote:"));
+const checkQuizLink = (payload, language) => {
+  const links = buttons(payload).filter(button => button.style === ButtonStyle.Link);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].url, `https://discord.com/channels/${identity.guildId}/${identity.channelId}/${identity.messageId}`);
+  assert.equal(links[0].label, message(language, "quizJumpButton"));
+  assert.equal(links[0].custom_id, undefined, "Navigation does not submit a quiz action");
+  assert.ok(payload.components.every(row => row.toJSON().components.length <= 5));
+};
 const wallet = async userId => (await db.userScore.findUnique({ where: { guildId_userId: { guildId: identity.guildId, userId } } })).sparks;
 try {
   const quiz = await db.quizSettlement.create({ data: buttonSettlementData(identity, "medium", 4, 0, new Date(Date.now() + 3_600_000)) });
@@ -37,6 +45,12 @@ try {
   assert.ok(panel.content.includes(message("en", "quizChosenAnswer", { answer: "2. Beta" })));
   assert.equal(choices(panel).filter(button => button.style === ButtonStyle.Success)[0].custom_id, `quiz:me:${quiz.messageId}:vote:2`);
   assert.equal(await wallet("alice"), 20);
+  assert.ok(!buttons(panel).find(button => button.custom_id === `quiz:me:${quiz.messageId}:wager`).disabled);
+  for (const language of messageLanguages) {
+    const localized = await quizPersonalPayload(identity, "alice", language);
+    assert.equal(buttons(localized).find(button => button.custom_id?.endsWith(":wager")).label, message(language, "wagerButton"));
+    checkQuizLink(localized, language);
+  }
   const publicQuiz = await quizVotingPayload({ question: "Test question?", options, optionEmojis: [] }, quiz.expiresAt, "en", false);
   assert.ok(publicQuiz.components[0].toJSON().components.every(button => button.style === ButtonStyle.Primary));
   assert.ok(buttons(publicQuiz).some(button => button.custom_id === "quiz:me"));
@@ -49,10 +63,12 @@ try {
   panel = await press("quiz:me", "bob");
   assert.ok(panel.content.includes(message("en", "quizNoChoice")));
   assert.ok(choices(panel).every(button => button.style !== ButtonStyle.Success), "Another player never sees Alice's choice");
+  assert.ok(buttons(panel).find(button => button.custom_id?.endsWith(":wager")).disabled, "Betting needs a saved answer");
   await press(`quiz:me:${quiz.messageId}:view`, "bob", false);
   assert.equal(deferred, 1); assert.equal(updated, 0, "Public messages are never edited with personal data");
   stage = "fifty-buttons";
   panel = await press("quiz:fifty");
+  checkQuizLink(panel, "en");
   assert.equal(choices(panel).length, 2); assert.equal(await wallet("alice"), 14);
   const remaining = choices(panel).map(button => Number(button.custom_id.at(-1)));
   assert.ok(remaining.includes(1));
@@ -71,16 +87,49 @@ try {
   panel = await press(`quiz:me:${quiz.messageId}:withdraw`, "alice", true);
   assert.equal(await wallet("alice"), 12);
   assert.ok(panel.content.includes(message("en", "quizNoChoice")));
-  assert.ok(buttons(panel).find(button => button.custom_id.endsWith(":withdraw")).disabled);
+  assert.ok(buttons(panel).find(button => button.custom_id?.endsWith(":withdraw")).disabled);
   await press(`quiz:me:${quiz.messageId}:vote:1`, "alice", true);
   assert.equal(await wallet("alice"), 12, "Voting after withdrawal remains free");
   await press("quiz:vote:2", "bob");
-  await placeQuizWager(identity, "alice", 10); await placeQuizWager(identity, "bob", 5);
+  stage = "private-wager-modal";
+  let modal;
+  await handleWagerButton({ ...request(`quiz:me:${quiz.messageId}:wager`, "alice", true), showModal: async value => modal = value.toJSON() });
+  assert.equal(modal.custom_id, `quiz:wager:${quiz.messageId}:private-response`);
+  assert.equal(await wallet("alice"), 12, "Opening a wager form never spends Sparks");
+  const submit = async (amount, overrides = {}) => {
+    deferred = updated = 0;
+    await handleWagerModal({ ...request(modal.custom_id, "alice", true), fields: { getTextInputValue: () => String(amount) }, ...overrides });
+    return replies.at(-1);
+  };
+  panel = await submit(10, { message: { id: "different-private-response", author: { id: "bot" }, flags: { has: () => true } } });
+  assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
+  panel = await submit(10, { message: { id: "private-response", author: { id: "bot" }, flags: { has: () => false } } });
+  assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
+  panel = await submit(10, { message: { id: "private-response", author: { id: "stranger" }, flags: { has: () => true } } });
+  assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
+  panel = await submit(10, { channelId: "another-channel" });
+  assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
+  panel = await submit(21);
+  assert.ok(panel.content.includes(message("en", "wagerInvalid", { max: 20 }))); assert.equal(await wallet("alice"), 12);
+  panel = await submit(20);
+  assert.ok(panel.content.includes(message("en", "sparksInsufficient", { cost: 20 }))); assert.equal(await wallet("alice"), 12);
+  panel = await submit(10);
+  assert.equal(updated, 1); assert.equal(deferred, 0, "Wager submission updates the existing private panel");
+  assert.equal(await wallet("alice"), 2);
+  assert.ok(panel.content.includes(message("en", "quizActiveWager", { stake: 10, payout: 20 })));
+  assert.ok(buttons(panel).find(button => button.custom_id?.endsWith(":wager")).disabled);
+  const savedWager = await db.quizWager.findUnique({ where: { messageId_userId: { messageId: quiz.messageId, userId: "alice" } } });
+  assert.equal(savedWager.answerId, 1); assert.equal(savedWager.messageId, quiz.messageId);
+  await submit(20);
+  assert.equal(await wallet("alice"), 2, "Repeating a stale wager form never charges twice");
+  await placeQuizWager(identity, "bob", 5);
   stage = "pending-result";
   await closeQuiz(quiz, false, "manager", "button", null);
   panel = await press("quiz:me");
   assert.ok(panel.content.includes(message("en", "quizResultPending")));
   assert.equal(choices(panel).length, 0);
+  assert.ok(!buttons(panel).some(button => button.custom_id?.endsWith(":wager")), "Closed panels do not offer betting");
+  checkQuizLink(panel, "en");
   assert.ok(!panel.content.includes(message("en", "quizCorrectAnswer", { answer: "1. Alpha" })));
   await applyFinalVotes(quiz, [], new Date());
   stage = "settled-result";
@@ -92,12 +141,15 @@ try {
   const before = await wallet("alice");
   await press(`quiz:me:${quiz.messageId}:vote:2`, "alice", true);
   assert.equal(await wallet("alice"), before, "A stale private panel cannot change settled answers or rewards");
+  await submit(10);
+  assert.equal(await wallet("alice"), before, "A stale wager form cannot charge after settlement");
   panel = await press("quiz:me", "bob");
   assert.ok(panel.content.includes(message("en", "quizAnswerLost", { points: 0 })));
   assert.ok(panel.content.includes(message("en", "quizWagerResult", { stake: 5, payout: 0, net: -5 })));
   for (const language of messageLanguages) {
     const localized = await quizPersonalPayload(identity, "alice", language);
     assert.ok(localized.content.includes(message(language, "quizWagerResult", { stake: 10, payout: 20, net: "+10" })));
+    checkQuizLink(localized, language);
     assert.ok(localized.content.length <= 2000 && !/\{\w+\}/.test(localized.content));
     for (const key of ["quizPersonalHeading", "quizResultHeading", "quizResultPending", "quizHintActive", "quizHintChoiceEliminated", "quizAnswerWon", "quizAnswerLost"]) {
       assert.ok(message(language, key).includes(feedbackKaomoji[key]));
@@ -113,7 +165,7 @@ try {
   await db.quizWager.deleteMany({ where: { guildId: identity.guildId, userId: "alice" } });
   panel = await press("quiz:me");
   assert.ok(panel.content.includes(message("en", "quizNoChoice")) && panel.content.includes(message("en", "quizNoWager")));
-  console.log(JSON.stringify({ check: "quiz-personal-postgres", passed: true, privateSelection: true, paidChanges: true, fiftyButtons: true, payoutVsProfit: true, settledReadOnly: true, isolation: true, locales: 6 }));
+  console.log(JSON.stringify({ check: "quiz-personal-postgres", passed: true, privateSelection: true, privateWager: true, quizNavigation: true, paidChanges: true, fiftyButtons: true, payoutVsProfit: true, settledReadOnly: true, isolation: true, locales: messageLanguages.length }));
 } catch (error) {
   console.error(JSON.stringify({ check: "quiz-personal-postgres", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "test-error", line: Number(error.stack?.match(/test-quiz-personal-postgres\.mjs:(\d+)/)?.[1] ?? 0) }));
   process.exitCode = 1;

@@ -6,19 +6,13 @@ import {
 import { db } from "../db.js";
 import { openFeedback } from "../feedback.js";
 import { message } from "../messages.js";
+import { isSupportedLanguage, supportedLanguages } from "../languages.js";
 import { cacheGuildSettings, getGuildSettings } from "../services/guild-settings.js";
 import { canManageDilemma } from "../services/management-permissions.js";
 import { guildTimezone, parseTimezone, timezoneSuggestions } from "../services/timezone.js";
 import { scheduleEvents } from "../services/schedule-events.js";
 
-export const supportedLanguages = [
-  { name: "English", value: "en" },
-  { name: "Polski", value: "pl" },
-  { name: "Deutsch", value: "de" },
-  { name: "Español", value: "es" },
-  { name: "Français", value: "fr" },
-  { name: "日本語", value: "ja" }
-];
+export { supportedLanguages } from "../languages.js";
 
 export const languageCommand = new SlashCommandSubcommandBuilder()
   .setName("language")
@@ -48,6 +42,7 @@ export async function handleSettings(interaction: ChatInputCommandInteraction) {
 
   if (interaction.options.getSubcommand() === "language") {
     const language = interaction.options.getString("value", true);
+    if (!isSupportedLanguage(language)) { await reply(text("languageUnavailable")); return; }
     cacheGuildSettings(await db.guildSettings.upsert({
       where: { guildId: interaction.guildId },
       create: { guildId: interaction.guildId, language },

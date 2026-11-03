@@ -1,5 +1,6 @@
 import type { GuildSettings } from "@prisma/client";
 import { db } from "../db.js";
+import { normalizeLanguage } from "../languages.js";
 
 const maxEntries = 10_000;
 const lifetimeMs = 60 * 60 * 1_000;
@@ -14,7 +15,8 @@ function put(guildId: string, value: Promise<GuildSettings | null>) {
 export function getGuildSettings(guildId: string): Promise<GuildSettings | null> {
   const stored = cache.get(guildId);
   if (stored && stored.expiresAt > Date.now()) return stored.value;
-  const value = db.guildSettings.findUnique({ where: { guildId } }).then(settings => settings);
+  const value = db.guildSettings.findUnique({ where: { guildId } })
+    .then(settings => settings ? { ...settings, language: normalizeLanguage(settings.language) } : null);
   put(guildId, value);
   void value.catch(() => {
     if (cache.get(guildId)?.value === value) cache.delete(guildId);
@@ -23,8 +25,9 @@ export function getGuildSettings(guildId: string): Promise<GuildSettings | null>
 }
 
 export function cacheGuildSettings(settings: GuildSettings): GuildSettings {
-  put(settings.guildId, Promise.resolve(settings));
-  return settings;
+  const normalized = { ...settings, language: normalizeLanguage(settings.language) };
+  put(normalized.guildId, Promise.resolve(normalized));
+  return normalized;
 }
 
 export async function ensureGuildSettings(guildId: string): Promise<GuildSettings> {

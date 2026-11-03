@@ -40,7 +40,7 @@ try {
     const help = getHelpEmbed(language).toJSON();
     assert.ok(help.fields.every(field => field.value.length <= 1024 && field.value.split("\n").every(line => line.startsWith("- "))));
   }
-  console.log(JSON.stringify({ check: "feedback-layout", passed: true, locales: 6, completePrivatePagination: true }));
+  console.log(JSON.stringify({ check: "feedback-layout", passed: true, locales: messageLanguages.length, completePrivatePagination: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "feedback-layout", passed: false, category: error instanceof assert.AssertionError ? "assertion" : "test-error",
     line: Number(error.stack?.match(/test-feedback-layout\.mjs:(\d+)/)?.[1] ?? 0) })); process.exitCode = 1;

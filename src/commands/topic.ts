@@ -130,7 +130,8 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         return;
       }
       if (error instanceof RandomQuizCooldownError) {
-        await reply(text("randomCooldown", { minutes: Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000)) }));
+        const remainingMinutes = Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000));
+        await reply(text("randomCooldown", { hours: Math.floor(remainingMinutes / 60), minutes: remainingMinutes % 60 }));
         return;
       }
       const feedback = quizErrorFeedback(error);

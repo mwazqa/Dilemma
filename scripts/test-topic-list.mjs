@@ -154,7 +154,7 @@ try {
     }
   }
   assert.equal(writes, 0); assert.equal(networks, 0);
-  console.log(JSON.stringify({ check: "topic-list", passed: true, locales: 6, completePagination: true,
+  console.log(JSON.stringify({ check: "topic-list", passed: true, locales: messageLanguages.length, completePagination: true,
     startDateOrder: true, filters: true, permissions: true, readOnly: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "topic-list", passed: false,

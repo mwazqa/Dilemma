@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## v3.6.0 - 2026-11-03
+
+- Add `/dilemma guide` to publish the localized player guide as one public text embed, with a Refresh button that updates the same message from the running version and current server language. Restrict publishing and refreshing to Manage Server or the configured Dilemma manager role, validate the source message and keep access/publication failures private. Add bilingual guide checks, synchronized documents and a review requirement for every release. Re-register commands when deploying; no migration is required.
+- Add a localized Go to quiz link button to private answer, 50/50 and result panels. Link directly to the original quiz message without sending another bot interaction or spending Sparks.
+- Add Place bet to the private answer panel, disabled until an answer is selected or when a bet is already active. Bind the wager form to the original quiz and private source message, update the panel after submission and retain one-time stake charging, stake limits and closed-quiz checks.
+- Display the remaining random-quiz cooldown in hours and minutes in English and Polish, rounding up to avoid suggesting an early retry. Keep the six-hour cooldown and server quota unchanged.
+- End quiz-card artwork at the lavender frame with transparency outside it. Preserve the existing layout and all four corners under Discord-style rounded clipping.
+- Limit supported languages to English and Polish across onboarding, command choices, quiz generation, feedback, results and difficulty labels. Remove the other translation entries, fall back to English for unsupported saved languages and reject stale language selections without writing settings. Preserve existing quiz history and use the same catalog for tests and runtime. Re-register Discord commands when deploying; no database migration is needed.
+- Rename the Polish My answer button to "Moja odpowiedź" while retaining "Mój wynik" after quiz completion.
 
 ## v3.5.0 - 2026-11-02
 
