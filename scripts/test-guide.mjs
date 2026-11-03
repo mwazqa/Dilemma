@@ -60,7 +60,8 @@ try {
     assert.ok(content.length > 2000 && content.replace(/\n/g, "\r\n").length <= 4000);
     assert.doesNotMatch(content, /\{\w+\}|^#{1,6}\s|<@|@everyone|@here/m);
     assert.ok(content.includes(feedbackKaomoji.playerGuide));
-    for (const key of ["myQuizVoteButton", "quizJumpButton", "wagerButton", "myQuizResultButton", "endQuizButton", "guideRefreshButton"]) {
+    assert.ok(!content.includes("/dilemma guide"), "The player guide omits its publishing and refresh instructions");
+    for (const key of ["myQuizVoteButton", "quizJumpButton", "wagerButton", "myQuizResultButton", "endQuizButton"]) {
       assert.ok(content.includes(message(language, key)));
     }
     assert.equal(readFileSync(`docs/player-guide.${language}.md`, "utf8").replace(/\r\n/g, "\n"), content + "\n");
@@ -87,13 +88,13 @@ try {
     assert.equal(result.privateReplies.length, 0); assert.equal(result.cleaned, 1);
   }
   stage = "access";
-  for (const refresh of [false, true]) for (const access of [
+  for (const access of [
     { permission: 0n }, { permission: 0n, roles: ["other-role"] },
     { permission: 0n, roles: [managerRoleId], managerRole: null },
     { permission: 0n, roles: [managerRoleId], settingsGuildId: "other-guild" },
     { permission: 0n, roles: ["guide-guild"], managerRole: "guide-guild" }
   ]) {
-    const result = await invoke(refresh, access);
+    const result = await invoke(false, access);
     assert.equal(result.sendAttempts, 0); assert.equal(result.editAttempts, 0);
     assert.equal(result.privateReplies[0].content, message("pl", "permission"));
   }
@@ -107,9 +108,10 @@ try {
   assert.equal(result.sendAttempts, 0);
   stage = "refresh";
   for (const language of messageLanguages) for (const access of [
-    { permission: PermissionFlagsBits.ManageGuild }, { permission: 0n, roles: [managerRoleId] }
+    { permission: PermissionFlagsBits.ManageGuild }, { permission: 0n, roles: [managerRoleId] },
+    { permission: 0n }, { permission: 0n, roles: ["other-role"] }, { permission: 0n, managerRole: null }
   ]) {
-    result = await invoke(true, { language, ...access });
+    result = await invoke(true, { language, locale: language === "pl" ? "en" : "pl", ...access });
     assert.equal(result.sendAttempts, 0); assert.equal(result.edited.length, 1);
     assert.equal(result.edited[0].embeds[0].toJSON().description, getPlayerGuideText(language));
     assert.deepEqual(result.edited[0].allowedMentions.parse, []);
@@ -119,23 +121,23 @@ try {
     { author: { id: "other-bot" } }, { guildId: "other-guild" }, { channelId: "other-channel" },
     { flags: { has: () => true } }, { components: [] }
   ]) {
-    result = await invoke(true, { source });
+    result = await invoke(true, { source, permission: 0n });
     assert.equal(result.editAttempts, 0); assert.equal(result.sendAttempts, 0);
     assert.equal(result.privateReplies[0].content, message("pl", "guideUnavailable"));
   }
-  result = await invoke(true, { customId: "quiz:refresh" });
+  result = await invoke(true, { customId: "quiz:refresh", permission: 0n });
   assert.equal(result.editAttempts, 0); assert.equal(result.privateReplies[0].content, message("pl", "guideUnavailable"));
   stage = "failures";
   result = await invoke(false, { failSend: true });
   assert.equal(result.sendAttempts, 1); assert.equal(result.cleaned, 0);
   assert.equal(result.privateReplies[0].content, message("pl", "guidePublishFailed"));
-  result = await invoke(true, { failEdit: true });
+  result = await invoke(true, { failEdit: true, permission: 0n });
   assert.equal(result.editAttempts, 1); assert.equal(result.cleaned, 0);
   assert.equal(result.privateReplies[0].content, message("pl", "guideRefreshFailed"));
   result = await invoke(false, { failCleanup: true });
   assert.equal(result.sent.length, 1); assert.equal(result.privateReplies[0].content, message("pl", "guidePublished"));
   console.log(JSON.stringify({ check: "guide", passed: true, locales: messageLanguages.length, publicPublishing: true, refreshInPlace: true,
-    adminAndRoleAccess: true, staleTextReplaced: true, noExtraSuccessMessage: true, lengthBudget: true }));
+    restrictedPublishing: true, everyoneCanRefresh: true, staleTextReplaced: true, noExtraSuccessMessage: true, lengthBudget: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "guide", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "test-error",
     line: Number(error.stack?.match(/test-guide\.mjs:(\d+)/)?.[1] ?? 0) }));

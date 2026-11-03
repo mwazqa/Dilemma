@@ -53,7 +53,6 @@ After settlement, click **My result**. Privately see your choice, the correct an
 The whole server shares **4 randoms per day**, normally **6 hours apart**. Days use the server timezone; midnight doesn't shorten a cooldown. Remaining time is shown in hours and minutes. Use designated random channels when configured.
 Close your own random with **Let's end this quiz**. The server owner, members with **Manage Server** or the Dilemma manager role can close all quizzes.
 `/dilemma random-reset` is for the owner or manager role. It resets the cooldown, not the daily quota. Closing early doesn't restore a random slot or shorten the cooldown~
-Use `/dilemma guide` to publish this guide with Manage Server or the Dilemma manager role. **Refresh** loads its latest text into the same message.
 
 **🔔 Notifications**
 

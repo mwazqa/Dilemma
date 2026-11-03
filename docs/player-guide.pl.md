@@ -53,7 +53,6 @@ Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawn
 Na cały serwer przypadają **4 randomy dziennie**, standardowo co **6 godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
 Swój random zamkniesz przyciskiem **Zakończ quiz**. Wszystkie quizy mogą zamykać też właściciel serwera, osoby z uprawnieniem **Zarządzanie serwerem** lub rolą opiekuna Dilemmy.
 `/dilemma random-reset` jest dla właściciela i osób z rolą opiekuna. Reset usuwa oczekiwanie, ale nie odnawia limitu dziennego. Wcześniejsze zamknięcie nie zwraca randoma ani nie skraca przerwy~
-Poradnik opublikujesz przez `/dilemma guide`, mając Zarządzanie serwerem lub rolę opiekuna. **Odśwież** wczytuje jego aktualny tekst w tej samej wiadomości.
 
 **🔔 Powiadomienia**
 

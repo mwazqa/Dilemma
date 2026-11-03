@@ -54,7 +54,6 @@ After settlement, click **{myResultButton}**. Privately see your choice, the cor
 The whole server shares **{randomDailyLimit} randoms per day**, normally **{randomCooldownHours} hours apart**. Days use the server timezone; midnight doesn't shorten a cooldown. Remaining time is shown in hours and minutes. Use designated random channels when configured.
 Close your own random with **{endQuizButton}**. The server owner, members with **Manage Server** or the Dilemma manager role can close all quizzes.
 \`/dilemma random-reset\` is for the owner or manager role. It resets the cooldown, not the daily quota. Closing early doesn't restore a random slot or shorten the cooldown~
-Use \`/dilemma guide\` to publish this guide with Manage Server or the Dilemma manager role. **{guideRefreshButton}** loads its latest text into the same message.
 
 **🔔 Notifications**
 
@@ -114,7 +113,6 @@ Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, p
 Na cały serwer przypadają **{randomDailyLimit} randomy dziennie**, standardowo co **{randomCooldownHours} godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
 Swój random zamkniesz przyciskiem **{endQuizButton}**. Wszystkie quizy mogą zamykać też właściciel serwera, osoby z uprawnieniem **Zarządzanie serwerem** lub rolą opiekuna Dilemmy.
 \`/dilemma random-reset\` jest dla właściciela i osób z rolą opiekuna. Reset usuwa oczekiwanie, ale nie odnawia limitu dziennego. Wcześniejsze zamknięcie nie zwraca randoma ani nie skraca przerwy~
-Poradnik opublikujesz przez \`/dilemma guide\`, mając Zarządzanie serwerem lub rolę opiekuna. **{guideRefreshButton}** wczytuje jego aktualny tekst w tej samej wiadomości.
 
 **🔔 Powiadomienia**
 

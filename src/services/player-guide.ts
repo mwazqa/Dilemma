@@ -10,7 +10,7 @@ export function getPlayerGuideText(language = "en"): string {
   return message(language, "playerGuide", {
     myAnswerButton: message(language, "myQuizVoteButton"), quizJumpButton: message(language, "quizJumpButton"),
     wagerButton: message(language, "wagerButton"), myResultButton: message(language, "myQuizResultButton"),
-    endQuizButton: message(language, "endQuizButton"), guideRefreshButton: message(language, "guideRefreshButton"),
+    endQuizButton: message(language, "endQuizButton"),
     withdrawCost: WITHDRAW_COST, revealCost: REVEAL_COST,
     fiftyCost: FIFTY_FIFTY_COST, maxWager: MAX_WAGER, experiencePerPoint,
     randomDailyLimit: RANDOM_DAILY_LIMIT, randomCooldownHours: RANDOM_COOLDOWN_MS / 3_600_000,

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.6.1 - 2026-11-03
+
+- Allow everyone with access to the public player guide to refresh that same message, while retaining source-message checks and restricted publishing. Remove the publishing and refresh instructions from the Polish and English guide text.
+
 ## v3.6.0 - 2026-11-03
 
 - Add `/dilemma guide` to publish the localized player guide as one public text embed, with a Refresh button that updates the same message from the running version and current server language. Restrict publishing and refreshing to Manage Server or the configured Dilemma manager role, validate the source message and keep access/publication failures private. Add bilingual guide checks, synchronized documents and a review requirement for every release. Re-register commands when deploying; no migration is required.

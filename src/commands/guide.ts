@@ -21,9 +21,8 @@ export async function handleGuide(interaction: ChatInputCommandInteraction) {
 }
 
 export async function handleGuideRefresh(interaction: ButtonInteraction) {
-  const { language, settings, text, reply } = await openFeedback(interaction);
+  const { language, text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) { await reply(text("serverOnly")); return; }
-  if (!canManageDilemma(interaction, settings)) { await reply(text("permission")); return; }
   const source = interaction.message;
   const hasRefreshButton = source.components.some(row => row.type === ComponentType.ActionRow
     && row.components.some(component => component.type === ComponentType.Button && component.customId === GUIDE_REFRESH_BUTTON_ID));
