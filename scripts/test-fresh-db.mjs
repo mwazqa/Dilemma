@@ -13,6 +13,10 @@ try {
     INSERT INTO "GeneratedPoll" (id, guildId, topicId, messageId, channelId, question, options, correctOption, explanation) VALUES ('g', 'test', 'legacy', 'gmsg', 'channel', 'Question', 'A||B', 0, 'Fact');
     INSERT INTO "RandomPoll" (id, guildId, language, messageId, channelId, question, options, correctOption, explanation) VALUES ('r', 'test', 'pl', 'rmsg', 'channel', 'Question', 'A||B', 0, 'Fact');`);
   for (const migration of migrations.slice(1)) {
+    if (migration === "20261103130000_answer_sparks_penalty") {
+      database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES ('legacy-penalty', 'test', 'channel', 'hard', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('legacy-penalty', 'legacy-player', 'test', 2, false, 0, CURRENT_TIMESTAMP);`);
+    }
     if (migration === "20261028120000_automatic_quiz_results") {
       database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES
         ('old-scored', 'test', 'channel', 'hard', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -26,6 +30,12 @@ try {
       database.exec(`INSERT INTO "UserScore" (guildId, userId, points, answered, correct, currentStreak, bestStreak, updatedAt) VALUES ('test', 'legacy-player', 10, 12, 10, 3, 4, CURRENT_TIMESTAMP)`);
     }
     database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+    if (migration === "20261103130000_answer_sparks_penalty") {
+      assert.equal(database.prepare('SELECT sparksPenalty FROM "QuizAnswer" WHERE messageId = ?').get("legacy-penalty").sparksPenalty, 0);
+      assert.equal(database.prepare('SELECT sparks FROM "UserScore" WHERE userId = ?').get("legacy-player").sparks, 0);
+      assert.equal(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"), readFileSync(`prisma/postgresql/migrations/${migration}/migration.sql`, "utf8"));
+      database.exec('DELETE FROM "QuizSettlement" WHERE messageId = \'legacy-penalty\'');
+    }
     if (migration === "20261028120000_automatic_quiz_results") {
       assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("old-scored").resultsPending, 0);
       assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("gmsg").resultsPending, 0);

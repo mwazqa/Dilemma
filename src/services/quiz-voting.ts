@@ -14,9 +14,9 @@ export const REVEAL_VOTES_ID = "quiz:reveal";
 export const FIFTY_FIFTY_ID = "quiz:fifty";
 export const WAGER_BUTTON_ID = "quiz:wager";
 export const WAGER_MODAL_PREFIX = "quiz:wager:";
-export const MAX_WAGER = 20;
+export const MAX_WAGER = 10;
 export const WITHDRAW_COST = 1;
-export const REVEAL_COST = 5;
+export const REVEAL_COST = 3;
 export const FIFTY_FIFTY_COST = 5;
 type Identity = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 

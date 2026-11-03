@@ -109,10 +109,15 @@ try {
   assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
   panel = await submit(10, { channelId: "another-channel" });
   assert.equal(panel.content, message("en", "notPoll")); assert.equal(await wallet("alice"), 12);
-  panel = await submit(21);
-  assert.ok(panel.content.includes(message("en", "wagerInvalid", { max: 20 }))); assert.equal(await wallet("alice"), 12);
-  panel = await submit(20);
-  assert.ok(panel.content.includes(message("en", "sparksInsufficient", { cost: 20 }))); assert.equal(await wallet("alice"), 12);
+  assert.equal(modal.components[0].components[0].label, message("en", "wagerAmount", { max: 10 }));
+  for (const amount of [11, 20, 21]) {
+    panel = await submit(amount);
+    assert.ok(panel.content.includes(message("en", "wagerInvalid", { max: 10 }))); assert.equal(await wallet("alice"), 12);
+  }
+  await db.userScore.update({ where: { guildId_userId: { guildId: identity.guildId, userId: "alice" } }, data: { sparks: 9 } });
+  panel = await submit(10);
+  assert.ok(panel.content.includes(message("en", "sparksInsufficient", { cost: 10 }))); assert.equal(await wallet("alice"), 9);
+  await db.userScore.update({ where: { guildId_userId: { guildId: identity.guildId, userId: "alice" } }, data: { sparks: 12 } });
   panel = await submit(10);
   assert.equal(updated, 1); assert.equal(deferred, 0, "Wager submission updates the existing private panel");
   assert.equal(await wallet("alice"), 2);
@@ -120,7 +125,7 @@ try {
   assert.ok(buttons(panel).find(button => button.custom_id?.endsWith(":wager")).disabled);
   const savedWager = await db.quizWager.findUnique({ where: { messageId_userId: { messageId: quiz.messageId, userId: "alice" } } });
   assert.equal(savedWager.answerId, 1); assert.equal(savedWager.messageId, quiz.messageId);
-  await submit(20);
+  await submit(10);
   assert.equal(await wallet("alice"), 2, "Repeating a stale wager form never charges twice");
   await placeQuizWager(identity, "bob", 5);
   stage = "pending-result";
@@ -144,7 +149,8 @@ try {
   await submit(10);
   assert.equal(await wallet("alice"), before, "A stale wager form cannot charge after settlement");
   panel = await press("quiz:me", "bob");
-  assert.ok(panel.content.includes(message("en", "quizAnswerLost", { points: 0 })));
+  assert.ok(panel.content.includes(message("en", "quizAnswerLost", { points: 0, penalty: 3 })));
+  assert.equal(await wallet("bob"), 12, "Wrong medium answer costs 3 Sparks in addition to the lost 5-Spark stake");
   assert.ok(panel.content.includes(message("en", "quizWagerResult", { stake: 5, payout: 0, net: -5 })));
   for (const language of messageLanguages) {
     const localized = await quizPersonalPayload(identity, "alice", language);

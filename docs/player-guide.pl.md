@@ -12,11 +12,12 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 **✨ Punkty, poziomy i Iskry**
 
 Za poprawną odpowiedź dostajesz **1 punkt i 1 Iskrę** w łatwym quizie, **2 punkty i 2 Iskry** w średnim lub **3 punkty i 3 Iskry** w trudnym. Punkt daje **10 EXP**, a zdobyty poziom dodatkowe **5 Iskier**!
+Za błąd tracisz **2/3/4 Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
 Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
 
 **🔍 Pomoc**
 
-- **Podgląd - 5 Iskier:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
+- **Podgląd - 3 Iskry:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
 - **50/50 - 5 Iskier:** w prywatnym panelu zostają dwa przyciski, w tym poprawna odpowiedź. Działa przy 3-4 odpowiedziach; odrzuconych opcji nie można już wybrać.
 
 Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
@@ -24,9 +25,9 @@ Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
 
 **🎲 Obstaw Iskry**
 
-Najpierw zagłosuj. Kliknij **Obstaw Iskry** pod kartą lub w panelu **Moja odpowiedź**. Zatwierdź całkowitą stawkę **1-20 Iskier**; pobiorę ją z portfela.
+Najpierw zagłosuj. Kliknij **Obstaw Iskry** pod kartą lub w panelu **Moja odpowiedź**. Zatwierdź całkowitą stawkę **1-10 Iskier**; pobiorę ją z portfela.
 
-- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki.
+- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki oraz karę za odpowiedź.
 - Nagrody za odpowiedź i poziom naliczam osobno.
 - Możesz mieć jeden aktywny zakład na quiz. Jego stawki nie zmienisz.
 - Zmiana odpowiedzi za 1 Iskrę przenosi zakład na nowy wybór.
@@ -37,7 +38,7 @@ Panel pokazuje stawkę i możliwą wypłatę. Przycisk obstawiania w panelu jest
 
 **🏁 Mój wynik**
 
-Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, zdobyte punkty oraz stawkę, wypłatę i zysk lub stratę z zakładu.
+Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, punkty, pobrane Iskry oraz stawkę, wypłatę i zysk lub stratę z zakładu.
 
 **🎮 Komendy**
 

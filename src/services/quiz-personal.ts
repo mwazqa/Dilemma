@@ -50,7 +50,9 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
     components.push(answers);
   } else if (quiz.scoredAt) {
     lines.push(message(language, "quizCorrectAnswer", { answer: describe(quiz.correctAnswerId) }));
-    if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", { points: answer.points }));
+    if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", {
+      points: answer.points, penalty: answer.sparksPenalty
+    }));
     if (wager?.payout !== null && wager?.payout !== undefined) {
       const net = wager.payout - wager.amount;
       lines.push(message(language, "quizWagerResult", { stake: wager.amount, payout: wager.payout, net: `${net > 0 ? "+" : ""}${net}` }));

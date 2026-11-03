@@ -12,11 +12,12 @@ I create questions with AI, and you collect points, Sparks, levels and badges~
 **✨ Points, levels and Sparks**
 
 A correct answer earns **1 point and 1 Spark** for easy, **2 points and 2 Sparks** for medium, or **3 points and 3 Sparks** for hard. Each point gives **10 EXP**, and each new level gives **5 extra Sparks**!
+Wrong answers cost **2/3/4 Sparks** for easy/medium/hard, up to your balance. Skipping is free.
 Correct answers build a streak. A mistake breaks it; skipping a quiz doesn't. Scores, badges and wallets are separate on each server~ (っ•ᴗ•)っ✦
 
 **🔍 A little help**
 
-- **Preview - 5 Sparks:** private vote counts without revealing the correct answer.
+- **Preview - 3 Sparks:** private vote counts without revealing the correct answer.
 - **50/50 - 5 Sparks:** your private panel keeps two answer buttons, including the correct one. Available with 3-4 answers; eliminated choices can no longer receive your vote.
 
 Buy each tool once per quiz. Reopening is free.
@@ -24,9 +25,9 @@ Buy each tool once per quiz. Reopening is free.
 
 **🎲 Place a bet**
 
-Vote first. Click **Place bet** below the card or in **My answer**. Confirm a whole-number stake of **1-20 Sparks**; I'll deduct it from your wallet.
+Vote first. Click **Place bet** below the card or in **My answer**. Confirm a whole-number stake of **1-10 Sparks**; I'll deduct it from your wallet.
 
-- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake.
+- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake plus the answer penalty.
 - Answer and level rewards are awarded separately.
 - One active bet per quiz. Its stake cannot be changed.
 - Changing your answer for 1 Spark moves the bet to your new choice.
@@ -37,7 +38,7 @@ The panel shows your stake and possible payout. Its bet button is disabled befor
 
 **🏁 My result**
 
-After settlement, click **My result**. Privately see your choice, the correct answer, points earned and your bet's stake, payout and profit or loss.
+After settlement, click **My result**. Privately see your choice, correct answer, points, any Sparks deducted and your bet's stake, payout and profit or loss.
 
 **🎮 Commands**
 

@@ -39,6 +39,7 @@ model QuizAnswer {
   answerId   Int
   correct    Boolean
   points     Int
+  sparksPenalty Int @default(0)
   finishedAt DateTime
   settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
 

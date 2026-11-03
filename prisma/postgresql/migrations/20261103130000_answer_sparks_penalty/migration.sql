@@ -1,0 +1,1 @@
+ALTER TABLE "QuizAnswer" ADD COLUMN "sparksPenalty" INTEGER NOT NULL DEFAULT 0;

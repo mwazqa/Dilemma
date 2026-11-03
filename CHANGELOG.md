@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.7.0 - 2026-11-03
+
+- Limit new bets to 1-10 Sparks and reduce the private vote preview price to 3 Sparks. Existing stakes keep their original payouts and refunds.
+- Deduct 2/3/4 Sparks for a wrong final answer on easy/medium/hard, capped at the available wallet balance. Keep points, EXP and correct-answer rewards unchanged; skipping or withdrawing produces no answer penalty. Record the actual deduction per answer and show it in the private result in Polish and English. Add an additive database migration, synchronized guides and isolated settlement tests.
+
 ## v3.6.1 - 2026-11-03
 
 - Allow everyone with access to the public player guide to refresh that same message, while retaining source-message checks and restricted publishing. Remove the publishing and refresh instructions from the Polish and English guide text.

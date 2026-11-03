@@ -13,6 +13,7 @@ I create questions with AI, and you collect points, Sparks, levels and badges~
 **✨ Points, levels and Sparks**
 
 A correct answer earns **1 point and 1 Spark** for easy, **2 points and 2 Sparks** for medium, or **3 points and 3 Sparks** for hard. Each point gives **{experiencePerPoint} EXP**, and each new level gives **5 extra Sparks**!
+Wrong answers cost **{easyPenalty}/{mediumPenalty}/{hardPenalty} Sparks** for easy/medium/hard, up to your balance. Skipping is free.
 Correct answers build a streak. A mistake breaks it; skipping a quiz doesn't. Scores, badges and wallets are separate on each server~ (っ•ᴗ•)っ✦
 
 **🔍 A little help**
@@ -27,7 +28,7 @@ Buy each tool once per quiz. Reopening is free.
 
 Vote first. Click **{wagerButton}** below the card or in **{myAnswerButton}**. Confirm a whole-number stake of **1-{maxWager} Sparks**; I'll deduct it from your wallet.
 
-- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake.
+- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake plus the answer penalty.
 - Answer and level rewards are awarded separately.
 - One active bet per quiz. Its stake cannot be changed.
 - Changing your answer for {withdrawCost} Spark moves the bet to your new choice.
@@ -38,7 +39,7 @@ The panel shows your stake and possible payout. Its bet button is disabled befor
 
 **🏁 My result**
 
-After settlement, click **{myResultButton}**. Privately see your choice, the correct answer, points earned and your bet's stake, payout and profit or loss.
+After settlement, click **{myResultButton}**. Privately see your choice, correct answer, points, any Sparks deducted and your bet's stake, payout and profit or loss.
 
 **🎮 Commands**
 
@@ -72,11 +73,12 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 **✨ Punkty, poziomy i Iskry**
 
 Za poprawną odpowiedź dostajesz **1 punkt i 1 Iskrę** w łatwym quizie, **2 punkty i 2 Iskry** w średnim lub **3 punkty i 3 Iskry** w trudnym. Punkt daje **{experiencePerPoint} EXP**, a zdobyty poziom dodatkowe **5 Iskier**!
+Za błąd tracisz **{easyPenalty}/{mediumPenalty}/{hardPenalty} Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
 Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
 
 **🔍 Pomoc**
 
-- **Podgląd - {revealCost} Iskier:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
+- **Podgląd - {revealCost} Iskry:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
 - **50/50 - {fiftyCost} Iskier:** w prywatnym panelu zostają dwa przyciski, w tym poprawna odpowiedź. Działa przy 3-4 odpowiedziach; odrzuconych opcji nie można już wybrać.
 
 Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
@@ -86,7 +88,7 @@ Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
 
 Najpierw zagłosuj. Kliknij **{wagerButton}** pod kartą lub w panelu **{myAnswerButton}**. Zatwierdź całkowitą stawkę **1-{maxWager} Iskier**; pobiorę ją z portfela.
 
-- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki.
+- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki oraz karę za odpowiedź.
 - Nagrody za odpowiedź i poziom naliczam osobno.
 - Możesz mieć jeden aktywny zakład na quiz. Jego stawki nie zmienisz.
 - Zmiana odpowiedzi za {withdrawCost} Iskrę przenosi zakład na nowy wybór.
@@ -97,7 +99,7 @@ Panel pokazuje stawkę i możliwą wypłatę. Przycisk obstawiania w panelu jest
 
 **🏁 Mój wynik**
 
-Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, zdobyte punkty oraz stawkę, wypłatę i zysk lub stratę z zakładu.
+Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, punkty, pobrane Iskry oraz stawkę, wypłatę i zysk lub stratę z zakładu.
 
 **🎮 Komendy**
 

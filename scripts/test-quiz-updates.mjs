@@ -15,7 +15,7 @@ try {
   assert.equal(earnedSparks(10, 1), 6);
   assert.equal(earnedSparks(10, 0), 0);
   assert.equal(dilemmaCommand.toJSON().options.find(option => option.name === "random").options.find(option => option.name === "duration_hours").max_value, 6);
-  assert.equal(MAX_WAGER, 20); assert.equal(WITHDRAW_COST, 1); assert.equal(REVEAL_COST, 5); assert.equal(FIFTY_FIFTY_COST, 5);
+  assert.equal(MAX_WAGER, 10); assert.equal(WITHDRAW_COST, 1); assert.equal(REVEAL_COST, 3); assert.equal(FIFTY_FIFTY_COST, 5);
   const feedbackKeys=["wagerRefunded","wagerExisting","wagerPlaced","wagerVoteFirst","wagerInvalid","fiftyResult","fiftyUnavailable","revealUnlocked","sparksCharged","sparksInsufficient","votingClosed","voteEliminated","voteMissing","voteWithdrawn","voteSaved","randomDurationInvalid"];
   for(const language of messageLanguages)for(const key of feedbackKeys){
     const reply=message(language,key,{amount:2,answer:2,payout:4,max:20,cost:5});

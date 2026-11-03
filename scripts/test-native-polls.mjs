@@ -24,7 +24,8 @@ db.$transaction = async work => work({
   } },
   quizAnswer: { create: async ({ data }) => { answers.push(data); return data; },
     findMany: async ({ where }) => answers.filter(answer => answer.guildId === where.guildId && answer.userId === where.userId) },
-  userScore: { upsert: async ({ create, update }) => { scores.set(create.userId, update); return update; } }
+  userScore: { findUnique: async () => ({ sparks: 2 }),
+    upsert: async ({ create, update }) => { scores.set(create.userId, update); return update; } }
 });
 const client = { user: { id: "bot" }, rest: { get: async route => {
   if (!route.includes("/answers/")) return { id: "quiz", channel_id: "channel", author: { id: "bot" }, poll: {
@@ -54,6 +55,8 @@ try {
   assert.deepEqual(wrong.votes, [{ userId: "101", answerId: 93 }]);
   assert.equal(await applyFinalVotes({ ...metadata, messageId: "second-quiz" }, wrong.votes, wrong.finishedAt), true);
   assert.equal(answers.at(-1).points, 0);
+  assert.equal(answers.at(-1).sparksPenalty, 2, "A medium-answer penalty is capped at the available 2 Sparks");
+  assert.equal(scores.get("101").sparks.increment, -2);
   selected = null;
   const withdrawn = await collectFinalVotes(client, metadata);
   assert.deepEqual(withdrawn.votes, []);

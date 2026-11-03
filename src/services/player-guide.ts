@@ -3,6 +3,7 @@ import { message } from "../messages.js";
 import { experiencePerPoint } from "./experience.js";
 import { RANDOM_COOLDOWN_MS, RANDOM_DAILY_LIMIT, RANDOM_MAX_DURATION_HOURS } from "./quiz-limits.js";
 import { FIFTY_FIFTY_COST, MAX_WAGER, REVEAL_COST, WITHDRAW_COST } from "./quiz-voting.js";
+import { wrongAnswerPenalties } from "./sparks.js";
 
 export const GUIDE_REFRESH_BUTTON_ID = "guide:refresh";
 
@@ -13,6 +14,7 @@ export function getPlayerGuideText(language = "en"): string {
     endQuizButton: message(language, "endQuizButton"),
     withdrawCost: WITHDRAW_COST, revealCost: REVEAL_COST,
     fiftyCost: FIFTY_FIFTY_COST, maxWager: MAX_WAGER, experiencePerPoint,
+    easyPenalty: wrongAnswerPenalties.easy, mediumPenalty: wrongAnswerPenalties.medium, hardPenalty: wrongAnswerPenalties.hard,
     randomDailyLimit: RANDOM_DAILY_LIMIT, randomCooldownHours: RANDOM_COOLDOWN_MS / 3_600_000,
     randomMaxHours: RANDOM_MAX_DURATION_HOURS
   });

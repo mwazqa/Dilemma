@@ -8,7 +8,7 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { scheduleEvents, settlementDeadline, type SettlementSchedule } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { publishQuizResults } from "./quiz-results.js";
-import { earnedSparks } from "./sparks.js";
+import { earnedSparks, wrongAnswerPenalties } from "./sparks.js";
 
 const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
@@ -96,15 +96,20 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
         if (!claim.count) return false;
         for (const vote of finalVotes) {
           const correct = vote.answerId === quiz.correctAnswerId;
+          const difficulty = parseDifficulty(quiz.difficulty);
+          const wallet = correct ? null : await tx.userScore.findUnique({
+            where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } }, select: { sparks: true }
+          });
+          const sparksPenalty = correct ? 0 : Math.min(wallet?.sparks ?? 0, wrongAnswerPenalties[difficulty]);
           await tx.quizAnswer.create({ data: { ...vote, guildId: quiz.guildId, messageId: quiz.messageId, correct,
-            points: correct ? pointsByDifficulty[parseDifficulty(quiz.difficulty)] : 0, finishedAt } });
+            points: correct ? pointsByDifficulty[difficulty] : 0, sparksPenalty, finishedAt } });
           const history = await tx.quizAnswer.findMany({ where: { guildId: quiz.guildId, userId: vote.userId },
             select: { correct: true, points: true }, orderBy: [{ finishedAt: "asc" }, { messageId: "asc" }] });
           const score = scoreHistory(history);
-          const earned = correct ? pointsByDifficulty[parseDifficulty(quiz.difficulty)] : 0;
-          const sparks = earnedSparks(score.points, earned);
+          const earned = correct ? pointsByDifficulty[difficulty] : 0;
+          const sparks = correct ? earnedSparks(score.points, earned) : -sparksPenalty;
           await tx.userScore.upsert({ where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } },
-            create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks }, update: { ...score, sparks: { increment: sparks } } });
+            create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks: Math.max(0, sparks) }, update: { ...score, sparks: { increment: sparks } } });
         }
         if (quiz.votingMode === "buttons") {
           const wagers = await tx.quizWager.findMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId, payout: null } });
