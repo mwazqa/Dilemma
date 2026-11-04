@@ -142,6 +142,7 @@ model GeneratedPoll {
   closeSource  String?
 
   @@index([guildId, createdAt])
+  @@index([guildId, topicId, createdAt])
 }
 
 model RandomPoll {

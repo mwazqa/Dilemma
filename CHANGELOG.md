@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.7.1 - 2026-11-04
+
+- Compare scheduled and random questions against shared per-server history, including questions from other or deleted topics. Preserve each saved topic's 365-question lookback and the 1460-random window. Feed recent and relevant questions to generation instead of the oldest 20 rows.
+- Detect exact repeats locally and review only short-listed possible paraphrases or reversed facts with the existing AI model. Bound reviews to five references, reuse the existing queue/deadline and reject uncertain responses before publication. Permit different facts about the same subject.
+- Serialize publication per server within the bot process so concurrent topic/random runs read each other's saved questions. Limit history reads, defer explanations until a possible match, add the saved-topic history index and isolated regression tests. Apply `20261104090000_shared_question_history_index` before deploying this change.
+
 ## v3.7.0 - 2026-11-03
 
 - Limit new bets to 1-10 Sparks and reduce the private vote preview price to 3 Sparks. Existing stakes keep their original payouts and refunds.

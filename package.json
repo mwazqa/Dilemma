@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "3.7.0",
+  "version": "3.7.1",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -54,7 +54,9 @@
     "test:quiz-card": "node scripts/test-quiz-card.mjs",
     "test:quiz-tools:postgres": "node scripts/test-quiz-tools-postgres.mjs",
     "test:quiz-personal:postgres": "node scripts/test-quiz-personal-postgres.mjs",
-    "test:sparks-penalties:postgres": "node scripts/test-sparks-penalties-postgres.mjs"
+    "test:sparks-penalties:postgres": "node scripts/test-sparks-penalties-postgres.mjs",
+    "test:question-novelty": "node scripts/test-question-novelty.mjs && node scripts/test-question-novelty-ai.mjs",
+    "test:question-history:postgres": "node scripts/test-question-history-postgres.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.8.4",

@@ -1,22 +1,21 @@
 import { PermissionFlagsBits, type SendableChannels } from "discord.js";
 import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
-import { AiGenerationError, generateQuestion } from "./question-generator.js";
+import { AiGenerationError, generateQuestion, repeatsQuestionFact } from "./question-generator.js";
 import { env } from "../config.js";
 import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { message, normalizeLanguage } from "../messages.js";
 import { getVotePrompt } from "../brand.js";
 import { buttonSettlementData, quizVotingPayload } from "./quiz-voting.js";
-import { normalizeRandomCategory, recentRandomCategories } from "./random-categories.js";
-import { claimQuizRun, quizDay, RANDOM_DAILY_LIMIT, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
+import { normalizeRandomCategory } from "./random-categories.js";
+import { claimQuizRun, quizDay, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { guildTimezone } from "./timezone.js";
 import { requireQuizChannel } from "./quiz-channels.js";
 import { resolveQuizPingRole } from "./quiz-notifications.js";
-
-const questionHistoryLimit = 365;
-const randomQuestionHistoryLimit = 365 * RANDOM_DAILY_LIMIT;
+import { loadQuestionFacts, loadQuestionHistory } from "./question-history.js";
+import { QuestionNoveltyIndex, withQuestionPublication, type PastQuestion } from "./question-novelty.js";
 
 export class QuizPublicationError extends Error {
   readonly permissionDenied: boolean;
@@ -28,6 +27,10 @@ export class QuizPublicationError extends Error {
 }
 
 export async function publishTopicQuestions(topic: Topic, channel: SendableChannels, early = true): Promise<number> {
+  return withQuestionPublication(topic.guildId, () => publishTopicQuestion(topic, channel, early));
+}
+
+async function publishTopicQuestion(topic: Topic, channel: SendableChannels, early: boolean): Promise<number> {
   const duration = validatePollDuration(topic.pollDurationHours);
   if (!topic.channelId || topic.channelId !== channel.id) throw new TopicChannelChangedError();
   const settings = await getGuildSettings(topic.guildId);
@@ -37,15 +40,9 @@ export async function publishTopicQuestions(topic: Topic, channel: SendableChann
   try {
     const language = normalizeLanguage(settings?.language ?? "en");
     const options = topic.options.split(",").map((option) => option.trim()).filter(Boolean);
-    const previousQuestions = (await db.generatedPoll.findMany({
-      where: { topicId: topic.id },
-      select: { question: true },
-      orderBy: { createdAt: "desc" },
-      take: questionHistoryLimit
-    })).map((poll) => poll.question);
+    const history = await loadQuestionHistory(topic.guildId, topic);
     const difficulty = parseDifficulty(topic.difficulty);
-    const question = await generateUniqueQuestion(topic.name, language, options, topic.optionCount, previousQuestions, difficulty);
-    previousQuestions.push(question.question);
+    const question = await generateUniqueQuestion(topic.guildId, topic.name, language, options, topic.optionCount, history.questions, difficulty, [], topic.id);
     const currentTimezone = guildTimezone(await getGuildSettings(topic.guildId));
     if (run.day !== quizDay(new Date(), currentTimezone) || timezone !== currentTimezone) {
       await releaseQuizRun(run);
@@ -119,6 +116,11 @@ export async function publishRandomQuestion(
   options: string[] = [],
   creatorUserId: string | null = null
 ): Promise<string> {
+  return withQuestionPublication(guildId, () => publishRandom(guildId, optionCount, channel, difficulty, durationHours, options, creatorUserId));
+}
+
+async function publishRandom(guildId: string, optionCount: number, channel: SendableChannels, difficulty: Difficulty,
+  durationHours: number, options: string[], creatorUserId: string | null): Promise<string> {
   const duration = validatePollDuration(durationHours, RANDOM_MAX_DURATION_HOURS);
   await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
@@ -126,20 +128,15 @@ export async function publishRandomQuestion(
   let sendAttempted = false;
   try {
     const language = normalizeLanguage(settings?.language ?? "en");
-    const history = await db.randomPoll.findMany({
-      where: { guildId },
-      select: { question: true, category: true },
-      orderBy: { createdAt: "desc" },
-      take: randomQuestionHistoryLimit
-    });
-    const previousQuestions = history.map(poll => poll.question);
-    const recentCategories = options.length ? [] : recentRandomCategories(history.map(poll => poll.category));
+    const history = await loadQuestionHistory(guildId);
+    const recentCategories = options.length ? [] : history.categories;
     const question = await generateUniqueQuestion(
+      guildId,
       "a freely chosen, random, surprising and family-friendly general-knowledge topic" + (options.length ? " suited to the supplied answers" : ""),
       language,
       options,
       optionCount,
-      previousQuestions,
+      history.questions,
       difficulty,
       recentCategories
     );
@@ -187,21 +184,29 @@ export async function publishRandomQuestion(
 }
 
 async function generateUniqueQuestion(
+  guildId: string,
   topic: string,
   language: string,
   allowedOptions: string[],
   optionCount: number,
-  previousQuestions: string[],
+  history: PastQuestion[],
   difficulty: Difficulty = defaultDifficulty,
-  avoidTopics: string[] = []
+  avoidTopics: string[] = [],
+  topicId?: string
 ) {
-  const normalizedPrevious = new Set(previousQuestions.map(normalizeQuestionText));
+  const index = new QuestionNoveltyIndex(history);
   const recentCategories = new Set(avoidTopics.map(normalizeRandomCategory));
+  const rejected: string[] = [];
   const signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const question = await generateQuestion(topic, language, allowedOptions, optionCount, previousQuestions.slice(-20), signal, difficulty, avoidTopics);
-    if (!normalizedPrevious.has(normalizeQuestionText(question.question)) && !recentCategories.has(normalizeRandomCategory(question.topic))) return question;
-    previousQuestions.push(question.question);
+    const question = await generateQuestion(topic, language, allowedOptions, optionCount, index.prompt(topicId, rejected), signal, difficulty, avoidTopics);
+    if (!index.hasExact(question.question) && !recentCategories.has(normalizeRandomCategory(question.topic))) {
+      const candidates = index.candidates(question.question, question.options[question.correctOption]);
+      if (!candidates.length || !await repeatsQuestionFact(question, await loadQuestionFacts(guildId, candidates), signal)) return question;
+      rejected.unshift(...candidates.map(row => row.question));
+    }
+    index.reject(question.question);
+    rejected.unshift(question.question);
   }
   throw new AiGenerationError("invalid-response");
 }
@@ -210,8 +215,4 @@ function canAttachQuizCard(channel: SendableChannels): boolean {
   if (!("guild" in channel)) return true;
   const member = channel.guild.members?.me;
   return Boolean(member && channel.permissionsFor(member)?.has(PermissionFlagsBits.AttachFiles));
-}
-
-function normalizeQuestionText(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }

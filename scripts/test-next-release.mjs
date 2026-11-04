@@ -108,20 +108,25 @@ db.topic.update = async ({ data }) => {
 };
 let randomHistory = [], topicHistory = [];
 db.randomPoll.findMany = async ({ where, select, orderBy, take }) => {
-  assert.deepEqual(where, { guildId: "guild" });
-  assert.deepEqual(select, { question: true, category: true });
-  assert.deepEqual(orderBy, { createdAt: "desc" });
-  assert.equal(take, 1460);
-  return randomHistory.slice(0, take);
+  assert.equal(where.guildId, "guild");
+  const rows = randomHistory.map((row, index) => ({ id: `random-${index}`, options: '["A","B","C","D"]', correctOption: 0,
+    createdAt: new Date(Date.UTC(2026, 9, 30) - index * 1000), ...row }));
+  if (where.id) return rows.filter(row => where.id.in.includes(row.id)).map(row => ({ ...row, explanation: "Synthetic fact." }));
+  assert.equal(select.explanation, undefined);
+  assert.deepEqual(orderBy, { createdAt: "desc" }); assert.equal(take, 1460);
+  return rows.slice(0, take);
 };
 db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => randomPoll = data;
 db.generatedPoll.findMany = async ({ where, select, orderBy, take }) => {
-  assert.deepEqual(where, { topicId: topic.id });
-  assert.deepEqual(select, { question: true });
+  assert.equal(where.guildId, "guild");
+  const rows = topicHistory.map((row, index) => ({ id: `topic-${index}`, topicId: topic.id, options: '["A","B","C","D"]', correctOption: 0,
+    createdAt: new Date(Date.UTC(2026, 9, 30) - index * 1000), ...row }));
+  if (where.id) return rows.filter(row => where.id.in.includes(row.id)).map(row => ({ ...row, explanation: "Synthetic fact." }));
+  assert.equal(select.explanation, undefined);
   assert.deepEqual(orderBy, { createdAt: "desc" });
   assert.equal(take, 365);
-  return topicHistory.slice(0, take);
+  return rows.slice(0, take);
 };
 db.generatedPoll.create = async ({ data }) => generatedPoll = data;
 db.quizSettlement.create = async ({ data }) => data;
@@ -132,6 +137,9 @@ let questionTexts = [];
 let topicTitles = [];
 globalThis.fetch = async (_, options) => {
   const body = JSON.parse(options.body);
+  if (body.text?.format?.name === "quiz_novelty") {
+    return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{"duplicate":false}' }] }] }), { headers: { "content-type": "application/json" } });
+  }
   assert.ok(body.instructions.includes(`(${settings.language})`));
   lastPrompt = body.input;
   assert.equal(body.reasoning.effort, "low");
@@ -398,7 +406,7 @@ const beforeRandomHistory = counter;
 await handleTopic(interaction("random", { option_count: 4 }));
 assert.equal(counter, beforeRandomHistory + 3, "Random rejects normalized duplicates beyond 365 and at the 1460th retained question");
 assert.equal(randomPoll.question, "A new random question?");
-assert.equal((lastPrompt.match(/Random\s+history\s+\d+\?/gi) ?? []).length, 20, "The larger random history keeps the 20-question AI prompt cap");
+assert.equal((lastPrompt.match(/(?:Random|Topic)\s+history\s+\d+\?/gi) ?? []).length, 20, "Shared history keeps the 20-question AI prompt cap");
 questionTexts = [randomHistory[1460].question];
 const beforeOutsideRandomHistory = counter;
 await handleTopic(interaction("random", { option_count: 4 }));
