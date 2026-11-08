@@ -4,6 +4,7 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 **🎮 Jak grać?**
 
 - Wybierz odpowiedź pod kartą. Pierwszy głos jest bezpłatny.
+- Odpowiedzi tasuję przed publikacją quizu.
 - **Moja odpowiedź** otwiera prywatny panel. Zielony przycisk oznacza zapisany wybór; poprawność poznasz po quizie.
 - Zmiana lub wycofanie odpowiedzi kosztuje **1 Iskrę**. Ponowne kliknięcie tej samej odpowiedzi i odświeżanie są bezpłatne.
 - **Przejdź do quizu** przenosi do karty, również z podpowiedzi i wyniku. Bez opłat~

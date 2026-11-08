@@ -89,6 +89,7 @@ let settings = { guildId: "guild", language: "pl", defaultDifficulty: "hard", de
 let topic;
 let randomPoll;
 let generatedPoll;
+let latestSettlement;
 db.dailyQuizRun.findMany = async () => [];
 db.dailyQuizRun.create = async ({ data }) => ({ ...data, createdAt: data.createdAt ?? new Date(), messageId: null });
 db.dailyQuizRun.updateMany = async () => ({ count: 1 });
@@ -129,7 +130,7 @@ db.generatedPoll.findMany = async ({ where, select, orderBy, take }) => {
   return rows.slice(0, take);
 };
 db.generatedPoll.create = async ({ data }) => generatedPoll = data;
-db.quizSettlement.create = async ({ data }) => data;
+db.quizSettlement.create = async ({ data }) => latestSettlement = data;
 db.$transaction = async callback => callback(db);
 let lastPrompt;
 let counter = 0;
@@ -176,6 +177,13 @@ const { publishTopicQuestions } = await import("../dist/services/poll-publisher.
 const { DailyQuizLimitError, RandomQuizCooldownError } = await import("../dist/services/quiz-limits.js");
 const { handlePing } = await import("../dist/commands/ping.js");
 let sent;
+function assertPublishedAnswers(row) {
+  const options = JSON.parse(row.options);
+  assert.deepEqual(quizAnswers(sent).map(answer => answer.text), options, "Buttons match the saved shuffled answers");
+  assert.equal(options[row.correctOption], "A", "The correct answer survives publication shuffling");
+  assert.equal(latestSettlement.correctAnswerId, row.correctOption + 1, "Settlement uses the displayed answer number");
+  assert.equal(latestSettlement.answerIds, options.map((_, index) => index + 1).join(","));
+}
 const channel = { id: "channel", isSendable: () => true, send: async payload => {
   assert.equal(payload.components.at(-1).toJSON().components.at(-1).custom_id, "quiz:end");
   assert.notEqual(payload.components.at(-1).toJSON().components.at(-1).disabled, true);
@@ -211,6 +219,7 @@ for (const level of ["easy", "medium", "hard"]) {
   await handleTopic(command);
   assert.match(lastPrompt, new RegExp(`Difficulty: ${level}`));
   assert.equal(randomPoll.difficulty, level);
+  assertPublishedAnswers(randomPoll);
   assert.match(sent.content, new RegExp(message("pl", level)));
   assert.match(command.replies.at(-1), /Quiz gotowy/);
 }
@@ -234,6 +243,7 @@ assert.equal(topic.difficulty, "easy", "Updating topic without difficulty preser
 await publishTopicQuestions(topic, channel);
 assert.match(lastPrompt, /Difficulty: easy/);
 assert.equal(generatedPoll.difficulty, "easy");
+assertPublishedAnswers(generatedPoll);
 resetTopicDay();
 await handleTopic(interaction("run", { name: "Test" }));
 assert.equal(generatedPoll.difficulty, "easy");

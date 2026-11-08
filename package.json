@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "3.7.1",
+  "version": "3.7.2",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -12,7 +12,7 @@
     "register": "tsx src/register-commands.ts",
     "check": "tsc --noEmit",
     "test:db:fresh": "node scripts/test-fresh-db.mjs",
-    "test:ai": "node scripts/test-ai-generation.mjs && node scripts/test-ai-errors.mjs",
+    "test:ai": "node scripts/test-question-options.mjs && node scripts/test-ai-generation.mjs && node scripts/test-ai-errors.mjs",
     "test:features": "node scripts/test-next-release.mjs",
     "test:languages": "node scripts/test-languages.mjs",
     "test:guide": "node scripts/test-guide.mjs",

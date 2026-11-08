@@ -16,6 +16,7 @@ import { requireQuizChannel } from "./quiz-channels.js";
 import { resolveQuizPingRole } from "./quiz-notifications.js";
 import { loadQuestionFacts, loadQuestionHistory } from "./question-history.js";
 import { QuestionNoveltyIndex, withQuestionPublication, type PastQuestion } from "./question-novelty.js";
+import { shuffleQuestionOptions } from "./question-options.js";
 
 export class QuizPublicationError extends Error {
   readonly permissionDenied: boolean;
@@ -202,7 +203,7 @@ async function generateUniqueQuestion(
     const question = await generateQuestion(topic, language, allowedOptions, optionCount, index.prompt(topicId, rejected), signal, difficulty, avoidTopics);
     if (!index.hasExact(question.question) && !recentCategories.has(normalizeRandomCategory(question.topic))) {
       const candidates = index.candidates(question.question, question.options[question.correctOption]);
-      if (!candidates.length || !await repeatsQuestionFact(question, await loadQuestionFacts(guildId, candidates), signal)) return question;
+      if (!candidates.length || !await repeatsQuestionFact(question, await loadQuestionFacts(guildId, candidates), signal)) return shuffleQuestionOptions(question);
       rejected.unshift(...candidates.map(row => row.question));
     }
     index.reject(question.question);

@@ -5,6 +5,7 @@ I create questions with AI, and you collect points, Sparks, levels and badges~
 **🎮 How to play**
 
 - Pick an answer below the card. Your first vote is free.
+- I shuffle answers before publishing each quiz.
 - **{myAnswerButton}** opens your private panel. Green marks your saved choice; correctness is revealed after the quiz.
 - Changing or withdrawing costs **{withdrawCost} Spark**. Picking the same answer again and refreshing are free.
 - **{quizJumpButton}** takes you to the card, including from hints and results. No charge~
@@ -65,6 +66,7 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 **🎮 Jak grać?**
 
 - Wybierz odpowiedź pod kartą. Pierwszy głos jest bezpłatny.
+- Odpowiedzi tasuję przed publikacją quizu.
 - **{myAnswerButton}** otwiera prywatny panel. Zielony przycisk oznacza zapisany wybór; poprawność poznasz po quizie.
 - Zmiana lub wycofanie odpowiedzi kosztuje **{withdrawCost} Iskrę**. Ponowne kliknięcie tej samej odpowiedzi i odświeżanie są bezpłatne.
 - **{quizJumpButton}** przenosi do karty, również z podpowiedzi i wyniku. Bez opłat~

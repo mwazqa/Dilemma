@@ -4,6 +4,7 @@ I create questions with AI, and you collect points, Sparks, levels and badges~
 **🎮 How to play**
 
 - Pick an answer below the card. Your first vote is free.
+- I shuffle answers before publishing each quiz.
 - **My answer** opens your private panel. Green marks your saved choice; correctness is revealed after the quiz.
 - Changing or withdrawing costs **1 Spark**. Picking the same answer again and refreshing are free.
 - **Go to quiz** takes you to the card, including from hints and results. No charge~

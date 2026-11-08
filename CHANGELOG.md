@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.7.2 - 2026-11-08
+
+- Shuffle answer options locally before publishing each new scheduled, manual or random quiz, including custom answers. Use unbiased cryptographic Fisher-Yates draws and remap the correct-answer index and emojis together. The card, buttons, stored answers and settlement use one shared order; existing quizzes keep their saved order.
+- Ask AI for self-contained generated answers without references to option labels or order. Add exhaustive coverage of all permutations for 2-4 answers and publication checks for matching buttons, saved answers and settlement. Shuffling adds no AI requests.
+- Synchronize and review the Polish and English player guides, including the new answer-shuffling explanation. No schema migration or Discord command registration is required from v3.7.1.
+
 ## v3.7.1 - 2026-11-04
 
 - Compare scheduled and random questions against shared per-server history, including questions from other or deleted topics. Preserve each saved topic's 365-question lookback and the 1460-random window. Feed recent and relevant questions to generation instead of the oldest 20 rows.

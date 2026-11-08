@@ -28,6 +28,8 @@ globalThis.fetch = async (url, options) => {
   assert.match(lastInstructions, /public topic title broad enough not to give away the answer/);
   assert.match(lastInstructions, /neutral emojis or empty strings/);
   assert.match(lastInstructions, /no extra detail should independently point to one option/);
+  assert.match(lastInstructions, /Answers are shuffled before publication/);
+  assert.match(lastInstructions, /Generated options must be self-contained/);
   assert.doesNotMatch(lastInput, /You are Dilemma|secondary clues/);
   assert.match(lastInput, /Difficulty: (?:easy|medium|hard)\./);
   assert.equal(body.model, "gpt-6-luna");

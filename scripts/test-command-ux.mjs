@@ -179,8 +179,10 @@ try {
   await invoke("random", { options: " Yes, No ", duration_hours: 2 }, false);
   assert.match(prompt, /Use exactly these answer options: Yes, No/);
   assert.equal(savedPoll.category, null, "Custom answers do not add a topic to the avoidance history");
-  assert.deepEqual(quizAnswers(sent).map(answer => answer.text), ["Yes", "No"]);
-  assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), ["Yes", "No"]);
+  const customAnswers = quizAnswers(sent).map(answer => answer.text);
+  assert.deepEqual([...customAnswers].sort(), ["No", "Yes"]);
+  assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), customAnswers);
+  assert.equal(customAnswers[savedPoll.correctOption], "No", "Custom-answer shuffling preserves the correct choice");
   await invoke("random", { options: "Yes,No", option_count: 2 });
   generatedAnswers = ["A", "B", "C"];
   await invoke("random", { option_count: 3 }); assert.equal(quizAnswers(sent).length, 3);
