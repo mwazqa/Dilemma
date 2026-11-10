@@ -57,10 +57,26 @@ model UserScore {
   bestStreak    Int      @default(0)
   selectedBadge String?
   sparks        Int      @default(0)
+  bonusExp      Int      @default(0)
   updatedAt     DateTime @updatedAt
+  exchanges     SparkExchange[]
 
   @@id([guildId, userId])
   @@index([guildId, points])
+}
+
+model SparkExchange {
+  interactionId String @id
+  guildId       String
+  userId        String
+  sparksSpent   Int
+  expGained     Int
+  sparksAfter   Int
+  levelAfter    Int
+  levelReward   Int
+  player        UserScore @relation(fields: [guildId, userId], references: [guildId, userId], onDelete: Cascade)
+
+  @@index([guildId, userId])
 }
 
 

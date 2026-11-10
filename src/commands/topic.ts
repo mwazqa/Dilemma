@@ -65,8 +65,7 @@ export const topicCommand = new SlashCommandBuilder()
   .addSubcommand((subcommand) => subcommand
     .setName("random")
     .setDescription("Generate a random quiz: four per server day, at least six hours apart.")
-    .addStringOption(option => option.setName("options").setDescription("Optional 2-4 comma-separated answers, each up to 55 characters; count is inferred.").setMinLength(1).setMaxLength(500))
-    .addIntegerOption(option => option.setName("option_count").setDescription("AI answer count (2-4), default 4; with options it must match their count.").setMinValue(2).setMaxValue(4))
+    .addIntegerOption(option => option.setName("option_count").setDescription("Number of generated answers (2-4); defaults to 4.").setMinValue(2).setMaxValue(4))
     .addStringOption(difficultyOption)
     .addIntegerOption((option) => option.setName("duration_hours").setDescription("Voting duration in hours (1-6); default at most 6 hours.").setRequired(false).setMinValue(1).setMaxValue(RANDOM_MAX_DURATION_HOURS)))
   .addSubcommand((subcommand) => subcommand
@@ -105,24 +104,19 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       return;
     }
     if (!await canUseRandomQuizChannel(interaction.guildId, channel.id)) { await reply(text("randomChannelOnly")); return; }
-    const rawOptions = interaction.options.getString("options");
-    const options = rawOptions === null ? [] : parseOptions(rawOptions);
+    if (interaction.options.getString("options") !== null) { await reply(text("randomCustomAnswersUnavailable")); return; }
     const requestedOptionCount = interaction.options.getInteger("option_count");
     const duration = interaction.options.getInteger("duration_hours");
-    if (!options) { await reply(text("optionsInvalid")); return; }
     const invalid = numberError(requestedOptionCount, 2, 4, "optionCountInvalid") ?? numberError(duration, 1, RANDOM_MAX_DURATION_HOURS, "randomDurationInvalid");
     if (invalid) { await reply(text(invalid)); return; }
-    if (options.length && requestedOptionCount !== null && requestedOptionCount !== options.length) {
-      await reply(text("optionsMismatch")); return;
-    }
-    const optionCount = options.length || requestedOptionCount || 4;
+    const optionCount = requestedOptionCount ?? 4;
     const settings = await ensureGuildSettings(interaction.guildId);
     const difficulty = parseDifficulty(interaction.options.getString("difficulty") ?? settings.defaultDifficulty);
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
       const generatedTopic = await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty,
-        duration ?? Math.min(settings.defaultPollDurationHours, RANDOM_MAX_DURATION_HOURS), options, interaction.user.id);
+        duration ?? Math.min(settings.defaultPollDurationHours, RANDOM_MAX_DURATION_HOURS), interaction.user.id);
       await reply(text("randomDone", { name: inlineText(generatedTopic), count: optionCount }));
     } catch (error) {
       if (error instanceof DailyQuizLimitError) {
@@ -326,12 +320,6 @@ export async function handleTopicAutocomplete(interaction: AutocompleteInteracti
     take: 25
   });
   await interaction.respond(topics.map((topic) => ({ name: topic.name, value: topic.name })));
-}
-
-function parseOptions(value: string): string[] | null {
-  const options = value.split(",").map((option) => option.trim());
-  return options.length >= 2 && options.length <= 4 && options.every(option => option.length > 0 && option.length <= 55) &&
-    new Set(options.map(option => option.toLowerCase())).size === options.length ? options : null;
 }
 
 function numberError(value: number | null, min: number, max: number, key: MessageKey): MessageKey | null {

@@ -44,8 +44,9 @@ After settlement, click **{myResultButton}**. Privately see your choice, correct
 
 **🎮 Commands**
 
-- \`/dilemma random\` - start a random quiz without a special role: difficulty, **2-4 answers**, **1-{randomMaxHours} hours** of voting. Separate custom answers with commas.
+- \`/dilemma random\` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-{randomMaxHours} hours** of voting.
 - \`/dilemma score profile\` - card, level, points, Sparks and stats.
+- \`/dilemma score exchange\` - trade 1 Spark for {expPerSpark} EXP, without changing points.
 - \`/dilemma score leaderboard\` - the server's top ten.
 - \`/dilemma score achievements\` - badges and progress.
 - \`/dilemma score badge\` - display up to 3 earned badges.
@@ -74,7 +75,7 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 
 **✨ Punkty, poziomy i Iskry**
 
-Za poprawną odpowiedź dostajesz **1 punkt i 1 Iskrę** w łatwym quizie, **2 punkty i 2 Iskry** w średnim lub **3 punkty i 3 Iskry** w trudnym. Punkt daje **{experiencePerPoint} EXP**, a zdobyty poziom dodatkowe **5 Iskier**!
+Za trafienie dostajesz **1/2/3 pkt i tyle samo Iskier** w łatwym/średnim/trudnym quizie. Punkt daje **{experiencePerPoint} EXP**, a poziom dodatkowe **5 Iskier**!
 Za błąd tracisz **{easyPenalty}/{mediumPenalty}/{hardPenalty} Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
 Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
 
@@ -105,8 +106,9 @@ Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, p
 
 **🎮 Komendy**
 
-- \`/dilemma random\` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi**, **1-{randomMaxHours} godzin** głosowania. Własne odpowiedzi oddziel przecinkami.
+- \`/dilemma random\` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-{randomMaxHours} godzin** głosowania.
 - \`/dilemma score profile\` - karta, poziom, punkty, Iskry i statystyki.
+- \`/dilemma score exchange\` - 1 Iskra za {expPerSpark} EXP, bez zmiany punktów.
 - \`/dilemma score leaderboard\` - najlepsza dziesiątka serwera.
 - \`/dilemma score achievements\` - odznaki i postępy.
 - \`/dilemma score badge\` - wybierz do 3 zdobytych odznak na kartę.

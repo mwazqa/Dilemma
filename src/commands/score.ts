@@ -4,6 +4,8 @@ import { getGuildSettings } from "../services/guild-settings.js";
 import { bulletList, inlineText } from "../formatting.js";
 import { openFeedback } from "../feedback.js";
 import { experienceProgress } from "../services/experience.js";
+import { exchangeSparks } from "../services/spark-exchange.js";
+import { expPerSpark, maxExchangeSparks } from "../services/sparks.js";
 import { boundedText, renderScoreCard } from "../services/score-card.js";
 import { serverRank } from "../services/score-ranking.js";
 import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSelectedBadges, isAchievementId, maxDisplayedBadges, selectedAchievements } from "../services/achievements.js";
@@ -15,6 +17,9 @@ export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("sc
   .addSubcommand(sub => sub.setName("leaderboard").setDescription("Show this server's top ten players."))
   .addSubcommand(sub => sub.setName("achievements").setDescription("Show unlocked quiz achievements and progress on this server.")
     .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
+  .addSubcommand(sub => sub.setName("exchange").setDescription(`Spend Sparks for EXP. Each Spark gives ${expPerSpark} EXP.`)
+    .addIntegerOption(option => option.setName("amount").setDescription("Number of Sparks to spend now.")
+      .setRequired(true).setMinValue(1).setMaxValue(maxExchangeSparks)))
   .addSubcommand(sub => sub.setName("badge").setDescription("Choose up to three unlocked profile badges, or hide all badges.")
     .addStringOption(option => option.setName("achievement").setDescription("Choose an unlocked achievement, or no badge.")
       .setRequired(true).setAutocomplete(true).setMaxLength(32))
@@ -41,6 +46,19 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   if (!interaction.guildId) { await reply(text("serverOnly")); return; }
   const guildId = interaction.guildId;
   const sub = interaction.options.getSubcommand();
+  if (sub === "exchange") {
+    const amount = interaction.options.getInteger("amount", true);
+    const result = await exchangeSparks(interaction.id, guildId, interaction.user.id, amount);
+    if (result.status === "invalid") { await reply(text("scoreExchangeInvalid", { max: maxExchangeSparks })); return; }
+    if (result.status === "insufficient") { await reply(text("scoreExchangeInsufficient", { amount, balance: result.balance })); return; }
+    if (result.status === "limit") { await reply(text("scoreExchangeLimit")); return; }
+    const receipt = result.receipt;
+    await reply(text(receipt.levelReward ? "scoreExchangeLevelUp" : "scoreExchangeDone", {
+      amount: receipt.sparksSpent, exp: receipt.expGained, balance: receipt.sparksAfter,
+      level: receipt.levelAfter, reward: receipt.levelReward
+    }));
+    return;
+  }
   if (sub === "badge") {
     const choices = badgeOptionNames.map((name, index) => interaction.options.getString(name, index === 0));
     const ids = choices.filter((id): id is string => id !== null && id !== "none");
@@ -53,7 +71,8 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
       return;
     }
     if (!ids.length || !ids.every(isAchievementId)) { await reply(text("badgeUnknown")); return; }
-    const requirements = ids.map(id => achievementRequirement(id)!);
+    const wallet = await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: interaction.user.id } }, select: { bonusExp: true } });
+    const requirements = ids.map(id => achievementRequirement(id, wallet?.bonusExp)!);
     const saved = await db.userScore.updateMany({ where: { guildId, userId: interaction.user.id, AND: requirements },
       data: { selectedBadge: encodeSelectedBadges(ids) } });
     if (!saved.count) { await reply(text("badgeLocked")); return; }
@@ -78,7 +97,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
       orderBy: [{ points: "desc" }, { correct: "desc" }, { userId: "asc" }], take: 10 });
     const description = players.length ? players.map((player, i) => {
       const rank = rankIcons[i] ?? `**${i + 1}.**`;
-      const progress = experienceProgress(player.points);
+      const progress = experienceProgress(player.points, player.bonusExp);
       const accuracy = player.answered ? Math.round(player.correct / player.answered * 100) : 0;
       return `${rank} <@${player.userId}>\n> ${text("scoreLevel", { level: progress.level })} · ${text("scorePoints", { points: player.points })}\n> ${text("scoreAnswers")}: ${player.answered} · ${text("scoreCorrect")}: ${player.correct} (${accuracy}%) · 🔥 ${player.bestStreak}`;
     }).join("\n\n") : text("scoreEmpty");
@@ -113,7 +132,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   const answered = player?.answered ?? 0;
   const correct = player?.correct ?? 0;
   const accuracy = answered ? Math.round(correct / answered * 100) : 0;
-  const progress = experienceProgress(player?.points ?? 0);
+  const progress = experienceProgress(player?.points ?? 0, player?.bonusExp);
   const rank = await serverRank(guildId, user.id, player);
   const title = displayName;
   const rankLabel = rank === null ? text("scoreUnranked") : text("scoreRank", { rank });

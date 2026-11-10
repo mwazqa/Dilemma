@@ -47,7 +47,7 @@ try {
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
   assert.equal(database.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type = 'index' AND name = 'GeneratedPoll_guildId_topicId_createdAt_idx'").get().count, 1);
-  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "DailyQuizRun", "QuizChannel"]) {
+  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "DailyQuizRun", "QuizChannel"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");
@@ -113,6 +113,7 @@ try {
   assert.equal(readFileSync(`prisma/migrations/${badgeMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${badgeMigration}`, "utf8"));
   const legacyPlayer = database.prepare('SELECT * FROM "UserScore" WHERE userId = ?').get("legacy-player");
   assert.equal(legacyPlayer.selectedBadge, null);
+  assert.equal(legacyPlayer.bonusExp, 0);
   assert.deepEqual([legacyPlayer.points, legacyPlayer.answered, legacyPlayer.correct, legacyPlayer.currentStreak, legacyPlayer.bestStreak], [10, 12, 10, 3, 4]);
   database.exec(`UPDATE "UserScore" SET selectedBadge = 'first_answer' WHERE guildId = 'test' AND userId = 'legacy-player'`);
   assert.equal(database.prepare('SELECT selectedBadge FROM "UserScore" WHERE userId = ?').get("legacy-player").selectedBadge, "first_answer");

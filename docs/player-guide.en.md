@@ -43,8 +43,9 @@ After settlement, click **My result**. Privately see your choice, correct answer
 
 **🎮 Commands**
 
-- `/dilemma random` - start a random quiz without a special role: difficulty, **2-4 answers**, **1-6 hours** of voting. Separate custom answers with commas.
+- `/dilemma random` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-6 hours** of voting.
 - `/dilemma score profile` - card, level, points, Sparks and stats.
+- `/dilemma score exchange` - trade 1 Spark for 3 EXP, without changing points.
 - `/dilemma score leaderboard` - the server's top ten.
 - `/dilemma score achievements` - badges and progress.
 - `/dilemma score badge` - display up to 3 earned badges.

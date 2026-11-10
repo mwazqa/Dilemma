@@ -19,7 +19,7 @@ try {
   for (const table of tables) {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, randomPingRoleId: null, randomCooldownResetAt: null, timezone: null }
-      : table === "UserScore" ? { selectedBadge: null }
+      : table === "UserScore" ? { selectedBadge: null, bonusExp: 0 }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null }
       : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null, readyPingSentAt: null, closedAt: null, closedByUserId: null, closeSource: null }
       : { difficulty: "medium", closedAt: null, closedByUserId: null, closeSource: null };

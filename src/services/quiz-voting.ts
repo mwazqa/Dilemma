@@ -1,12 +1,12 @@
 import { randomInt } from "node:crypto";
-import { setTimeout as delay } from "node:timers/promises";
-import { Prisma, type QuizSettlement } from "@prisma/client";
+import type { Prisma, QuizSettlement } from "@prisma/client";
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { db } from "../db.js";
 import { message } from "../messages.js";
 import { END_QUIZ_BUTTON_ID, myQuizButton } from "./poll-controls.js";
 import { renderQuizCard } from "./quiz-card.js";
 import { privateErrorSummary } from "../private-errors.js";
+import { walletTransaction } from "./wallet-transaction.js";
 
 export const VOTE_PREFIX = "quiz:vote:";
 export const WITHDRAW_VOTE_ID = "quiz:withdraw";
@@ -59,16 +59,6 @@ export function buttonSettlementData(identity: Identity, difficulty: string, opt
     answerIds: Array.from({ length: optionCount }, (_, index) => index + 1).join(","), expiresAt, votingMode: "buttons", resultsPending: true };
 }
 
-async function quizTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try { return await db.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15_000 }); }
-    catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || !["P2034", "P2002"].includes(error.code) || attempt >= 4) throw error;
-      await delay(10 * 2 ** attempt + randomInt(10));
-    }
-  }
-}
-
 async function lockActiveQuiz(tx: Prisma.TransactionClient, identity: Identity) {
   const claim = await tx.quizSettlement.updateMany({ where: { ...identity, votingMode: "buttons", scoredAt: null,
     closedAt: null, expiresAt: { gt: new Date() } }, data: { votingMode: "buttons" } });
@@ -84,7 +74,7 @@ async function spendSparks(tx: Prisma.TransactionClient, guildId: string, userId
 }
 
 export async function castQuizVote(identity: Identity, userId: string, answerId: number | null) {
-  return quizTransaction(async tx => {
+  return walletTransaction(async tx => {
     const quiz = await lockActiveQuiz(tx, identity);
     if (!quiz) return { status: "closed" as const, charged: 0 };
     if (answerId !== null && !quiz.answerIds.split(",").map(Number).includes(answerId)) return { status: "invalid" as const, charged: 0 };
@@ -117,7 +107,7 @@ export async function castQuizVote(identity: Identity, userId: string, answerId:
 
 export async function placeQuizWager(identity: Identity, userId: string, amount: number) {
   if (!Number.isInteger(amount) || amount < 1 || amount > MAX_WAGER) return { status: "invalid" as const };
-  return quizTransaction(async tx => {
+  return walletTransaction(async tx => {
     const quiz = await lockActiveQuiz(tx, identity);
     if (!quiz) return { status: "closed" as const };
     const key = { messageId: quiz.messageId, userId };
@@ -132,7 +122,7 @@ export async function placeQuizWager(identity: Identity, userId: string, amount:
 }
 
 export async function useQuizTool(identity: Identity, userId: string, kind: "reveal" | "fifty") {
-  return quizTransaction(async tx => {
+  return walletTransaction(async tx => {
     const quiz = await lockActiveQuiz(tx, identity);
     if (!quiz) return { status: "closed" as const };
     const answerIds = quiz.answerIds.split(",").map(Number);

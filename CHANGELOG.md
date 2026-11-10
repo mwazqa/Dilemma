@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.8.0 - 2026-11-10
+
+- Add `/dilemma score exchange` at 3 EXP per Spark. Purchased EXP counts toward levels and level badges. Ranking uses points earned in quizzes. A level-up awards 5 Sparks, and retrying the same successful exchange returns its receipt.
+- Generate all answers for `/dilemma random`. Keep the difficulty, 2-4 answer count and voting duration options. Reject retired custom-answer requests before generation or quota reservation.
+- Explicitly start new servers in English. List English before Polski in the welcome menu and `/dilemma language`.
+- Synchronize the English and Polish player guides. Apply `20261109120000_sparks_experience_exchange` and re-register Discord commands when upgrading from v3.7.2.
+
 ## v3.7.2 - 2026-11-08
 
 - Shuffle answer options locally before publishing each new scheduled, manual or random quiz, including custom answers. Use unbiased cryptographic Fisher-Yates draws and remap the correct-answer index and emojis together. The card, buttons, stored answers and settlement use one shared order; existing quizzes keep their saved order.

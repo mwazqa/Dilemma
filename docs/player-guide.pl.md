@@ -12,7 +12,7 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 
 **✨ Punkty, poziomy i Iskry**
 
-Za poprawną odpowiedź dostajesz **1 punkt i 1 Iskrę** w łatwym quizie, **2 punkty i 2 Iskry** w średnim lub **3 punkty i 3 Iskry** w trudnym. Punkt daje **10 EXP**, a zdobyty poziom dodatkowe **5 Iskier**!
+Za trafienie dostajesz **1/2/3 pkt i tyle samo Iskier** w łatwym/średnim/trudnym quizie. Punkt daje **10 EXP**, a poziom dodatkowe **5 Iskier**!
 Za błąd tracisz **2/3/4 Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
 Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
 
@@ -43,8 +43,9 @@ Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawn
 
 **🎮 Komendy**
 
-- `/dilemma random` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi**, **1-6 godzin** głosowania. Własne odpowiedzi oddziel przecinkami.
+- `/dilemma random` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-6 godzin** głosowania.
 - `/dilemma score profile` - karta, poziom, punkty, Iskry i statystyki.
+- `/dilemma score exchange` - 1 Iskra za 3 EXP, bez zmiany punktów.
 - `/dilemma score leaderboard` - najlepsza dziesiątka serwera.
 - `/dilemma score achievements` - odznaki i postępy.
 - `/dilemma score badge` - wybierz do 3 zdobytych odznak na kartę.

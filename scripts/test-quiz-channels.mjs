@@ -82,7 +82,7 @@ function request(action, values = {}, { manager = true, permission = 0n, guildId
       getChannel: name => values[name] ?? null },
     deferReply: async payload => assert.equal(payload.flags, MessageFlags.Ephemeral),
     editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content);
-      lastFeedback = ["aiInvalidResponse", "generationFailed", "randomCooldown", "randomDailyLimit", "aiConfiguration", "aiUnavailable", "randomChannelOnly", "optionCountInvalid", "durationInvalid", "optionsMismatch", "optionsInvalid"].find(key => message("pl", key) === payload.content) ?? null; },
+      lastFeedback = ["aiInvalidResponse", "generationFailed", "randomCooldown", "randomDailyLimit", "aiConfiguration", "aiUnavailable", "randomChannelOnly", "optionCountInvalid", "durationInvalid", "randomCustomAnswersUnavailable"].find(key => message("pl", key) === payload.content) ?? null; },
     followUp: async payload => { assert.equal(payload.flags, MessageFlags.Ephemeral); replies.push(payload.content); } };
 }
 async function invoke(handler, action, values, options) { const item = request(action, values, options); await handler(item); return item.replies.at(-1); }

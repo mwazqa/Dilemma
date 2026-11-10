@@ -50,7 +50,7 @@ let answerRows = [];
 let player;
 db.$transaction = async cb => cb({ quizSettlement: { updateMany: async () => ({ count: claims++ === 0 ? 1 : 0 }) },
   quizAnswer: { create: async ({ data }) => { answerRows.push(data); return data; }, findMany: async () => answerRows },
-  userScore: { upsert: async ({ create }) => player = create } });
+  userScore: { findUnique: async () => player ?? null, upsert: async ({ create }) => player = create } });
 assert.equal(await applyFinalVotes(quiz, [{ userId: "1", answerId: 17 }], new Date(0)), true);
 assert.equal(player.points, 3);
 assert.equal(player.currentStreak, 1);
@@ -119,7 +119,7 @@ const unconfirmed = interaction("forget");
 await routeCommand(unconfirmed); assert.equal(deletions, 0);
 assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
 const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 5); assert.equal(forgotten.replies[0], message("pl", "scoreForgotten"));
-assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "badge", "forget"]);
+assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "exchange", "badge", "forget"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };
 db.quizSettlement.updateMany = async () => { checkUpdates++; };

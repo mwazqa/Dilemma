@@ -41,6 +41,7 @@ db.guildSettings.findUnique = async () => ({ guildId: "guild", language, default
 db.topic.findUnique = async () => { throw new Error("Published results must not read changed topic settings"); };
 db.quizAnswer.create = async ({ data }) => { answers.push(data); return data; };
 db.quizAnswer.findMany = async () => answers;
+db.userScore.findUnique = async () => score ?? null;
 db.userScore.upsert = async ({ create }) => { score = create; return create; };
 db.$transaction = (work, options) => {
   const next = serial.then(async () => {

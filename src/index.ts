@@ -43,7 +43,7 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.GuildCreate, async (guild) => {
   const settings = cacheGuildSettings(await db.guildSettings.upsert({
     where: { guildId: guild.id },
-    create: { guildId: guild.id },
+    create: { guildId: guild.id, language: "en" },
     update: {}
   }));
 

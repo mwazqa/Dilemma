@@ -97,8 +97,8 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
         for (const vote of finalVotes) {
           const correct = vote.answerId === quiz.correctAnswerId;
           const difficulty = parseDifficulty(quiz.difficulty);
-          const wallet = correct ? null : await tx.userScore.findUnique({
-            where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } }, select: { sparks: true }
+          const wallet = await tx.userScore.findUnique({
+            where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } }, select: { sparks: true, bonusExp: true }
           });
           const sparksPenalty = correct ? 0 : Math.min(wallet?.sparks ?? 0, wrongAnswerPenalties[difficulty]);
           await tx.quizAnswer.create({ data: { ...vote, guildId: quiz.guildId, messageId: quiz.messageId, correct,
@@ -107,7 +107,7 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
             select: { correct: true, points: true }, orderBy: [{ finishedAt: "asc" }, { messageId: "asc" }] });
           const score = scoreHistory(history);
           const earned = correct ? pointsByDifficulty[difficulty] : 0;
-          const sparks = correct ? earnedSparks(score.points, earned) : -sparksPenalty;
+          const sparks = correct ? earnedSparks(score.points, earned, wallet?.bonusExp) : -sparksPenalty;
           await tx.userScore.upsert({ where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } },
             create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks: Math.max(0, sparks) }, update: { ...score, sparks: { increment: sparks } } });
         }

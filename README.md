@@ -6,7 +6,7 @@ The v3.7.0 economy update limits new stakes to 1-10 Sparks, prices vote previews
 
 Dilemma lets Discord communities configure quiz topics and schedules, then answer AI-generated multiple-choice questions using Discord buttons. Members can withdraw or change their answer until the quiz closes. Counts stay hidden until closing unless a player unlocks a private preview with Sparks.
 
-Supported languages are English and Polish. Onboarding, `/dilemma language`, quiz generation, feedback and results use the same two-language catalog. Unsupported saved languages and Discord locales fall back to English without changing stored quiz history. Old language selections are rejected without overwriting settings. Updating this command menu requires Discord command registration when deploying the change; no database migration is needed.
+New servers start in English. Onboarding and `/dilemma language` list English first and Polski second, using the same language catalog as quizzes, feedback and results. Unsupported saved languages and Discord locales fall back to English without changing stored quiz history. Old language selections are rejected without overwriting settings. Updating this command menu requires Discord command registration when deploying the change; no database migration is needed.
 
 ## Current status
 
@@ -38,7 +38,7 @@ Version v2.0.0 migrates quiz generation to OpenAI directly. This is a breaking c
 - Discord bot with all commands under `/dilemma`
 - AI-generated questions, options, facts and context-aware emoji
 - Direct OpenAI Responses API generation with strict JSON output and bounded token usage
-- AI-generated topic answers and optional custom answers for on-demand random quizzes
+- AI-generated questions and answers for scheduled and on-demand quizzes
 - Topic intervals, one question per run, configurable poll duration, fixed generation time and optional first publication date
 - Automatic scheduled generation
 - Immediate poll closing with correct answer and fact
@@ -112,7 +112,7 @@ Each server can save up to 31 quiz topics in total, including disabled topics. D
 - `/dilemma create name:...` - create a new topic only; optional settings in order: `channel`, `start_date`, `generation_time`, `interval_days:1-30`, `duration_hours:1-24`, `difficulty:easy|medium|hard`, `option_count:2-4`. The destination defaults to the current channel. Answers are AI-generated, with 4 by default. Existing names direct you to `configure` rather than overwriting a topic.
 - `/dilemma configure name:...` - update an existing topic using the same fields and order as `create`; provide at least one change. Omitted fields, channel, enabled state, history and quota remain unchanged. `start_date:none` removes the fixed anchor; `generation_time:none` removes automatic publication time only if there is no active start date.
 - `/dilemma run name:...` - publish an available quiz early in its saved channel, even when invoked elsewhere, without moving fixed repeat dates; optional `duration_hours:1-24` overrides this poll only
-- `/dilemma random` - generate one quiz without a saved topic. Optional fields in order: `options`, `option_count`, `difficulty`, `duration_hours`. Use 2-4 unique comma-separated `options`, each at most 55 characters; their count is inferred. Without custom answers, AI generates `option_count` answers, or 4 when omitted. When both fields are set, the count must match the custom answers. All members share the same daily quota and cooldown.
+- `/dilemma random` - generate one quiz without a saved topic. Optional fields in order: `option_count`, `difficulty`, `duration_hours`. AI generates 2-4 answers, with 4 by default. All members share the same daily quota and cooldown.
 - `/dilemma random-reset` - reset the server's random cooldown on demand. Only the server owner or configured Dilemma management role can use it. The four-per-day limit stays in place.
 - `/dilemma random-channels add channel:...`, `/dilemma random-channels remove channel:...`, `/dilemma random-channels list` - manage the channels where everyone may start random quizzes; requires Manage Server or the configured management role
 - `/dilemma random-notifications set role:...`, `/dilemma random-notifications clear`, `/dilemma random-notifications show` - configure an optional role ping when another random quiz becomes available; requires Manage Server or the configured management role
@@ -169,7 +169,7 @@ Topic confirmations, topic lists and other detailed replies use Markdown bullet 
 
 Before upgrading, test the additive `20261025120000_quiz_channels` migration on isolated PostgreSQL, back up production, apply the migration, then re-register commands. Existing topic destinations and player data are preserved. The new random-channel list starts empty, so existing servers retain unrestricted random-channel access until a manager assigns a channel. Run `npm run test:quiz-channels`, `npm run test:feedback-layout`, `npm run test:db:fresh` and the existing command, scheduling and quota regressions before release.
 
-Discord does not support conditionally hidden or conditionally required slash-command options. The bot validates dependent fields before changing a topic, reserving random quota or calling AI; it explains missing or conflicting values privately. Custom answers cannot be empty, duplicated ignoring case, longer than 55 characters or outside the 2-4 answer range. AI output must match the requested answer count and preserve custom text and order; mismatches retry within the existing timeout and retry budget, then fail without publishing. Existing topics with legacy fixed answers keep them until `configure option_count` explicitly switches them to generated answers. `npm run test:command-ux` covers the forms, dependencies, permissions, preserved settings and random answer flow with local fixtures, not live Discord or AI calls.
+The bot validates command fields before changing a topic, reserving random quota or calling AI. Old `/dilemma random` requests with `options` are rejected before generation. AI output must match the requested answer count. Existing topics with legacy fixed answers keep them until `configure option_count` switches them to generated answers. `npm run test:command-ux` covers the forms, permissions, preserved settings and random answer flow with local fixtures. Re-register Discord commands after deploying the updated random form.
 
 ### Notify a role when a saved quiz starts
 
@@ -219,7 +219,7 @@ Configure a role with `/dilemma random-notifications set role:@Role` to ping it 
 
 Saved topics last 24 hours by default. Set `duration_hours:1-24` in topic creation, configuration or a manual run. Random quizzes accept `duration_hours:1-6`; omitted values use the saved default capped at 6 hours. Historical saved defaults can still supply omitted values, but there is no defaults command. A run override does not change the saved topic duration. Closing a quiz early does not reset a topic's daily quota or the random cooldown.
 
-Without custom answers, AI freely generates the topic and question; there is no fixed category list. It receives the topics from the last 64 categorized random quizzes on the same server and is instructed to avoid related subjects, synonyms and translations. Repeated topic titles are also rejected locally after normalizing case, spacing and punctuation, within the existing three-attempt budget. Semantic variety depends on the model's output. Generated topics persist across restarts; custom-answer quizzes do not consume this history. The existing normalized question-history comparison remains active.
+AI freely generates the random topic, question and answers. It receives the topics from the last 64 categorized random quizzes on the same server and is instructed to avoid related subjects, synonyms and translations. Repeated topic titles are also rejected locally after normalizing case, spacing and punctuation, within the existing three-attempt budget. Semantic variety depends on the model's output. Generated topics persist across restarts. The existing normalized question-history comparison remains active.
 
 Scheduled and random quizzes share question history within each server. Each publication reads up to 365 recent scheduled questions and 1460 recent random questions in parallel. A saved topic also retains its own 365-question lookback, loading an additional bounded slice only when the shared scheduled window lacks those rows. Deleted or recreated topic names do not hide questions still retained in the server's shared window. Apply the additive `20261104090000_shared_question_history_index` migration before deploying this change.
 
@@ -302,7 +302,11 @@ Before deploying this feature, test the additive `20261015120000_profile_badges`
 
 ### Levels and EXP
 
-Players start at level 1. Correct answers grant 10 EXP on easy, 20 on medium and 30 on hard; wrong answers and missing votes grant no EXP. EXP is derived from settled points at 10 EXP per point, so existing scores immediately contribute without a database migration or reset.
+Players start at level 1. Correct answers grant 10 EXP on easy, 20 on medium and 30 on hard. Wrong answers and missing votes grant no EXP. Each settled point contributes 10 EXP to the player's level.
+
+`/dilemma score exchange amount:10` spends 10 Sparks for 30 EXP on the current server. Purchased EXP counts toward levels and level badges. The leaderboard ranks by quiz points, and each new level awards 5 Sparks.
+
+Apply `20261109120000_sparks_experience_exchange` before deploying the exchange feature, then register the updated Discord commands. Existing players start with zero purchased EXP and keep the EXP from their quiz points.
 
 Advancing from level L to L+1 requires 100 × L EXP. Total EXP needed to reach level L is 50 × L × (L-1): level 2 starts at 100 EXP, level 3 at 300 and level 4 at 600. Surplus EXP carries into the next level. At a threshold the level advances and the bar resets to the new level's progress; the card never displays a rounded-up 100% before an advance.
 

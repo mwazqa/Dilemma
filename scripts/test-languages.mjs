@@ -24,7 +24,9 @@ const invoke = async value => {
 };
 try {
   assert.deepEqual(messageLanguages, ["en", "pl"]);
-  assert.deepEqual(languageCommand.toJSON().options[0].choices.map(({ name, value }) => ({ name, value })), supportedLanguages);
+  const choices = [{ name: "English", value: "en" }, { name: "Polski", value: "pl" }];
+  assert.deepEqual(supportedLanguages, choices);
+  assert.deepEqual(languageCommand.toJSON().options[0].choices.map(({ name, value }) => ({ name, value })), choices);
   assert.deepEqual(supportedLanguages.map(item => item.value), messageLanguages);
   const difficulty = difficultyOption(new SlashCommandStringOption()).toJSON();
   assert.ok(difficulty.choices.every(choice => Object.keys(choice.name_localizations).join() === "pl"));

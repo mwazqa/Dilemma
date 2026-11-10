@@ -22,6 +22,7 @@ export function getHelpEmbed(language = "en"): EmbedBuilder {
     { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma timezone", "helpTimezone"],
       ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
       ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
+      ["/dilemma score exchange", "helpExchange"],
       ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },
     { title: "helpChannelsTitle", commands: [
       ["/dilemma random-channels add", "helpChannelsAdd"], ["/dilemma random-channels remove", "helpChannelsRemove"],

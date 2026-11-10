@@ -92,7 +92,7 @@ try {
   assert.deepEqual(names(find("configure")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
   assert.equal(find("create").options[0].autocomplete, false);
   assert.equal(find("configure").options[0].autocomplete, true);
-  assert.deepEqual(names(find("random")), ["options", "option_count", "difficulty", "duration_hours"]);
+  assert.deepEqual(names(find("random")), ["option_count", "difficulty", "duration_hours"]);
   assert.ok(find("random").options.every(option => !option.required));
   assert.deepEqual(names(find("timezone")), ["value"]);
   assert.equal(find("defaults"), undefined);
@@ -164,10 +164,7 @@ try {
   assert.ok(noTime.replies[0].includes(message("pl", "manualPublication"))); assert.equal([...topics.values()].at(-1).generationTime, null);
   await invalid("create", { name: "Missing time", start_date: "2030-01-01", generation_time: "none" }, "scheduleTimeRequired");
   await invalid("run", { name: "New", duration_hours: 25 }, "durationInvalid");
-  for (const value of ["", "A", "A,A", "A,a", "A, ,B", "A,B,", "A,B,C,D,E", `${"a".repeat(56)},B`]) {
-    await invalid("random", { options: value }, "optionsInvalid");
-  }
-  await invalid("random", { options: "A,B", option_count: 4 }, "optionsMismatch");
+  await invalid("random", { options: "Yes, No", option_count: 2 }, "randomCustomAnswersUnavailable");
   await invalid("random", { option_count: 1 }, "optionCountInvalid");
   for (const duration of [0, 7, 24, 25, 1.5]) await invalid("random", { duration_hours: duration }, "randomDurationInvalid");
   const random = await invoke("random", {}, false);
@@ -175,19 +172,21 @@ try {
   assert.equal(savedPoll.creatorUserId, "actor");
   assert.equal(typeof savedPoll.category, "string", "Random history stores the topic chosen by AI");
   assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 6);
+  assert.deepEqual(sent.components.flatMap(row => row.toJSON().components.map(button => button.custom_id)), [
+    "quiz:vote:1", "quiz:vote:2", "quiz:vote:3", "quiz:vote:4", "quiz:me", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"
+  ]);
   generatedAnswers = ["Yes", "No"];
-  await invoke("random", { options: " Yes, No ", duration_hours: 2 }, false);
-  assert.match(prompt, /Use exactly these answer options: Yes, No/);
-  assert.equal(savedPoll.category, null, "Custom answers do not add a topic to the avoidance history");
-  const customAnswers = quizAnswers(sent).map(answer => answer.text);
-  assert.deepEqual([...customAnswers].sort(), ["No", "Yes"]);
-  assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), customAnswers);
-  assert.equal(customAnswers[savedPoll.correctOption], "No", "Custom-answer shuffling preserves the correct choice");
-  await invoke("random", { options: "Yes,No", option_count: 2 });
+  await invoke("random", { option_count: 2, duration_hours: 2 }, false);
+  assert.match(prompt, /Create exactly 2 suitable answer options/);
+  assert.doesNotMatch(prompt, /Use exactly these answer options/);
+  const answers = quizAnswers(sent).map(answer => answer.text);
+  assert.deepEqual([...answers].sort(), ["No", "Yes"]);
+  assert.equal(quizDuration(sent), 2); assert.deepEqual(JSON.parse(savedPoll.options), answers);
+  assert.equal(answers[savedPoll.correctOption], "No", "Shuffling preserves the correct choice");
   generatedAnswers = ["A", "B", "C"];
   await invoke("random", { option_count: 3 }); assert.equal(quizAnswers(sent).length, 3);
   const beforeWrongAnswers = { deliveries, releases };
-  const wrong = await invoke("random", { options: "Yes,No" });
+  const wrong = await invoke("random", { option_count: 2 });
   assert.equal(wrong.replies.at(-1), message("pl", "aiInvalidResponse"));
   assert.equal(deliveries, beforeWrongAnswers.deliveries); assert.ok(releases > beforeWrongAnswers.releases);
   const successfulFetch = fetchFixture;
@@ -277,7 +276,7 @@ try {
     }
   }
   console.log(JSON.stringify({ check: "command-ux", passed: true, sharedFields: true, dependentFields: true, noInvalidWrites: true,
-    createOnly: true, configurePreservesState: true, customRandomAnswers: true, aiAnswerContract: true, localizedHelp: true }));
+    createOnly: true, configurePreservesState: true, generatedRandomAnswers: true, aiAnswerContract: true, localizedHelp: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "command-ux", passed: false, category: error instanceof assert.AssertionError ? "assertion" : "test-error",
     line: Number(error.stack?.match(/test-command-ux\.mjs:(\d+)/)?.[1] ?? 0) })); process.exitCode = 1;

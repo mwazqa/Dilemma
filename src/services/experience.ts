@@ -7,9 +7,10 @@ export function levelThreshold(level: number): number {
   return threshold;
 }
 
-export function experienceProgress(points: number) {
+export function experienceProgress(points: number, bonusExp = 0) {
   if (!Number.isSafeInteger(points) || points < 0) throw new RangeError("Invalid points");
-  const totalExp = points * experiencePerPoint;
+  if (!Number.isSafeInteger(bonusExp) || bonusExp < 0) throw new RangeError("Invalid bonus experience");
+  const totalExp = points * experiencePerPoint + bonusExp;
   if (!Number.isSafeInteger(totalExp)) throw new RangeError("Experience is too large");
   let level = Math.floor((1 + Math.sqrt(1 + totalExp * 0.08)) / 2);
   while (level > 1 && levelThreshold(level) > totalExp) level--;

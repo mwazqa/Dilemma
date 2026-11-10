@@ -42,7 +42,10 @@ try {
   assert.equal((await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: "player" } } })).currentStreak, 2);
   const rollback = await createQuiz("rollback", "hard");
   db.$transaction = (cb, options) => originalTransaction(tx => cb(new Proxy(tx, { get(target, key) {
-    return key === "userScore" ? { upsert: async () => { throw new Error("Injected score write failure"); } } : target[key];
+    return key === "userScore" ? {
+      findUnique: args => target.userScore.findUnique(args),
+      upsert: async () => { throw new Error("Injected score write failure"); }
+    } : target[key];
   } })), options);
   await assert.rejects(applyFinalVotes(rollback, [{ userId: "player", answerId: 17 }], new Date(5000)), /Injected/);
   db.$transaction = originalTransaction;

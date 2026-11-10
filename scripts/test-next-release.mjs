@@ -19,7 +19,7 @@ const friendlyFeedbackKeys = [
   "achievementLevel2Goal", "achievementLevel5Goal", "achievementsSummary", "badgeSet", "badgeCleared", "badgeLocked",
   "badgeUnknown", "badgeSelectionInvalid", "pollClosing", "topicDailyLimit", "randomCooldown", "randomDailyLimit", "serverOnly",
   "permission", "channel", "emptyTopics", "generating", "randomDone", "timeout", "quota", "generationFailed",
-  "missing", "optionsInvalid", "optionsMismatch", "optionsMissing", "saved", "deleted", "runDone", "settingsMissing",
+  "missing", "randomCustomAnswersUnavailable", "saved", "deleted", "runDone", "settingsMissing",
   "timeInvalid", "configured", "languageSet", "timezoneSet", "notPoll", "pollDone", "pollFailed", "error", "ping",
   "helpIntro", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
   "optionCountInvalid", "intervalInvalid", "durationInvalid", "timezoneInvalid", "manualPublication", "scoreEmpty", "partial"
@@ -54,8 +54,7 @@ for (const language of messageLanguages) {
     assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Short labels remain readable");
   }
-  assert.ok(message(language, "optionsInvalid").includes("2-4") && message(language, "optionsInvalid").includes("55"));
-  assert.ok(message(language, "optionsMissing").includes("options") && message(language, "optionsMissing").includes("option_count"));
+  assert.ok(message(language, "randomCustomAnswersUnavailable").includes("2-4") && message(language, "randomCustomAnswersUnavailable").includes("option_count"));
   assert.ok(message(language, "timeInvalid").includes("HH:mm") && message(language, "timeInvalid").includes("18:30"));
   assert.ok(message(language, "randomCooldown").includes("6") && message(language, "randomCooldown").includes("{hours}") && message(language, "randomCooldown").includes("{minutes}"));
   assert.ok(message(language, "randomDailyLimit").includes("4") && message(language, "randomDailyLimit").includes("6"));
@@ -266,7 +265,7 @@ await routeCommand(privateRandom);
 assert.equal(privateRandom.replies[0], message("en", "serverOnly"));
 const invalid = interaction("random", { options: "A,A" });
 await handleTopic(invalid);
-assert.match(invalid.replies[0], /różne odpowiedzi/);
+assert.equal(invalid.replies[0], message("pl", "randomCustomAnswersUnavailable"));
 const { isGenerationTime, isTopicDue } = await import("../dist/services/quiz-limits.js");
 for (const time of ["00:00", "18:30", "23:59"]) assert.equal(isGenerationTime(time), true);
 for (const time of ["", " ", "9:00", "24:00", "18:60", "-1:00", "18.30", "18:30:00"]) assert.equal(isGenerationTime(time), false);

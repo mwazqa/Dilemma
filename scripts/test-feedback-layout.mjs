@@ -27,7 +27,7 @@ try {
   assert.deepEqual(responses.map(item => item.content), pages);
   assert.ok(responses.every(item => item.allowedMentions.parse.length === 0));
   for (const language of messageLanguages) {
-    for(const key of ["randomResetPermission","randomCooldownReset","randomPingRoleInvalid","randomPingSet","randomPingCleared","randomPingCurrent","randomPingUnset","randomReadyPing","topicListNoMatches","topicListInvalid","topicChanged","topicExists","nameInvalid","optionCountInvalid","intervalInvalid","durationInvalid","achievementsSummary","badgeCleared","badgeLocked","badgeUnknown","badgeSelectionInvalid","topicScheduleUnavailable","serverOnly","channel","emptyTopics","optionsMissing","saved","deleted","settingsMissing","notPoll","partial"]){
+    for(const key of ["randomResetPermission","randomCooldownReset","randomPingRoleInvalid","randomPingSet","randomPingCleared","randomPingCurrent","randomPingUnset","randomReadyPing","topicListNoMatches","topicListInvalid","topicChanged","topicExists","nameInvalid","optionCountInvalid","intervalInvalid","durationInvalid","achievementsSummary","badgeCleared","badgeLocked","badgeUnknown","badgeSelectionInvalid","topicScheduleUnavailable","serverOnly","channel","emptyTopics","randomCustomAnswersUnavailable","saved","deleted","settingsMissing","notPoll","partial"]){
       assert.ok(feedbackKaomoji[key]&&message(language,key).includes(feedbackKaomoji[key]),`${key} keeps Dilemma's contextual kaomoji in ${language}`);
     }
     const summary = message(language, "summary", { name: "Prawda czy absurd?", state: message(language, "enabled"), channel: "<#123>",

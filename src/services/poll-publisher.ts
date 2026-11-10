@@ -114,14 +114,13 @@ export async function publishRandomQuestion(
   channel: SendableChannels,
   difficulty: Difficulty = defaultDifficulty,
   durationHours = RANDOM_MAX_DURATION_HOURS,
-  options: string[] = [],
   creatorUserId: string | null = null
 ): Promise<string> {
-  return withQuestionPublication(guildId, () => publishRandom(guildId, optionCount, channel, difficulty, durationHours, options, creatorUserId));
+  return withQuestionPublication(guildId, () => publishRandom(guildId, optionCount, channel, difficulty, durationHours, creatorUserId));
 }
 
 async function publishRandom(guildId: string, optionCount: number, channel: SendableChannels, difficulty: Difficulty,
-  durationHours: number, options: string[], creatorUserId: string | null): Promise<string> {
+  durationHours: number, creatorUserId: string | null): Promise<string> {
   const duration = validatePollDuration(durationHours, RANDOM_MAX_DURATION_HOURS);
   await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
@@ -130,16 +129,15 @@ async function publishRandom(guildId: string, optionCount: number, channel: Send
   try {
     const language = normalizeLanguage(settings?.language ?? "en");
     const history = await loadQuestionHistory(guildId);
-    const recentCategories = options.length ? [] : history.categories;
     const question = await generateUniqueQuestion(
       guildId,
-      "a freely chosen, random, surprising and family-friendly general-knowledge topic" + (options.length ? " suited to the supplied answers" : ""),
+      "a freely chosen, random, surprising and family-friendly general-knowledge topic",
       language,
-      options,
+      [],
       optionCount,
       history.questions,
       difficulty,
-      recentCategories
+      history.categories
     );
     run = await refreshRandomQuizRun(run, guildTimezone(await getGuildSettings(guildId)));
     await requireQuizChannel(guildId, channel.id);
@@ -158,7 +156,7 @@ async function publishRandom(guildId: string, optionCount: number, channel: Send
           creatorUserId,
           difficulty,
           language,
-          category: options.length ? null : question.topic,
+          category: question.topic,
           messageId: sentPoll.id,
           channelId: channel.id,
           question: question.question,
