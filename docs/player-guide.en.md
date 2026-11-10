@@ -45,7 +45,7 @@ After settlement, click **My result**. Privately see your choice, correct answer
 
 - `/dilemma random` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-6 hours** of voting.
 - `/dilemma score profile` - card, level, points, Sparks and stats.
-- `/dilemma score exchange` - trade 1 Spark for 3 EXP, without changing points.
+- `/dilemma score exchange` - 3 EXP per Spark, min. 3 Sparks. Quiz points stay separate.
 - `/dilemma score leaderboard` - the server's top ten.
 - `/dilemma score achievements` - badges and progress.
 - `/dilemma score badge` - display up to 3 earned badges.

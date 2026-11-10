@@ -304,7 +304,7 @@ Before deploying this feature, test the additive `20261015120000_profile_badges`
 
 Players start at level 1. Correct answers grant 10 EXP on easy, 20 on medium and 30 on hard. Wrong answers and missing votes grant no EXP. Each settled point contributes 10 EXP to the player's level.
 
-`/dilemma score exchange amount:10` spends 10 Sparks for 30 EXP on the current server. Purchased EXP counts toward levels and level badges. The leaderboard ranks by quiz points, and each new level awards 5 Sparks.
+`/dilemma score exchange amount:10` spends 10 Sparks for 30 EXP on the current server. Each exchange costs at least 3 Sparks. Purchased EXP counts toward levels and level badges. The leaderboard ranks by quiz points, and each new level awards 5 Sparks.
 
 Apply `20261109120000_sparks_experience_exchange` before deploying the exchange feature, then register the updated Discord commands. Existing players start with zero purchased EXP and keep the EXP from their quiz points.
 

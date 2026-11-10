@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.8.1 - 2026-11-10
+
+- Require at least 3 Sparks per new EXP exchange. The minimum gives 9 EXP at the 3 EXP per Spark rate.
+- Show the minimum in the Discord command and both player guides. Keep receipts for earlier exchanges available on retries.
+- Re-register Discord commands when upgrading from v3.8.0.
+
 ## v3.8.0 - 2026-11-10
 
 - Add `/dilemma score exchange` at 3 EXP per Spark. Purchased EXP counts toward levels and level badges. Ranking uses points earned in quizzes. A level-up awards 5 Sparks, and retrying the same successful exchange returns its receipt.

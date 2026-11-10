@@ -45,7 +45,7 @@ Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawn
 
 - `/dilemma random` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-6 godzin** głosowania.
 - `/dilemma score profile` - karta, poziom, punkty, Iskry i statystyki.
-- `/dilemma score exchange` - 1 Iskra za 3 EXP, bez zmiany punktów.
+- `/dilemma score exchange` - 3 EXP za Iskrę, min. 3 Iskry. Punkty liczę osobno.
 - `/dilemma score leaderboard` - najlepsza dziesiątka serwera.
 - `/dilemma score achievements` - odznaki i postępy.
 - `/dilemma score badge` - wybierz do 3 zdobytych odznak na kartę.

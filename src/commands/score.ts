@@ -5,7 +5,7 @@ import { bulletList, inlineText } from "../formatting.js";
 import { openFeedback } from "../feedback.js";
 import { experienceProgress } from "../services/experience.js";
 import { exchangeSparks } from "../services/spark-exchange.js";
-import { expPerSpark, maxExchangeSparks } from "../services/sparks.js";
+import { expPerSpark, maxExchangeSparks, minExchangeSparks } from "../services/sparks.js";
 import { boundedText, renderScoreCard } from "../services/score-card.js";
 import { serverRank } from "../services/score-ranking.js";
 import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSelectedBadges, isAchievementId, maxDisplayedBadges, selectedAchievements } from "../services/achievements.js";
@@ -18,8 +18,8 @@ export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("sc
   .addSubcommand(sub => sub.setName("achievements").setDescription("Show unlocked quiz achievements and progress on this server.")
     .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
   .addSubcommand(sub => sub.setName("exchange").setDescription(`Spend Sparks for EXP. Each Spark gives ${expPerSpark} EXP.`)
-    .addIntegerOption(option => option.setName("amount").setDescription("Number of Sparks to spend now.")
-      .setRequired(true).setMinValue(1).setMaxValue(maxExchangeSparks)))
+    .addIntegerOption(option => option.setName("amount").setDescription(`Number of Sparks to spend now (minimum ${minExchangeSparks}).`)
+      .setRequired(true).setMinValue(minExchangeSparks).setMaxValue(maxExchangeSparks)))
   .addSubcommand(sub => sub.setName("badge").setDescription("Choose up to three unlocked profile badges, or hide all badges.")
     .addStringOption(option => option.setName("achievement").setDescription("Choose an unlocked achievement, or no badge.")
       .setRequired(true).setAutocomplete(true).setMaxLength(32))
@@ -49,7 +49,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
   if (sub === "exchange") {
     const amount = interaction.options.getInteger("amount", true);
     const result = await exchangeSparks(interaction.id, guildId, interaction.user.id, amount);
-    if (result.status === "invalid") { await reply(text("scoreExchangeInvalid", { max: maxExchangeSparks })); return; }
+    if (result.status === "invalid") { await reply(text("scoreExchangeInvalid", { min: minExchangeSparks, max: maxExchangeSparks })); return; }
     if (result.status === "insufficient") { await reply(text("scoreExchangeInsufficient", { amount, balance: result.balance })); return; }
     if (result.status === "limit") { await reply(text("scoreExchangeLimit")); return; }
     const receipt = result.receipt;

@@ -46,7 +46,7 @@ After settlement, click **{myResultButton}**. Privately see your choice, correct
 
 - \`/dilemma random\` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-{randomMaxHours} hours** of voting.
 - \`/dilemma score profile\` - card, level, points, Sparks and stats.
-- \`/dilemma score exchange\` - trade 1 Spark for {expPerSpark} EXP, without changing points.
+- \`/dilemma score exchange\` - {expPerSpark} EXP per Spark, min. {minExchangeSparks} Sparks. Quiz points stay separate.
 - \`/dilemma score leaderboard\` - the server's top ten.
 - \`/dilemma score achievements\` - badges and progress.
 - \`/dilemma score badge\` - display up to 3 earned badges.
@@ -108,7 +108,7 @@ Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, p
 
 - \`/dilemma random\` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-{randomMaxHours} godzin** głosowania.
 - \`/dilemma score profile\` - karta, poziom, punkty, Iskry i statystyki.
-- \`/dilemma score exchange\` - 1 Iskra za {expPerSpark} EXP, bez zmiany punktów.
+- \`/dilemma score exchange\` - {expPerSpark} EXP za Iskrę, min. {minExchangeSparks} Iskry. Punkty liczę osobno.
 - \`/dilemma score leaderboard\` - najlepsza dziesiątka serwera.
 - \`/dilemma score achievements\` - odznaki i postępy.
 - \`/dilemma score badge\` - wybierz do 3 zdobytych odznak na kartę.

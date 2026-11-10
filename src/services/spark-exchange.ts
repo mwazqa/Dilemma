@@ -1,5 +1,5 @@
 import { experienceProgress } from "./experience.js";
-import { expPerSpark, maxExchangeSparks, maxWalletValue, sparksPerLevel } from "./sparks.js";
+import { expPerSpark, maxExchangeSparks, maxWalletValue, minExchangeSparks, sparksPerLevel } from "./sparks.js";
 import { walletTransaction } from "./wallet-transaction.js";
 
 export async function exchangeSparks(interactionId: string, guildId: string, userId: string, amount: number) {
@@ -11,6 +11,7 @@ export async function exchangeSparks(interactionId: string, guildId: string, use
       if (existing.guildId !== guildId || existing.userId !== userId || existing.sparksSpent !== amount) return { status: "invalid" as const };
       return { status: "exchanged" as const, receipt: existing };
     }
+    if (amount < minExchangeSparks) return { status: "invalid" as const };
 
     const where = { guildId_userId: { guildId, userId } };
     const player = await tx.userScore.findUnique({ where, select: { sparks: true, points: true, bonusExp: true } });

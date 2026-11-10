@@ -145,7 +145,7 @@ export const messages = {
   helpAchievements: ["let's explore your achievements and progress","zobaczmy twoje osiągnięcia i postęp"],
   helpBadge: ["dress your card with up to 3 badges, or hide them","ozdób kartę maksymalnie 3 odznakami lub je ukryj"],
   helpExchange: ["spend Sparks to gain EXP","wymień Iskry na EXP"],
-  scoreExchangeInvalid: ["Pick a whole number from 1 to {max} ✦ to exchange~","Wpisz liczbę Iskier od 1 do {max}, bez ułamków~"],
+  scoreExchangeInvalid: ["Pick a whole number from {min} to {max} ✦ to exchange~","Wpisz liczbę Iskier od {min} do {max}, bez ułamków~"],
   scoreExchangeInsufficient: ["A few Sparks short~ You need **{amount} ✦** and have **{balance} ✦**.","Brakuje Iskierek~ Potrzebujesz **{amount} ✦**, a masz **{balance} ✦**."],
   scoreExchangeLimit: ["That exchange would exceed your EXP or wallet limit~ Try a smaller amount.","Ta wymiana przekroczyłaby limit EXP lub portfela~ Spróbuj z mniejszą liczbą Iskier."],
   scoreExchangeDone: ["I traded **{amount} ✦** for **{exp} EXP**~ You have **{balance} ✦** at level **{level}**.","Wymieniłam **{amount} ✦** na **{exp} EXP**~ Masz **{balance} ✦** i poziom **{level}**."],
