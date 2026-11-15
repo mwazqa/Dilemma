@@ -97,7 +97,7 @@ assert.match(otherProfile.payloads[0].files[0].description, /Wybrany gracz/);
 const leaderboard = interaction("leaderboard"); await routeCommand(leaderboard);
 assert.equal(leaderboard.replies[0], null, "No duplicate ranking text above the card");
 assert.equal(leaderboard.payloads[0].embeds.length, 1);
-assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /🥇 <@1>/);
+assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /✦ \*\*1\.\*\* <@1>/);
 assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /Odpowiedzi: 1/);
 assert.match(leaderboard.payloads[0].embeds[0].toJSON().description, /Poprawne: 1 \(100%\)/);
 assert.equal(leaderboard.payloads[0].embeds[0].toJSON().footer, undefined, "Ranking has no rules footer");

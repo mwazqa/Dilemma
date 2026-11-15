@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.8.2 - 2026-11-15
+
+- Replace leaderboard medals for places 1-3 with Dilemma-style spark symbols and explicit position numbers.
+- Review the Polish and English player guides. No schema migration or Discord command registration is required from v3.8.1.
+
 ## v3.8.1 - 2026-11-10
 
 - Require at least 3 Sparks per new EXP exchange. The minimum gives 9 EXP at the 3 EXP per Spark rate.

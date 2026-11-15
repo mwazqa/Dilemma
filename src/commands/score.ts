@@ -30,7 +30,7 @@ export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("sc
   .addSubcommand(sub => sub.setName("forget").setDescription("Delete your answers, score, Sparks, tools and bets on this server.")
     .addBooleanOption(option => option.setName("confirm").setDescription("Confirm permanent deletion. Future votes can earn points again.").setRequired(true)));
 
-const rankIcons = ["🥇", "🥈", "🥉"];
+const rankMarkers = ["✦ **1.**", "✧ **2.**", "⋆ **3.**"];
 
 function progressBar(value: number, size = 10) {
   const filled = Math.floor(value / 100 * size);
@@ -96,7 +96,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     const players = await db.userScore.findMany({ where: { guildId, answered: { gt: 0 } },
       orderBy: [{ points: "desc" }, { correct: "desc" }, { userId: "asc" }], take: 10 });
     const description = players.length ? players.map((player, i) => {
-      const rank = rankIcons[i] ?? `**${i + 1}.**`;
+      const rank = rankMarkers[i] ?? `**${i + 1}.**`;
       const progress = experienceProgress(player.points, player.bonusExp);
       const accuracy = player.answered ? Math.round(player.correct / player.answered * 100) : 0;
       return `${rank} <@${player.userId}>\n> ${text("scoreLevel", { level: progress.level })} · ${text("scorePoints", { points: player.points })}\n> ${text("scoreAnswers")}: ${player.answered} · ${text("scoreCorrect")}: ${player.correct} (${accuracy}%) · 🔥 ${player.bestStreak}`;
