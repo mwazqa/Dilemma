@@ -1,63 +1,28 @@
 **Hi~ I'm Dilemma, your quiz companion!** (｡•̀ᴗ-)✧
-I create questions with AI, and you collect points, Sparks, levels and badges~
+I create questions with AI, and you can play together, collect points and develop your profile~
 
-**🎮 How to play**
+**🎮 Join a quiz**
 
-- Pick an answer below the card. Your first vote is free.
-- I shuffle answers before publishing each quiz.
-- **My answer** opens your private panel. Green marks your saved choice; correctness is revealed after the quiz.
-- Changing or withdrawing costs **1 Spark**. Picking the same answer again and refreshing are free.
-- **Go to quiz** takes you to the card, including from hints and results. No charge~
-- Your final answer counts. After closing, I'll show everyone the vote counts, correct answer and explanation.
-- **Report quiz** opens a private issue form, even after the quiz. Free~
+Pick an answer below an active quiz card. **My answer** opens your private panel with your saved choice. The final answer you leave before closing is the one that counts. I'll reveal the correct answer and explanation after the quiz~
 
-**✨ Points, levels and Sparks**
+**✨ Points, Sparks and progress**
 
-A correct answer earns **1 point and 1 Spark** for easy, **2 points and 2 Sparks** for medium, or **3 points and 3 Sparks** for hard. Each point gives **10 EXP**, and each new level gives **5 extra Sparks**!
-Wrong answers cost **2/3/4 Sparks** for easy/medium/hard, up to your balance. Skipping is free.
-Correct answers build a streak. A mistake breaks it; skipping a quiz doesn't. Scores, badges and wallets are separate on each server~ (っ•ᴗ•)っ✦
+Correct answers build your score, EXP and streak. Sparks are your quiz currency: use them for optional tools, bets or an EXP exchange. Your profile, progress and wallet belong to each server separately.
+Check the current fees and wrong-answer penalty on the quiz card, in your private panel and beside the buttons before taking an action~ (っ•ᴗ•)っ✦
 
-**🔍 A little help**
+**🔍 Optional help and bets**
 
-- **Preview - 3 Sparks:** private vote counts without revealing the correct answer.
-- **50/50 - 5 Sparks:** your private panel keeps two answer buttons, including the correct one. Available with 3-4 answers; eliminated choices can no longer receive your vote.
+Use the tools offered below the quiz if you need a hint or a look at the votes. You can also place a bet on your saved answer. Read the details in the panel before confirming; the result is settled after closing.
 
-Buy each tool once per quiz. Reopening is free.
-**50/50 doesn't change your saved vote or bet.** If your choice was eliminated, change it for 1 Spark~
+**🏁 Your result and profile**
 
-**🎲 Place a bet**
+After the quiz, **My result** shows your own answer, points and Spark settlement privately.
+Use `/dilemma score profile` for your profile and `/dilemma score leaderboard` for the server ranking. Discover the other commands, badges and quiz options through `/dilemma help`~
 
-Vote first. Click **Place bet** below the card or in **My answer**. Confirm a whole-number stake of **1-10 Sparks**; I'll deduct it from your wallet.
+**💬 Something looks wrong?**
 
-- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake plus the answer penalty.
-- Answer and level rewards are awarded separately.
-- One active bet per quiz. Its stake cannot be changed.
-- Changing your answer for 1 Spark moves the bet to your new choice.
-- Withdrawing cancels the bet and returns the stake minus the 1-Spark fee.
-- Closing the form without confirming is free.
+**Report quiz** opens a private form for a problem with the question, answers or explanation. Describe what needs checking without sharing private details.
 
-The panel shows your stake and possible payout. Its bet button is disabled before you vote and while a bet is active~ (ง •̀ω•́)ง
+**🔔 What's new?**
 
-**🏁 My result**
-
-After settlement, click **My result**. Privately see your choice, correct answer, points, any Sparks deducted and your bet's stake, payout and profit or loss.
-
-**🎮 Commands**
-
-- `/dilemma random` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-6 hours** of voting.
-- `/dilemma score profile` - card, level, points, Sparks and stats.
-- `/dilemma score exchange` - 3 EXP per Spark, min. 3 Sparks. Quiz points stay separate.
-- `/dilemma score leaderboard` - the server's top ten.
-- `/dilemma score achievements` - badges and progress.
-- `/dilemma score badge` - display up to 3 earned badges.
-- `/dilemma help` - command guide.
-
-**⏱️ Randoms and closing quizzes**
-
-The whole server shares **4 randoms per day**, normally **6 hours apart**. Days use the server timezone; midnight doesn't shorten a cooldown. Remaining time is shown in hours and minutes. Use designated random channels when configured.
-Close your own random with **Let's end this quiz**. The server owner, members with **Manage Server** or the Dilemma manager role can close all quizzes.
-`/dilemma random-reset` is for the owner or manager role. It resets the cooldown, not the daily quota. Closing early doesn't restore a random slot or shorten the cooldown~
-
-**🔔 Notifications**
-
-Scheduled quizzes appear automatically; the configured role gets a start ping. Managers can also enable a role ping in the last random's channel when the cooldown and daily quota allow another~ (ﾉ◕ヮ◕)ﾉ
+I'll post a separate message here with the changes in each new release. This guide stays a general introduction to playing~ (ﾉ◕ヮ◕)ﾉ

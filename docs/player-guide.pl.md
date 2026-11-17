@@ -1,63 +1,28 @@
 **Hej~ Jestem Dilemma, Twoja quizowa towarzyszka!** (｡•̀ᴗ-)✧
-Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
+Tworzę pytania z pomocą AI, a Ty możesz grać ze znajomymi, zbierać punkty i rozwijać swój profil~
 
-**🎮 Jak grać?**
+**🎮 Dołącz do quizu**
 
-- Wybierz odpowiedź pod kartą. Pierwszy głos jest bezpłatny.
-- Odpowiedzi tasuję przed publikacją quizu.
-- **Moja odpowiedź** otwiera prywatny panel. Zielony przycisk oznacza zapisany wybór; poprawność poznasz po quizie.
-- Zmiana lub wycofanie odpowiedzi kosztuje **1 Iskrę**. Ponowne kliknięcie tej samej odpowiedzi i odświeżanie są bezpłatne.
-- **Przejdź do quizu** przenosi do karty, również z podpowiedzi i wyniku. Bez opłat~
-- Liczy się końcowa odpowiedź. Po quizie pokażę wszystkim liczby głosów, poprawną odpowiedź i wyjaśnienie.
-- **Zgłoś quiz** otwiera prywatny formularz problemu, także po quizie. Za darmo~
+Wybierz odpowiedź pod aktywną kartą quizu. **Moja odpowiedź** otwiera prywatny panel z Twoim zapisanym wyborem. Liczy się końcowa odpowiedź pozostawiona przed zamknięciem. Poprawną odpowiedź i wyjaśnienie pokażę po quizie~
 
-**✨ Punkty, poziomy i Iskry**
+**✨ Punkty, Iskry i postępy**
 
-Za trafienie dostajesz **1/2/3 pkt i tyle samo Iskier** w łatwym/średnim/trudnym quizie. Punkt daje **10 EXP**, a poziom dodatkowe **5 Iskier**!
-Za błąd tracisz **2/3/4 Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
-Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
+Trafienia budują wynik, EXP i serię. Iskry to quizowa waluta: przydają się do dodatkowej pomocy, zakładów i wymiany na EXP. Profil, postępy i portfel są osobne na każdym serwerze.
+Aktualne opłaty i karę za błędną odpowiedź sprawdzaj na karcie quizu, w prywatnym panelu i przy przyciskach przed wykonaniem akcji~ (っ•ᴗ•)っ✦
 
-**🔍 Pomoc**
+**🔍 Pomoc i zakłady**
 
-- **Podgląd - 3 Iskry:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
-- **50/50 - 5 Iskier:** w prywatnym panelu zostają dwa przyciski, w tym poprawna odpowiedź. Działa przy 3-4 odpowiedziach; odrzuconych opcji nie można już wybrać.
+Skorzystaj z opcji pod quizem, jeśli potrzebujesz podpowiedzi lub podglądu głosów. Możesz też obstawić swoją zapisaną odpowiedź. Przed zatwierdzeniem przeczytaj szczegóły w panelu; rozliczenie nastąpi po zakończeniu quizu.
 
-Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
-**50/50 nie zmienia zapisanego głosu ani zakładu.** Jeśli Twój wybór odpadł, zmień odpowiedź za 1 Iskrę~
+**🏁 Twój wynik i profil**
 
-**🎲 Obstaw Iskry**
+Po quizie **Mój wynik** pokaże Ci prywatnie Twój wybór, punkty i rozliczenie Iskier.
+Profil znajdziesz w `/dilemma score profile`, a ranking serwera w `/dilemma score leaderboard`. Pozostałe komendy, odznaki i możliwości quizów poznasz przez `/dilemma help`~
 
-Najpierw zagłosuj. Kliknij **Obstaw Iskry** pod kartą lub w panelu **Moja odpowiedź**. Zatwierdź całkowitą stawkę **1-10 Iskier**; pobiorę ją z portfela.
+**💬 Coś się nie zgadza?**
 
-- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki oraz karę za odpowiedź.
-- Nagrody za odpowiedź i poziom naliczam osobno.
-- Możesz mieć jeden aktywny zakład na quiz. Jego stawki nie zmienisz.
-- Zmiana odpowiedzi za 1 Iskrę przenosi zakład na nowy wybór.
-- Wycofanie głosu anuluje zakład i zwraca stawkę pomniejszoną o 1 Iskrę opłaty.
-- Zamknięcie formularza bez zatwierdzenia jest bezpłatne.
+**Zgłoś quiz** otwiera prywatny formularz problemu z pytaniem, odpowiedziami lub wyjaśnieniem. Opisz, co wymaga sprawdzenia, bez danych prywatnych.
 
-Panel pokazuje stawkę i wypłatę. Obstawisz po wyborze odpowiedzi, bez aktywnego zakładu~ (ง •̀ω•́)ง
+**🔔 Nowości**
 
-**🏁 Mój wynik**
-
-Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, punkty, pobrane Iskry oraz stawkę, wypłatę i zysk lub stratę z zakładu.
-
-**🎮 Komendy**
-
-- `/dilemma random` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-6 godzin** głosowania.
-- `/dilemma score profile` - karta, poziom, punkty, Iskry i statystyki.
-- `/dilemma score exchange` - 3 EXP za Iskrę, min. 3 Iskry. Punkty liczę osobno.
-- `/dilemma score leaderboard` - najlepsza dziesiątka serwera.
-- `/dilemma score achievements` - odznaki i postępy.
-- `/dilemma score badge` - wybierz do 3 zdobytych odznak na kartę.
-- `/dilemma help` - przewodnik po komendach.
-
-**⏱️ Randomy i kończenie quizów**
-
-Serwer ma **4 randomy dziennie**, standardowo co **6 godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
-Swój random zamkniesz przyciskiem **Zakończ quiz**. Wszystkie quizy mogą zamykać też właściciel serwera, osoby z uprawnieniem **Zarządzanie serwerem** lub rolą opiekuna Dilemmy.
-`/dilemma random-reset` jest dla właściciela i osób z rolą opiekuna. Reset usuwa oczekiwanie, ale nie odnawia limitu dziennego. Wcześniejsze zamknięcie nie zwraca randoma ani nie skraca przerwy~
-
-**🔔 Powiadomienia**
-
-Quizy z harmonogramu pojawiają się automatycznie; ustawiona rola dostaje ping na start. Opiekunowie mogą też włączyć ping roli na kanale ostatniego randoma, gdy czas i limit pozwolą rozpocząć następny~ (ﾉ◕ヮ◕)ﾉ
+Przy każdym nowym wydaniu napiszę tutaj osobną wiadomość o zmianach. Ten poradnik pozostaje ogólnym wprowadzeniem do gry~ (ﾉ◕ヮ◕)ﾉ

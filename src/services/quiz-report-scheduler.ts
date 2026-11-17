@@ -1,4 +1,4 @@
-import { Routes, type Client } from "discord.js";
+import { escapeMarkdown, Routes, type Client } from "discord.js";
 import { env } from "../config.js";
 import { db } from "../db.js";
 import { message } from "../messages.js";
@@ -17,7 +17,7 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
   if (!env.QUIZ_REPORT_RECIPIENT_ID) return false;
   const reports = await db.quizReport.findMany({ where: { reviewedAt: null, createdAt: { lte: cutoff } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 20,
-    select: { id: true, guildId: true, channelId: true, messageId: true, question: true, options: true, correctOption: true,
+    select: { id: true, guildId: true, channelId: true, messageId: true, reporterUserId: true, question: true, options: true, correctOption: true,
       explanation: true, reason: true, analysis: true } });
   const groups = new Map<string, typeof reports>();
   for (const report of reports) {
@@ -25,6 +25,28 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
     const group = groups.get(key) ?? []; group.push(report); groups.set(key, group);
   }
   const language = env.QUIZ_REPORT_REVIEW_LANGUAGE;
+  const authors = new Map<string, Promise<string>>();
+  const reportAuthor = (userId: string) => {
+    if (!/^\d{17,20}$/.test(userId)) return Promise.resolve(message(language, "quizReportReviewUnknownAuthor"));
+    let author = authors.get(userId);
+    if (!author) {
+      author = (async () => {
+        let name: string | undefined;
+        try {
+          const cached = client.users.cache.get(userId);
+          if (cached) name = cached.username;
+          else {
+            const user = await client.rest.get(Routes.user(userId), { signal: AbortSignal.timeout(5000) }) as { username?: string };
+            name = user.username;
+          }
+        } catch {}
+        const label = name ? inlineText(safeReportText(name).slice(0, 100)) : message(language, "quizReportReviewProfile");
+        return `[${label}](https://discord.com/users/${userId}) (\`${userId}\`)`;
+      })();
+      authors.set(userId, author);
+    }
+    return author;
+  };
   for (const group of [...groups.values()].slice(0, 4)) {
     if (!current()) return false;
     const first = group[0];
@@ -39,28 +61,34 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
       : analysis.verdict === "not-confirmed" ? "quizReportReviewNotConfirmed" : "quizReportReviewUncertain";
     const url = [first.guildId, first.channelId, first.messageId].every(id => /^\d{17,20}$/.test(id))
       ? `https://discord.com/channels/${first.guildId}/${first.channelId}/${first.messageId}` : "";
-    const blocks = [`**${inlineText(safeReportText(first.question))}**`, url,
-      `**${message(language, "quizReportReviewReasons")}:**\n` + [...new Set(group.map(report => {
-        const reason = safeReportText(report.reason);
-        return inlineText(reason.length > 350 ? reason.slice(0, 350) + "..." : reason);
-      }))].join("\n"),
+    const findings = [
       `**${message(language, verdict)}**`, `**${message(language, "quizReportReviewFinding")}:** ${safeReportText(analysis.finding)}`,
       `**${message(language, "quizReportReviewSuggestion")}:** ${safeReportText(analysis.suggestion)}`,
       analysis.sources.length ? `**${message(language, "quizReportReviewSources")}:**\n` + analysis.sources.map(source =>
         `[${inlineText(source.title)}](${source.url.replace(/[()]/g, character => encodeURIComponent(character))})`).join("\n")
         : message(language, "quizReportReviewNoSources")];
     let channel: { id: string } | undefined;
-    const result = await deliverQuizReportReview(db, { recipientId: env.QUIZ_REPORT_RECIPIENT_ID,
-      reviews: group.map(report => ({ id: report.id,
-        note: [`${message(language, "quizReportReviewFinding")}: ${analysis.finding}`,
-          `${message(language, "quizReportReviewSuggestion")}: ${analysis.suggestion}`,
-          ...analysis.sources.map(source => source.url)].join("\n").slice(0, 3000) })),
-      messages: textPages(blocks, 1900) }, async body => {
-      if (!current()) throw Error("Report review stopped");
-      channel ??= await client.rest.post(Routes.userChannels(), { body: { recipient_id: env.QUIZ_REPORT_RECIPIENT_ID } }) as { id: string };
-      return client.rest.post(Routes.channelMessages(channel.id), { body, signal: AbortSignal.timeout(15000) });
-    }, message(language, "quizReportReviewIntro", { count: group.length }));
-    if (result.status !== "delivered" && result.status !== "already-delivered") throw Error("Report review delivery pending");
+    for (let offset = 0; offset < group.length; offset += 5) {
+      if (!current()) return false;
+      const delivery = group.slice(offset, offset + 5);
+      const reportBlocks = [];
+      for (const report of delivery) {
+        const author = await reportAuthor(report.reporterUserId);
+        const reason = safeReportText(report.reason).split(/\r\n|[\r\n\u2028\u2029]/u).map(line => `> ${escapeMarkdown(line)}`).join("\n");
+        reportBlocks.push(`**${message(language, "quizReportReviewAuthor")}:** ${author}\n**${message(language, "quizReportReviewReasons")}:**\n${reason}`);
+      }
+      const result = await deliverQuizReportReview(db, { recipientId: env.QUIZ_REPORT_RECIPIENT_ID,
+        reviews: delivery.map(report => ({ id: report.id,
+          note: [`${message(language, "quizReportReviewFinding")}: ${analysis.finding}`,
+            `${message(language, "quizReportReviewSuggestion")}: ${analysis.suggestion}`,
+            ...analysis.sources.map(source => source.url)].join("\n").slice(0, 3000) })),
+        messages: textPages([`**${inlineText(safeReportText(first.question))}**`, url, ...reportBlocks, ...findings], 1900) }, async body => {
+        if (!current()) throw Error("Report review stopped");
+        channel ??= await client.rest.post(Routes.userChannels(), { body: { recipient_id: env.QUIZ_REPORT_RECIPIENT_ID } }) as { id: string };
+        return client.rest.post(Routes.channelMessages(channel.id), { body, signal: AbortSignal.timeout(15000) });
+      }, message(language, "quizReportReviewIntro", { count: delivery.length }));
+      if (result.status !== "delivered" && result.status !== "already-delivered") throw Error("Report review delivery pending");
+    }
   }
   return reports.length === 20 || groups.size > 4;
 }

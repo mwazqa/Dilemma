@@ -13,6 +13,7 @@ export const scheduleEvents = new EventEmitter<{
   randomNotificationsChanged: [guildId: string];
   settlementChanged: [quiz: SettlementSchedule];
   settlementClosed: [messageId: string, at: Date];
+  guidePublished: [guildId: string, channelId: string];
 }>();
 
 export function settlementDeadline(quiz: SettlementSchedule): number | null {

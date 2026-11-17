@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.10.0 - 2026-11-17
+
+- Replace the detailed PL/EN player guide with a general introduction and remove Refresh. Discover and convert legacy bot guides once.
+- Register guide channels and post separate bilingual release announcements after GitHub publication, with persisted receipts, retry backoff and restart recovery.
+- Include each quiz reporter's username when available, Discord profile, account ID and full description in private owner DMs. Keep identical reports separate, quote untrusted text and paginate delivery while retaining cached analysis and successful delivery groups.
+- Explain reporter visibility in the form and confirmation. Keep identity outside AI input and preserve sensitive-text redaction.
+- Review both guides and release highlights; add isolated discovery, migration, concurrent announcement, full-description and partial-delivery tests. Apply `20261117160000_guide_release_updates`, regenerate Prisma and re-register commands from v3.9.0.
+
 ## v3.9.0 - 2026-11-17
 
 - Show wrong-answer penalties on new quiz cards, in alternative text and in the text fallback.

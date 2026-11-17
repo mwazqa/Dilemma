@@ -26,12 +26,13 @@ import { cacheGuildSettings } from "./services/guild-settings.js";
 import { handleTopicListComponent, TOPIC_LIST_PREFIX } from "./commands/topic-list.js";
 import { startRandomNotificationScheduler } from "./services/random-notifications.js";
 import { personalQuizAction } from "./services/quiz-personal.js";
-import { handleGuideRefresh } from "./commands/guide.js";
-import { GUIDE_REFRESH_BUTTON_ID } from "./services/player-guide.js";
+import { handleLegacyGuide } from "./commands/guide.js";
+import { LEGACY_GUIDE_REFRESH_BUTTON_ID } from "./services/player-guide.js";
 import { handleQuizReportButton, handleQuizReportModal } from "./commands/quiz-report.js";
 import { REPORT_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
 import { REPORT_MODAL_PREFIX } from "./services/quiz-reports.js";
 import { startQuizReportReviewScheduler } from "./services/quiz-report-scheduler.js";
+import { startGuideUpdatesScheduler } from "./services/guide-updates.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -41,7 +42,7 @@ client.on(Events.Error, error => {
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as Discord bot");
-  stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client), startQuizReportReviewScheduler(client));
+  stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client), startQuizReportReviewScheduler(client), startGuideUpdatesScheduler(client));
 });
 
 client.on(Events.GuildCreate, async (guild) => {
@@ -77,8 +78,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await routeAutocomplete(interaction);
       return;
     }
-    if (interaction.isButton() && interaction.customId === GUIDE_REFRESH_BUTTON_ID) {
-      await handleGuideRefresh(interaction); return;
+    if (interaction.isButton() && interaction.customId === LEGACY_GUIDE_REFRESH_BUTTON_ID) {
+      await handleLegacyGuide(interaction); return;
     }
     if (interaction.isButton() && interaction.customId === REPORT_QUIZ_BUTTON_ID) {
       await handleQuizReportButton(interaction); return;

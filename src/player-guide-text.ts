@@ -1,128 +1,58 @@
 export const playerGuideTranslations = [
 `**Hi~ I'm Dilemma, your quiz companion!**
-I create questions with AI, and you collect points, Sparks, levels and badges~
+I create questions with AI, and you can play together, collect points and develop your profile~
 
-**🎮 How to play**
+**🎮 Join a quiz**
 
-- Pick an answer below the card. Your first vote is free.
-- I shuffle answers before publishing each quiz.
-- **{myAnswerButton}** opens your private panel. Green marks your saved choice; correctness is revealed after the quiz.
-- Changing or withdrawing costs **{withdrawCost} Spark**. Picking the same answer again and refreshing are free.
-- **{quizJumpButton}** takes you to the card, including from hints and results. No charge~
-- Your final answer counts. After closing, I'll show everyone the vote counts, correct answer and explanation.
-- **{reportQuizButton}** opens a private issue form, even after the quiz. Free~
+Pick an answer below an active quiz card. **{myAnswerButton}** opens your private panel with your saved choice. The final answer you leave before closing is the one that counts. I'll reveal the correct answer and explanation after the quiz~
 
-**✨ Points, levels and Sparks**
+**✨ Points, Sparks and progress**
 
-A correct answer earns **1 point and 1 Spark** for easy, **2 points and 2 Sparks** for medium, or **3 points and 3 Sparks** for hard. Each point gives **{experiencePerPoint} EXP**, and each new level gives **5 extra Sparks**!
-Wrong answers cost **{easyPenalty}/{mediumPenalty}/{hardPenalty} Sparks** for easy/medium/hard, up to your balance. Skipping is free.
-Correct answers build a streak. A mistake breaks it; skipping a quiz doesn't. Scores, badges and wallets are separate on each server~ (っ•ᴗ•)っ✦
+Correct answers build your score, EXP and streak. Sparks are your quiz currency: use them for optional tools, bets or an EXP exchange. Your profile, progress and wallet belong to each server separately.
+Check the current fees and wrong-answer penalty on the quiz card, in your private panel and beside the buttons before taking an action~ (っ•ᴗ•)っ✦
 
-**🔍 A little help**
+**🔍 Optional help and bets**
 
-- **Preview - {revealCost} Sparks:** private vote counts without revealing the correct answer.
-- **50/50 - {fiftyCost} Sparks:** your private panel keeps two answer buttons, including the correct one. Available with 3-4 answers; eliminated choices can no longer receive your vote.
+Use the tools offered below the quiz if you need a hint or a look at the votes. You can also place a bet on your saved answer. Read the details in the panel before confirming; the result is settled after closing.
 
-Buy each tool once per quiz. Reopening is free.
-**50/50 doesn't change your saved vote or bet.** If your choice was eliminated, change it for {withdrawCost} Spark~
+**🏁 Your result and profile**
 
-**🎲 Place a bet**
+After the quiz, **{myResultButton}** shows your own answer, points and Spark settlement privately.
+Use \`/dilemma score profile\` for your profile and \`/dilemma score leaderboard\` for the server ranking. Discover the other commands, badges and quiz options through \`/dilemma help\`~
 
-Vote first. Click **{wagerButton}** below the card or in **{myAnswerButton}**. Confirm a whole-number stake of **1-{maxWager} Sparks**; I'll deduct it from your wallet.
+**💬 Something looks wrong?**
 
-- A correct answer pays **2x your stake in total**: stake 10, receive 20, profit 10. A wrong answer loses the stake plus the answer penalty.
-- Answer and level rewards are awarded separately.
-- One active bet per quiz. Its stake cannot be changed.
-- Changing your answer for {withdrawCost} Spark moves the bet to your new choice.
-- Withdrawing cancels the bet and returns the stake minus the {withdrawCost}-Spark fee.
-- Closing the form without confirming is free.
+**{reportQuizButton}** opens a private form for a problem with the question, answers or explanation. Describe what needs checking without sharing private details.
 
-The panel shows your stake and possible payout. Its bet button is disabled before you vote and while a bet is active~ (ง •̀ω•́)ง
+**🔔 What's new?**
 
-**🏁 My result**
-
-After settlement, click **{myResultButton}**. Privately see your choice, correct answer, points, any Sparks deducted and your bet's stake, payout and profit or loss.
-
-**🎮 Commands**
-
-- \`/dilemma random\` - start a random quiz without a special role: difficulty, **2-4 AI-generated answers**, **1-{randomMaxHours} hours** of voting.
-- \`/dilemma score profile\` - card, level, points, Sparks and stats.
-- \`/dilemma score exchange\` - {expPerSpark} EXP per Spark, min. {minExchangeSparks} Sparks. Quiz points stay separate.
-- \`/dilemma score leaderboard\` - the server's top ten.
-- \`/dilemma score achievements\` - badges and progress.
-- \`/dilemma score badge\` - display up to 3 earned badges.
-- \`/dilemma help\` - command guide.
-
-**⏱️ Randoms and closing quizzes**
-
-The whole server shares **{randomDailyLimit} randoms per day**, normally **{randomCooldownHours} hours apart**. Days use the server timezone; midnight doesn't shorten a cooldown. Remaining time is shown in hours and minutes. Use designated random channels when configured.
-Close your own random with **{endQuizButton}**. The server owner, members with **Manage Server** or the Dilemma manager role can close all quizzes.
-\`/dilemma random-reset\` is for the owner or manager role. It resets the cooldown, not the daily quota. Closing early doesn't restore a random slot or shorten the cooldown~
-
-**🔔 Notifications**
-
-Scheduled quizzes appear automatically; the configured role gets a start ping. Managers can also enable a role ping in the last random's channel when the cooldown and daily quota allow another~ (ﾉ◕ヮ◕)ﾉ`,
+I'll post a separate message here with the changes in each new release. This guide stays a general introduction to playing~ (ﾉ◕ヮ◕)ﾉ`,
 `**Hej~ Jestem Dilemma, Twoja quizowa towarzyszka!**
-Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
+Tworzę pytania z pomocą AI, a Ty możesz grać ze znajomymi, zbierać punkty i rozwijać swój profil~
 
-**🎮 Jak grać?**
+**🎮 Dołącz do quizu**
 
-- Wybierz odpowiedź pod kartą. Pierwszy głos jest bezpłatny.
-- Odpowiedzi tasuję przed publikacją quizu.
-- **{myAnswerButton}** otwiera prywatny panel. Zielony przycisk oznacza zapisany wybór; poprawność poznasz po quizie.
-- Zmiana lub wycofanie odpowiedzi kosztuje **{withdrawCost} Iskrę**. Ponowne kliknięcie tej samej odpowiedzi i odświeżanie są bezpłatne.
-- **{quizJumpButton}** przenosi do karty, również z podpowiedzi i wyniku. Bez opłat~
-- Liczy się końcowa odpowiedź. Po quizie pokażę wszystkim liczby głosów, poprawną odpowiedź i wyjaśnienie.
-- **{reportQuizButton}** otwiera prywatny formularz problemu, także po quizie. Za darmo~
+Wybierz odpowiedź pod aktywną kartą quizu. **{myAnswerButton}** otwiera prywatny panel z Twoim zapisanym wyborem. Liczy się końcowa odpowiedź pozostawiona przed zamknięciem. Poprawną odpowiedź i wyjaśnienie pokażę po quizie~
 
-**✨ Punkty, poziomy i Iskry**
+**✨ Punkty, Iskry i postępy**
 
-Za trafienie dostajesz **1/2/3 pkt i tyle samo Iskier** w łatwym/średnim/trudnym quizie. Punkt daje **{experiencePerPoint} EXP**, a poziom dodatkowe **5 Iskier**!
-Za błąd tracisz **{easyPenalty}/{mediumPenalty}/{hardPenalty} Iskry** w łatwym/średnim/trudnym quizie, do wysokości salda. Pominięcie jest bezpłatne.
-Trafienia budują serię. Błąd ją przerywa, pominięcie quizu nie. Wyniki, odznaki i portfel są osobne na każdym serwerze~ (っ•ᴗ•)っ✦
+Trafienia budują wynik, EXP i serię. Iskry to quizowa waluta: przydają się do dodatkowej pomocy, zakładów i wymiany na EXP. Profil, postępy i portfel są osobne na każdym serwerze.
+Aktualne opłaty i karę za błędną odpowiedź sprawdzaj na karcie quizu, w prywatnym panelu i przy przyciskach przed wykonaniem akcji~ (っ•ᴗ•)っ✦
 
-**🔍 Pomoc**
+**🔍 Pomoc i zakłady**
 
-- **Podgląd - {revealCost} Iskry:** prywatne liczby głosów bez ujawniania poprawnej odpowiedzi.
-- **50/50 - {fiftyCost} Iskier:** w prywatnym panelu zostają dwa przyciski, w tym poprawna odpowiedź. Działa przy 3-4 odpowiedziach; odrzuconych opcji nie można już wybrać.
+Skorzystaj z opcji pod quizem, jeśli potrzebujesz podpowiedzi lub podglądu głosów. Możesz też obstawić swoją zapisaną odpowiedź. Przed zatwierdzeniem przeczytaj szczegóły w panelu; rozliczenie nastąpi po zakończeniu quizu.
 
-Każdą pomoc kupujesz raz na quiz. Ponowne otwarcia są bezpłatne.
-**50/50 nie zmienia zapisanego głosu ani zakładu.** Jeśli Twój wybór odpadł, zmień odpowiedź za {withdrawCost} Iskrę~
+**🏁 Twój wynik i profil**
 
-**🎲 Obstaw Iskry**
+Po quizie **{myResultButton}** pokaże Ci prywatnie Twój wybór, punkty i rozliczenie Iskier.
+Profil znajdziesz w \`/dilemma score profile\`, a ranking serwera w \`/dilemma score leaderboard\`. Pozostałe komendy, odznaki i możliwości quizów poznasz przez \`/dilemma help\`~
 
-Najpierw zagłosuj. Kliknij **{wagerButton}** pod kartą lub w panelu **{myAnswerButton}**. Zatwierdź całkowitą stawkę **1-{maxWager} Iskier**; pobiorę ją z portfela.
+**💬 Coś się nie zgadza?**
 
-- Trafienie wypłaca **2x stawkę łącznie**: stawiasz 10, dostajesz 20, zysk wynosi 10. Błąd oznacza utratę stawki oraz karę za odpowiedź.
-- Nagrody za odpowiedź i poziom naliczam osobno.
-- Możesz mieć jeden aktywny zakład na quiz. Jego stawki nie zmienisz.
-- Zmiana odpowiedzi za {withdrawCost} Iskrę przenosi zakład na nowy wybór.
-- Wycofanie głosu anuluje zakład i zwraca stawkę pomniejszoną o {withdrawCost} Iskrę opłaty.
-- Zamknięcie formularza bez zatwierdzenia jest bezpłatne.
+**{reportQuizButton}** otwiera prywatny formularz problemu z pytaniem, odpowiedziami lub wyjaśnieniem. Opisz, co wymaga sprawdzenia, bez danych prywatnych.
 
-Panel pokazuje stawkę i wypłatę. Obstawisz po wyborze odpowiedzi, bez aktywnego zakładu~ (ง •̀ω•́)ง
+**🔔 Nowości**
 
-**🏁 Mój wynik**
-
-Po rozliczeniu kliknij **{myResultButton}**. Prywatnie zobaczysz swój wybór, poprawną odpowiedź, punkty, pobrane Iskry oraz stawkę, wypłatę i zysk lub stratę z zakładu.
-
-**🎮 Komendy**
-
-- \`/dilemma random\` - losowy quiz bez specjalnej roli: trudność, **2-4 odpowiedzi od AI**, **1-{randomMaxHours} godzin** głosowania.
-- \`/dilemma score profile\` - karta, poziom, punkty, Iskry i statystyki.
-- \`/dilemma score exchange\` - {expPerSpark} EXP za Iskrę, min. {minExchangeSparks} Iskry. Punkty liczę osobno.
-- \`/dilemma score leaderboard\` - najlepsza dziesiątka serwera.
-- \`/dilemma score achievements\` - odznaki i postępy.
-- \`/dilemma score badge\` - wybierz do 3 zdobytych odznak na kartę.
-- \`/dilemma help\` - przewodnik po komendach.
-
-**⏱️ Randomy i kończenie quizów**
-
-Serwer ma **{randomDailyLimit} randomy dziennie**, standardowo co **{randomCooldownHours} godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
-Swój random zamkniesz przyciskiem **{endQuizButton}**. Wszystkie quizy mogą zamykać też właściciel serwera, osoby z uprawnieniem **Zarządzanie serwerem** lub rolą opiekuna Dilemmy.
-\`/dilemma random-reset\` jest dla właściciela i osób z rolą opiekuna. Reset usuwa oczekiwanie, ale nie odnawia limitu dziennego. Wcześniejsze zamknięcie nie zwraca randoma ani nie skraca przerwy~
-
-**🔔 Powiadomienia**
-
-Quizy z harmonogramu pojawiają się automatycznie; ustawiona rola dostaje ping na start. Opiekunowie mogą też włączyć ping roli na kanale ostatniego randoma, gdy czas i limit pozwolą rozpocząć następny~ (ﾉ◕ヮ◕)ﾉ`
+Przy każdym nowym wydaniu napiszę tutaj osobną wiadomość o zmianach. Ten poradnik pozostaje ogólnym wprowadzeniem do gry~ (ﾉ◕ヮ◕)ﾉ`
 ] as const;

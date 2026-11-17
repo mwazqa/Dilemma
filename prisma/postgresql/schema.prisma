@@ -244,3 +244,38 @@ model QuizReport {
   @@unique([messageId, reporterUserId])
   @@index([reviewedAt, createdAt, id])
 }
+
+model GuidePublication {
+  messageId String   @id
+  guildId   String
+  channelId String
+  active    Boolean  @default(true)
+  genericAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([active, guildId, channelId])
+  @@index([genericAt])
+}
+
+model GuideReleaseNotice {
+  guildId     String
+  channelId   String
+  version     String
+  messageId   String?
+  deliveredAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@id([guildId, channelId, version])
+}
+
+model GuideDiscovery {
+  channelId       String
+  kind            String   @default("messages")
+  guildId         String
+  cursor          String?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@id([channelId, kind])
+  @@index([completedAt])
+}

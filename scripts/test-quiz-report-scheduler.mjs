@@ -30,7 +30,8 @@ const RealDate = Date, originalSetTimeout = globalThis.setTimeout, originalClear
 let stop, stage = "analysis";
 try {
   const fact = { question: "Which number is even?", options: '["2","3"]', correctOption: 0, explanation: "Two is even.",
-    reason: "Check this fact; password=" + "synthetic-secret" + " <@111111111111111111> https://discord.com/channels/111111111111111111/111111111111111111/111111111111111111" };
+    reason: "Check this fact; password=" + "synthetic-secret" + " <@111111111111111111> https://discord.com/channels/111111111111111111/111111111111111111/111111111111111111",
+    reporterUserId: "private-reporter" };
   assert.equal((await analyzeQuizReports([fact])).verdict, "confirmed");
   mode = "uncited";
   const unsupported = await analyzeQuizReports([fact]);
@@ -39,12 +40,14 @@ try {
   assert.equal(requests, 3);
   stage = "server-delivery";
   const fixture = index => ({ id: "c" + String(index).padStart(24, "0"), guildId: "222222222222222222", channelId: "333333333333333333",
-    messageId: String(444444444444444440n + BigInt(index)), ...fact, reason: "The explanation needs checking.", createdAt: new RealDate(0),
+    messageId: String(444444444444444440n + BigInt(index)), ...fact, reporterUserId: String(555555555555555550n + BigInt(index)),
+    reason: "The explanation needs checking.", createdAt: new RealDate(0),
     analysis: null, analyzedAt: null, reviewNote: null, reviewedAt: null });
-  let reports = [fixture(1)], analyses = 0, failSend = true, sends = 0;
+  let reports = [fixture(1)], analyses = 0, failSend = true, failAfterFirstGroup = false, sends = 0;
+  const sentBodies = [], lookups = [];
   db.quizReport.findMany = async ({ where, take, select }) => {
     if (where.id) return reports.filter(row => where.id.in.includes(row.id)).map(row => ({ ...row }));
-    assert.equal(take, 20); assert.ok(where.createdAt.lte instanceof RealDate); assert.equal(select.reporterUserId, undefined);
+    assert.equal(take, 20); assert.ok(where.createdAt.lte instanceof RealDate); assert.equal(select.reporterUserId, true);
     return reports.filter(row => !row.reviewedAt && row.createdAt <= where.createdAt.lte).slice(0, take).map(row => ({ ...row }));
   };
   db.quizReport.updateMany = async ({ where, data }) => {
@@ -56,10 +59,17 @@ try {
     const before = structuredClone(reports);
     try { return await work(db); } catch (error) { reports = before; throw error; }
   };
-  const client = { rest: { post: async (route, { body }) => {
+  const client = { users: { cache: new Map([[fixture(1).reporterUserId, { username: "cached_reporter" }]]) }, rest: {
+    get: async route => {
+      assert.match(route, /^\/users\/\d{17,20}$/); lookups.push(route);
+      if (route.endsWith(fixture(32).reporterUserId)) throw Error("Synthetic account unavailable");
+      return { username: "quiz_reporter_" + route.split("/").at(-1) };
+    }, post: async (route, { body }) => {
     if (route === "/users/@me/channels") { assert.equal(body.recipient_id, env.QUIZ_REPORT_RECIPIENT_ID); return { id: "direct" }; }
     assert.equal(route, "/channels/direct/messages"); assert.equal(body.enforce_nonce, true); assert.deepEqual(body.allowed_mentions, { parse: [] });
-    if (failSend) throw Error("Synthetic DM failure"); sends++; return { id: "message" };
+    assert.ok(body.content.length <= 1900);
+    if (failSend || failAfterFirstGroup && reports.some(row => row.reviewedAt)) throw Error("Synthetic DM failure");
+    sentBodies.push(body.content); sends++; return { id: "message" };
   } } };
   const analyze = async () => { analyses++; return analysis; };
   const cutoff = new RealDate();
@@ -68,6 +78,9 @@ try {
   failSend = false;
   await processQuizReportBatch(client, cutoff, () => true, analyze);
   assert.equal(analyses, 1, "Retry uses persisted analysis without another AI request"); assert.ok(reports[0].reviewedAt);
+  assert.ok(sentBodies.join("\n").includes("cached\\_reporter"));
+  assert.ok(sentBodies.join("\n").includes(`https://discord.com/users/${fixture(1).reporterUserId}`));
+  assert.ok(sentBodies.join("\n").includes(fixture(1).reporterUserId)); assert.equal(lookups.length, 0);
   const delivered = sends;
   await processQuizReportBatch(client, cutoff, () => true, analyze); assert.equal(sends, delivered);
   reports = Array.from({ length: 5 }, (_, index) => fixture(index + 2));
@@ -75,6 +88,35 @@ try {
   assert.equal(reports.filter(row => row.reviewedAt).length, 4);
   assert.equal(await processQuizReportBatch(client, cutoff, () => true, analyze), false);
   assert.ok(reports.every(row => row.reviewedAt));
+  stage = "full-authored-descriptions";
+  const reason = "Shared report line\n" + "*".repeat(950) + " end-of-report";
+  reports = Array.from({ length: 20 }, (_, index) => ({ ...fixture(index + 20), messageId: fixture(20).messageId, reason }));
+  sentBodies.length = 0;
+  const beforeAnalysis = analyses;
+  assert.equal(await processQuizReportBatch(client, cutoff, () => true, analyze), true);
+  assert.ok(reports.every(row => row.reviewedAt)); assert.equal(analyses, beforeAnalysis + 1, "One analysis covers all reports for the same quiz");
+  const descriptions = sentBodies.join("\n");
+  assert.equal(descriptions.split("end-of-report").length - 1, 20, "Identical full reports are kept for every author");
+  assert.equal(descriptions.split("Shared report line\n").length - 1, 20, "Original line breaks survive");
+  for (const report of reports) assert.ok(descriptions.includes(`https://discord.com/users/${report.reporterUserId}`));
+  assert.ok(descriptions.includes("Profil Discord"), "A missing username retains a profile link and account ID");
+  assert.ok(descriptions.includes("\\*\\*"), "Report Markdown is quoted as text");
+  assert.ok(descriptions.includes("quiz\\_reporter\\_"));
+  stage = "partial-delivery-retry";
+  reports = Array.from({ length: 6 }, (_, index) => ({ ...fixture(index + 50), messageId: fixture(50).messageId,
+    reason: "Check this full report; password=" + "synthetic-secret" + " <@111111111111111111>" }));
+  sentBodies.length = 0; failAfterFirstGroup = true;
+  const beforePartialAnalysis = analyses;
+  await assert.rejects(processQuizReportBatch(client, cutoff, () => true, analyze), /Synthetic DM failure/);
+  assert.equal(reports.filter(row => row.reviewedAt).length, 5);
+  const completedId = reports[0].reporterUserId;
+  const firstGroupMentions = sentBodies.join("\n").split(completedId).length;
+  failAfterFirstGroup = false;
+  await processQuizReportBatch(client, cutoff, () => true, analyze);
+  assert.ok(reports.every(row => row.reviewedAt)); assert.equal(analyses, beforePartialAnalysis + 1);
+  assert.equal(sentBodies.join("\n").split(completedId).length, firstGroupMentions, "A completed delivery group is not sent again");
+  assert.doesNotMatch(sentBodies.join("\n"), /synthetic-secret|<@111111111111111111>/);
+  assert.ok(sentBodies.join("\n").includes("redacted credential"));
   stage = "midnight-scheduler";
   let now = RealDate.parse("2026-11-17T22:59:00Z"), timerId = 0;
   const timers = new Map();
@@ -110,7 +152,8 @@ try {
   env.QUIZ_REPORT_RECIPIENT_ID = "";
   stop = startQuizReportReviewScheduler(client, async () => { throw Error("Disabled scheduler ran"); });
   await advance(86400000); assert.equal(timers.size, 0); stop();
-  console.log(JSON.stringify({ check: "quiz-report-scheduler", passed: true, midnightWarsaw: true, daylightSaving: true, restartCatchup: true, cachedRetry: true, groundedSources: true, noIdlePolling: true }));
+  console.log(JSON.stringify({ check: "quiz-report-scheduler", passed: true, midnightWarsaw: true, daylightSaving: true, restartCatchup: true, cachedRetry: true, groundedSources: true, noIdlePolling: true,
+    reporterAccounts: true, fullDescriptions: true, separateAuthors: true, boundedDelivery: true, partialRetry: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "quiz-report-scheduler", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation", line: Number(error.stack?.match(/test-quiz-report-scheduler\.mjs:(\d+)/)?.[1] || 0) }));
   process.exitCode = 1;

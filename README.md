@@ -10,6 +10,8 @@ New servers start in English. Onboarding and `/dilemma language` list English fi
 
 ## Current status
 
+Version v3.10.0 makes the player guide a general introduction without a Refresh button and adds separate PL/EN release announcements on guide channels. Existing guides are discovered and converted once. Apply `20261117160000_guide_release_updates`, regenerate Prisma and re-register commands when deploying this update. See [Guide and release news](docs/guide-release-updates.md) for delivery and release checks.
+
 Version v3.6.1 lets everyone with access to a public player guide refresh it in place. Publishing remains restricted to Manage Server or the configured Dilemma manager role. The Polish and English guides no longer include the publishing/refresh instructions. Upgrading from v3.6.0 requires no migration or command re-registration.
 
 Version v3.6.0 adds `/dilemma guide` with in-place refresh, Place bet and Go to quiz in private quiz panels, hours-and-minutes random cooldowns and transparent quiz-card margins. Supported languages are now English and Polish. Upgrading from v3.5.0 requires Discord command re-registration; no database migration is needed.
@@ -18,7 +20,7 @@ Version v3.5.0 adds private My answer and My result panels, clickable 50/50 choi
 
 Version v3.4.0 requires the additive `20261029120000_random_topics_sparks` and `20261029130000_button_quiz_tools` migrations, Prisma client regeneration and Discord command registration. New random quizzes last 1-6 hours; omitted durations use the saved default capped at 6 hours. Saved topics keep their 1-24 hour range. New quizzes use persistent button votes; existing native Discord polls continue through the legacy finalized-results flow and retain Discord's visible counts and normal voting controls.
 
-Code version: `v3.6.1`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.10.0`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Quiz cards are rendered locally in navy, lavender and gold, with the question, answer choices and voting duration. Topic and difficulty stay above the card. Two answers use one row, three use a centered final answer and four use two rows. Discord buttons below the image handle voting, withdrawal, private counts, 50/50, bets and closing. The image includes full alternative text; rendering failures or missing Attach Files permission use a complete text fallback. The duration on the image is static, not a countdown.
 
@@ -237,11 +239,13 @@ Direct deployment normally rejects pending migrations. After creating a backup a
 
 ## Player guide
 
-`/dilemma guide` publishes one public text embed on the current channel, using the server's Polish or English language setting. The full guide includes answer previews, 50/50, points, Sparks, bets, personal results, random limits, permissions and notifications. It uses bold section titles and stays below 4000 characters, including a CRLF copy of the text. See the saved [Polish guide](docs/player-guide.pl.md) and [English guide](docs/player-guide.en.md).
+`/dilemma guide` publishes one public text embed on the current channel, using the server's Polish or English language setting. It gives players a general introduction to answers, results, profiles, Sparks, optional help, bets and reporting a quiz. Current prices, penalties and other changing details stay in the quiz interface. The guide uses bold section titles and stays below 4000 characters, including a CRLF copy of the text. See the saved [Polish guide](docs/player-guide.pl.md) and [English guide](docs/player-guide.en.md).
 
-The Refresh button replaces that same message with the guide from the currently running bot version and current server language. It sends no new public message or role ping. Anyone with access to the public guide can refresh it. Publishing still requires Manage Server, including Administrator, or the configured Dilemma manager role. Source-message validation prevents a refresh from editing a different bot's message, another channel/server or a private message. Access and delivery errors remain private.
+The guide has no Refresh button. Publishing requires Manage Server, including Administrator, or the configured Dilemma manager role, and registers the channel for future release news. At startup, the bot resumes discovery of its old guides, converts each to the general version once and removes its old Refresh button. Source-message validation prevents editing another bot's message, another channel/server or a private message. Access and delivery errors remain private.
 
-Before every GitHub or production release, review both guide translations against the final changes and implemented behavior. Update commands, labels, mechanics, costs, rewards, limits and permissions when needed. Run `npm run guide:sync` to regenerate the saved documents, inspect both complete texts and run `npm run test:guide`. CI and the deployment checks include this test. Refresh existing published guides after deploying the updated bot; publishing or automatically editing Discord messages still requires task authorization. Adding `/dilemma guide` requires command re-registration when deploying, without a database migration.
+For each release, review the general guide for accuracy and prepare player-facing PL/EN highlights in `src/player-release.ts`, matching the package version. Dilemma posts those highlights as a separate message on every registered guide channel after the matching GitHub release becomes public. Several guides on one channel still produce one announcement; saved receipts skip completed deliveries after restarts and temporary failures retry. See [Guide and release news](docs/guide-release-updates.md) for discovery, permissions and delivery limits.
+
+Before every GitHub or production release, run `npm run guide:sync`, inspect both complete guide texts and run `npm run test:guide` and `npm run test:guide:postgres` against a disposable database. CI includes these checks. Ordinary releases leave the published general guide in place and append release news instead.
 
 ## Database idle behavior
 
