@@ -47,7 +47,7 @@ export class AiAnswerOptionsMismatchError extends AiGenerationError {
   }
 }
 
-async function withAiRateLimit<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
+export async function withAiRateLimit<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
   const previous = requestQueue;
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });

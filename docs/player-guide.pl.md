@@ -9,6 +9,7 @@ Tworzę pytania z pomocą AI, a Ty zbierasz punkty, Iskry, poziomy i odznaki~
 - Zmiana lub wycofanie odpowiedzi kosztuje **1 Iskrę**. Ponowne kliknięcie tej samej odpowiedzi i odświeżanie są bezpłatne.
 - **Przejdź do quizu** przenosi do karty, również z podpowiedzi i wyniku. Bez opłat~
 - Liczy się końcowa odpowiedź. Po quizie pokażę wszystkim liczby głosów, poprawną odpowiedź i wyjaśnienie.
+- **Zgłoś quiz** otwiera prywatny formularz problemu, także po quizie. Za darmo~
 
 **✨ Punkty, poziomy i Iskry**
 
@@ -35,7 +36,7 @@ Najpierw zagłosuj. Kliknij **Obstaw Iskry** pod kartą lub w panelu **Moja odpo
 - Wycofanie głosu anuluje zakład i zwraca stawkę pomniejszoną o 1 Iskrę opłaty.
 - Zamknięcie formularza bez zatwierdzenia jest bezpłatne.
 
-Panel pokazuje stawkę i możliwą wypłatę. Przycisk obstawiania w panelu jest nieaktywny przed wyborem odpowiedzi i przy aktywnym zakładzie~ (ง •̀ω•́)ง
+Panel pokazuje stawkę i wypłatę. Obstawisz po wyborze odpowiedzi, bez aktywnego zakładu~ (ง •̀ω•́)ง
 
 **🏁 Mój wynik**
 
@@ -53,7 +54,7 @@ Po rozliczeniu kliknij **Mój wynik**. Prywatnie zobaczysz swój wybór, poprawn
 
 **⏱️ Randomy i kończenie quizów**
 
-Na cały serwer przypadają **4 randomy dziennie**, standardowo co **6 godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
+Serwer ma **4 randomy dziennie**, standardowo co **6 godzin**. Dzień wyznacza strefa serwera; północ nie skraca przerwy. Czas oczekiwania pokazuję w godzinach i minutach. Korzystaj z wyznaczonych kanałów, jeśli je ustawiono.
 Swój random zamkniesz przyciskiem **Zakończ quiz**. Wszystkie quizy mogą zamykać też właściciel serwera, osoby z uprawnieniem **Zarządzanie serwerem** lub rolą opiekuna Dilemmy.
 `/dilemma random-reset` jest dla właściciela i osób z rolą opiekuna. Reset usuwa oczekiwanie, ale nie odnawia limitu dziennego. Wcześniejsze zamknięcie nie zwraca randoma ani nie skraca przerwy~
 

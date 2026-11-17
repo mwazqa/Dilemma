@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.9.0 - 2026-11-17
+
+- Show wrong-answer penalties on new quiz cards, in alternative text and in the text fallback.
+- Add free private quiz reports with duplicate prevention and retained question snapshots, including for closed quizzes.
+- Review reports on the server at midnight Europe/Warsaw and deliver source-backed findings and proposed corrections in private owner DMs. Cache analysis for retries, retain pending reports after failed delivery and catch up after restarts. Require a human decision before corrections.
+- Update both player guides and add isolated report, migration, delivery, scheduling, daylight-saving and AI privacy tests. Apply `20261117120000_quiz_reports` and configure the private DM recipient; no command registration is required from v3.8.2.
+
 ## v3.8.2 - 2026-11-15
 
 - Replace leaderboard medals for places 1-3 with Dilemma-style spark symbols and explicit position numbers.

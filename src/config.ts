@@ -5,6 +5,8 @@ const envSchema = z.object({
   DISCORD_TOKEN: z.string().min(1),
   DISCORD_CLIENT_ID: z.string().min(1),
   DISCORD_GUILD_ID: z.string().optional(),
+  QUIZ_REPORT_RECIPIENT_ID: z.string().refine(value => value === "" || /^\d{17,20}$/.test(value), "Invalid report recipient").default(""),
+  QUIZ_REPORT_REVIEW_LANGUAGE: z.enum(["en", "pl"]).default("pl"),
   DISCORD_REGISTER_GLOBAL: z.preprocess((value) => value === true || value === "true", z.boolean()).default(false),
   QUIZ_TIMEZONE: z.string().refine(value => {
     try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; }

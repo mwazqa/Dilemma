@@ -1,5 +1,8 @@
 import sharp from "sharp";
 import { cardFont, escapeXml } from "./score-card.js";
+import { message } from "../messages.js";
+import { defaultDifficulty, type Difficulty } from "../difficulty.js";
+import { wrongAnswerPenalties } from "./sparks.js";
 
 const width = 1400;
 const margin = 90;
@@ -11,7 +14,8 @@ async function textBlock(value: string, available: number, size: number, bold = 
     .png().toBuffer({ resolveWithObject: true });
 }
 
-export async function renderQuizCard(question: string, options: string[], hours: number): Promise<Buffer> {
+export async function renderQuizCard(question: string, options: string[], hours: number,
+  details: { language: string; difficulty: Difficulty } = { language: "en", difficulty: defaultDifficulty }): Promise<Buffer> {
   if (!question.trim() || question.length > 300 || options.length < 2 || options.length > 4 ||
       options.some(option => !option.trim() || option.length > 55) || !Number.isInteger(hours) || hours < 1 || hours > 24) throw new Error("Invalid quiz card data");
   let title = await textBlock(question, width - margin * 2, 64, true);
@@ -24,6 +28,7 @@ export async function renderQuizCard(question: string, options: string[], hours:
   const height = Math.max(560, gridTop + rows * rowHeight + (rows - 1) * gap + 88);
   const positions = options.map((_, index) => ({ x: options.length === 3 && index === 2 ? (width - cellWidth) / 2
     : margin + (index % 2) * (cellWidth + gap), y: gridTop + Math.floor(index / 2) * (rowHeight + gap) }));
+  const cost = await textBlock(message(details.language, "quizWrongAnswerCost", { cost: wrongAnswerPenalties[details.difficulty] }), 700, 30, true);
   const spark = (x: number, y: number, size: number) => `<path d="M ${x} ${y - size} Q ${x} ${y} ${x + size} ${y} Q ${x} ${y} ${x} ${y + size} Q ${x} ${y} ${x - size} ${y} Q ${x} ${y} ${x} ${y - size}" fill="#f2c879"/>`;
   const background = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
     <defs><linearGradient id="navy" x2="1" y2="1"><stop stop-color="#0b1432"/><stop offset="1" stop-color="#141a39"/></linearGradient>
@@ -36,6 +41,7 @@ export async function renderQuizCard(question: string, options: string[], hours:
     </g><g fill="none" stroke="#f2c879" stroke-opacity="0.65"><path d="M -25 205 C 145 220 270 115 335 55 M 1050 ${height + 10} C 1160 ${height - 95} 1320 ${height - 15} 1440 ${height - 190}"/></g>
     ${spark(56, 158, 14)}${spark(337, 54, 17)}${spark(1045, 54, 6)}${spark(1348, height - 175, 17)}${spark(1190, height - 43, 14)}${spark(58, height - 54, 6)}
     </g>
+    <rect x="90" y="54" width="${cost.info.width + 46}" height="65" rx="32" fill="#10152c" stroke="#ad94f3" stroke-width="2"/>
     <rect x="1160" y="54" width="178" height="65" rx="32" fill="#10152c" stroke="#ad94f3" stroke-width="2"/>
     <g fill="none" stroke="#b9a5ec" stroke-width="4" stroke-linecap="round"><circle cx="1193" cy="86" r="14"/><path d="M 1193 76 V 86 L 1200 90"/></g>
     ${positions.map(position => `<rect x="${position.x}" y="${position.y}" width="${cellWidth}" height="${rowHeight}" rx="23" fill="#12172f" fill-opacity="0.7" stroke="#ad94f3" stroke-width="2"/>`).join("")}
@@ -43,6 +49,7 @@ export async function renderQuizCard(question: string, options: string[], hours:
   </svg>`;
   const timer = await textBlock(`${hours} h`, 96, 34, true);
   return sharp(Buffer.from(background)).composite([
+    { input: cost.data, left: 113, top: Math.round(86 - cost.info.height / 2) },
     { input: title.data, left: Math.round((width - title.info.width) / 2), top: 146 },
     { input: timer.data, left: 1223, top: Math.round(86 - timer.info.height / 2) },
     ...answers.map((answer, index) => ({ input: answer.data, left: Math.round(positions[index].x + (cellWidth - answer.info.width) / 2),

@@ -69,7 +69,7 @@ try {
   for (const name of ["block", "unblock", "blocks"]) assert.equal(commands.includes(name), false);
   for (const language of messageLanguages) {
     const buttons = pollControls(language).flatMap(row => row.toJSON().components);
-    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:end"]);
+    assert.deepEqual(buttons.map(button => button.custom_id), ["quiz:end", "quiz:report"]);
     assert.equal(buttons[0].disabled, false);
     assert.equal(pollControls(language, true)[0].toJSON().components[0].disabled, true);
     assert.doesNotMatch(getHelpContent(language), /\/dilemma (?:block|unblock|blocks)\b/);

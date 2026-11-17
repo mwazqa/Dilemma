@@ -5,6 +5,7 @@ Object.assign(process.env,{DATABASE_URL:"postgresql://test:test@127.0.0.1:1/dile
 const {renderQuizCard}=await import("../dist/services/quiz-card.js");
 const {quizVotingPayload}=await import("../dist/services/quiz-voting.js");
 const {db}=await import("../dist/db.js");
+const {message}=await import("../dist/messages.js");
 const preview=process.argv.includes("--preview");
 try{
   if(preview)mkdirSync(".tools/quiz-card-preview",{recursive:true});
@@ -43,6 +44,16 @@ try{
   assert.equal(withoutAttachments.files.length,0);assert.ok(withoutAttachments.embeds[0].toJSON().description.includes(question));
   assert.equal(withoutAttachments.components[0].components.length,4);
   if(preview)writeFileSync(".tools/quiz-card-preview/long-question.png",payload.files[0].attachment);
+  const costs = new Set();
+  for (const language of ["en", "pl"]) for (const [difficulty, cost] of [["easy", 2], ["medium", 3], ["hard", 4]]) {
+    const priced = await quizVotingPayload({ question: "Ile wynosi 7 × 8?", options: ["48", "54", "56", "64"], optionEmojis: [] }, expiry, language, true, difficulty);
+    assert.equal(priced.files.length, 1);
+    assert.ok(priced.files[0].description.includes(message(language, "quizWrongAnswerCost", { cost })));
+    assert.equal(priced.embeds[0].toJSON().description, undefined, "The cost is on the image, not repeated above it");
+    costs.add(priced.files[0].attachment.toString("base64"));
+    if (preview) writeFileSync(`.tools/quiz-card-preview/cost-${language}-${difficulty}.png`, priced.files[0].attachment);
+  }
+  assert.equal(costs.size, 6, "Both languages and all penalties render distinct labels");
   const japanese=await renderQuizCard("世界の歴史と科学について正しい説明を選んでください。".repeat(12).slice(0,300),["科学の説明についての回答".repeat(5).slice(0,55),"別の説明についての回答".repeat(5).slice(0,55)],24);
   assert.equal((await sharp(japanese).metadata()).width,1400);
   if(preview)writeFileSync(".tools/quiz-card-preview/japanese.png",japanese);

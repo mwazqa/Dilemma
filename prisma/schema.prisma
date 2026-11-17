@@ -220,3 +220,27 @@ model QuizWager {
   @@id([messageId, userId])
   @@index([guildId, userId])
 }
+
+model QuizReport {
+  id             String   @id @default(cuid())
+  guildId        String
+  channelId      String
+  messageId      String
+  reporterUserId String
+  reason         String
+  source         String
+  question       String
+  options        String
+  correctOption  Int
+  explanation    String
+  difficulty     String
+  quizCreatedAt  DateTime
+  createdAt      DateTime @default(now())
+  reviewedAt     DateTime?
+  reviewNote     String?
+  analysis       String?
+  analyzedAt     DateTime?
+
+  @@unique([messageId, reporterUserId])
+  @@index([reviewedAt, createdAt, id])
+}

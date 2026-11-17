@@ -61,7 +61,7 @@ try {
     assert.doesNotMatch(content, /\{\w+\}|^#{1,6}\s|<@|@everyone|@here/m);
     assert.ok(content.includes(feedbackKaomoji.playerGuide));
     assert.ok(!content.includes("/dilemma guide"), "The player guide omits its publishing and refresh instructions");
-    for (const key of ["myQuizVoteButton", "quizJumpButton", "wagerButton", "myQuizResultButton", "endQuizButton"]) {
+    for (const key of ["myQuizVoteButton", "quizJumpButton", "wagerButton", "myQuizResultButton", "endQuizButton", "quizReportButton"]) {
       assert.ok(content.includes(message(language, key)));
     }
     assert.equal(readFileSync(`docs/player-guide.${language}.md`, "utf8").replace(/\r\n/g, "\n"), content + "\n");

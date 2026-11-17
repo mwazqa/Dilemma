@@ -9,6 +9,7 @@ I create questions with AI, and you collect points, Sparks, levels and badges~
 - Changing or withdrawing costs **1 Spark**. Picking the same answer again and refreshing are free.
 - **Go to quiz** takes you to the card, including from hints and results. No charge~
 - Your final answer counts. After closing, I'll show everyone the vote counts, correct answer and explanation.
+- **Report quiz** opens a private issue form, even after the quiz. Free~
 
 **✨ Points, levels and Sparks**
 

@@ -3,10 +3,12 @@ import type { Prisma, QuizSettlement } from "@prisma/client";
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { db } from "../db.js";
 import { message } from "../messages.js";
-import { END_QUIZ_BUTTON_ID, myQuizButton } from "./poll-controls.js";
+import { END_QUIZ_BUTTON_ID, myQuizButton, reportQuizButton } from "./poll-controls.js";
 import { renderQuizCard } from "./quiz-card.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { walletTransaction } from "./wallet-transaction.js";
+import { defaultDifficulty, type Difficulty } from "../difficulty.js";
+import { wrongAnswerPenalties } from "./sparks.js";
 
 export const VOTE_PREFIX = "quiz:vote:";
 export const WITHDRAW_VOTE_ID = "quiz:withdraw";
@@ -20,7 +22,8 @@ export const REVEAL_COST = 3;
 export const FIFTY_FIFTY_COST = 5;
 type Identity = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
-export async function quizVotingPayload(question: { question: string; options: string[]; optionEmojis: string[] }, expiresAt: Date, language: string, imageAllowed = true) {
+export async function quizVotingPayload(question: { question: string; options: string[]; optionEmojis: string[] }, expiresAt: Date,
+  language: string, imageAllowed = true, difficulty: Difficulty = defaultDifficulty) {
   if (question.options.length < 2 || question.options.length > 4) throw new Error("Invalid quiz answer count");
   const answers = new ActionRowBuilder<ButtonBuilder>().addComponents(question.options.map((option, index) => {
     const button = new ButtonBuilder().setCustomId(`${VOTE_PREFIX}${index + 1}`).setLabel(`${index + 1}. ${option}`).setStyle(ButtonStyle.Primary);
@@ -36,14 +39,17 @@ export async function quizVotingPayload(question: { question: string; options: s
   );
   const finish = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(WAGER_BUTTON_ID).setLabel(message(language, "wagerButton")).setStyle(ButtonStyle.Secondary),
+    reportQuizButton(language),
     new ButtonBuilder().setCustomId(END_QUIZ_BUTTON_ID).setLabel(message(language, "endQuizButton")).setStyle(ButtonStyle.Danger)
   );
   const description = question.question + "\n" + question.options.map((option, index) => `${index + 1}. ${option}`).join("\n")
-    + `\n${message(language, "votingEnds", { time: expiresAt.toISOString() })}`;
+    + `\n${message(language, "votingEnds", { time: expiresAt.toISOString() })}`
+    + `\n${message(language, "quizWrongAnswerCost", { cost: wrongAnswerPenalties[difficulty] })}`;
   const embed = new EmbedBuilder().setColor(0xad94f3);
   if (!imageAllowed) return { embeds: [embed.setDescription(description)], components: [answers, controls, finish], files: [] };
   try {
-    const card = await renderQuizCard(question.question, question.options, Math.max(1, Math.min(24, Math.ceil((+expiresAt - Date.now()) / 3_600_000))));
+    const card = await renderQuizCard(question.question, question.options,
+      Math.max(1, Math.min(24, Math.ceil((+expiresAt - Date.now()) / 3_600_000))), { language, difficulty });
     const attachment = new AttachmentBuilder(card, { name: "quiz.png", description });
     embed.setImage("attachment://quiz.png");
     return { embeds: [embed], components: [answers, controls, finish], files: [attachment] };

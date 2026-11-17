@@ -173,7 +173,7 @@ try {
   assert.equal(typeof savedPoll.category, "string", "Random history stores the topic chosen by AI");
   assert.equal(quizAnswers(sent).length, 4); assert.equal(quizDuration(sent), 6);
   assert.deepEqual(sent.components.flatMap(row => row.toJSON().components.map(button => button.custom_id)), [
-    "quiz:vote:1", "quiz:vote:2", "quiz:vote:3", "quiz:vote:4", "quiz:me", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:end"
+    "quiz:vote:1", "quiz:vote:2", "quiz:vote:3", "quiz:vote:4", "quiz:me", "quiz:withdraw", "quiz:reveal", "quiz:fifty", "quiz:wager", "quiz:report", "quiz:end"
   ]);
   generatedAnswers = ["Yes", "No"];
   await invoke("random", { option_count: 2, duration_hours: 2 }, false);

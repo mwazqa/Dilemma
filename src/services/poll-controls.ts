@@ -4,6 +4,10 @@ import { privateErrorSummary } from "../private-errors.js";
 
 export const END_QUIZ_BUTTON_ID = "quiz:end";
 export const MY_QUIZ_BUTTON_ID = "quiz:me";
+export const REPORT_QUIZ_BUTTON_ID = "quiz:report";
+export function reportQuizButton(language: string) {
+  return new ButtonBuilder().setCustomId(REPORT_QUIZ_BUTTON_ID).setLabel(message(language, "quizReportButton")).setStyle(ButtonStyle.Secondary);
+}
 export function myQuizButton(language: string, messageId?: string, finished = false) {
   return new ButtonBuilder().setCustomId(messageId ? `${MY_QUIZ_BUTTON_ID}:${messageId}:view` : MY_QUIZ_BUTTON_ID)
     .setLabel(message(language, finished ? "myQuizResultButton" : "myQuizVoteButton")).setStyle(ButtonStyle.Secondary);
@@ -17,6 +21,7 @@ export function pollControls(language: string, disabled = false) {
       .setDisabled(disabled)
   );
   if (disabled) row.addComponents(myQuizButton(language, undefined, true));
+  row.addComponents(reportQuizButton(language));
   return [row];
 }
 

@@ -68,7 +68,7 @@ async function publishTopicQuestion(topic: Topic, channel: SendableChannels, ear
     const sentPoll = await channel.send({
       content: `${pingRoleId ? `<@&${pingRoleId}>\n` : ""}**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${topic.name} · #${questionNumber}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [], roles: pingRoleId ? [pingRoleId] : [], users: [], repliedUser: false },
-      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel))
+      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel), difficulty)
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId: topic.guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     const updatedTopic = await db.$transaction(async tx => {
@@ -146,7 +146,7 @@ async function publishRandom(guildId: string, optionCount: number, channel: Send
     const sentPoll = await channel.send({
       content: `**${question.topicEmoji ? `${question.topicEmoji} ` : ""}${question.topic}**\n${message(language, "difficulty", { difficulty: message(language, difficulty) })}\n\n${getVotePrompt(language)}`,
       allowedMentions: { parse: [] },
-      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel))
+      ...await quizVotingPayload(question, expiresAt, language, canAttachQuizCard(channel), difficulty)
     }).catch(error => { throw new QuizPublicationError(error); });
     const settlement = buttonSettlementData({ messageId: sentPoll.id, guildId, channelId: channel.id }, difficulty, question.options.length, question.correctOption, expiresAt);
     await db.$transaction(async tx => {

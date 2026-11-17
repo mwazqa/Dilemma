@@ -28,6 +28,10 @@ import { startRandomNotificationScheduler } from "./services/random-notification
 import { personalQuizAction } from "./services/quiz-personal.js";
 import { handleGuideRefresh } from "./commands/guide.js";
 import { GUIDE_REFRESH_BUTTON_ID } from "./services/player-guide.js";
+import { handleQuizReportButton, handleQuizReportModal } from "./commands/quiz-report.js";
+import { REPORT_QUIZ_BUTTON_ID } from "./services/poll-controls.js";
+import { REPORT_MODAL_PREFIX } from "./services/quiz-reports.js";
+import { startQuizReportReviewScheduler } from "./services/quiz-report-scheduler.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -37,7 +41,7 @@ client.on(Events.Error, error => {
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as Discord bot");
-  stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client));
+  stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client), startQuizReportReviewScheduler(client));
 });
 
 client.on(Events.GuildCreate, async (guild) => {
@@ -75,6 +79,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.isButton() && interaction.customId === GUIDE_REFRESH_BUTTON_ID) {
       await handleGuideRefresh(interaction); return;
+    }
+    if (interaction.isButton() && interaction.customId === REPORT_QUIZ_BUTTON_ID) {
+      await handleQuizReportButton(interaction); return;
+    }
+    if (interaction.isModalSubmit() && interaction.customId.startsWith(REPORT_MODAL_PREFIX)) {
+      await handleQuizReportModal(interaction); return;
     }
     if (interaction.isModalSubmit() && interaction.customId.startsWith(WAGER_MODAL_PREFIX)) {
       await handleWagerModal(interaction); return;

@@ -47,7 +47,7 @@ try {
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
   assert.equal(database.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type = 'index' AND name = 'GeneratedPoll_guildId_topicId_createdAt_idx'").get().count, 1);
-  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "DailyQuizRun", "QuizChannel"]) {
+  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "DailyQuizRun", "QuizChannel", "QuizReport"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");

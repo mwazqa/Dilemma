@@ -12,6 +12,7 @@ export function getPlayerGuideText(language = "en"): string {
     myAnswerButton: message(language, "myQuizVoteButton"), quizJumpButton: message(language, "quizJumpButton"),
     wagerButton: message(language, "wagerButton"), myResultButton: message(language, "myQuizResultButton"),
     endQuizButton: message(language, "endQuizButton"),
+    reportQuizButton: message(language, "quizReportButton"),
     withdrawCost: WITHDRAW_COST, revealCost: REVEAL_COST,
     fiftyCost: FIFTY_FIFTY_COST, maxWager: MAX_WAGER, experiencePerPoint, expPerSpark, minExchangeSparks,
     easyPenalty: wrongAnswerPenalties.easy, mediumPenalty: wrongAnswerPenalties.medium, hardPenalty: wrongAnswerPenalties.hard,
