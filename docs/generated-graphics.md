@@ -9,7 +9,7 @@ Dilemma creates two standalone image attachments during normal bot operation. Bo
 | Quiz card | [`renderQuizCard`](../src/services/quiz-card.ts), called by [`quizVotingPayload`](../src/services/quiz-voting.ts) | Once when publishing a new `/dilemma random` quiz, a scheduled topic question or an early `/dilemma run` question | `quiz.png`, 1400 px wide, height fitted to the question and 2-4 answer choices |
 | Player profile card | [`renderScoreCard` / `scoreCardSvg`](../src/services/score-card.ts), called by [`handleScore`](../src/commands/score.ts) | On each `/dilemma score profile` request, for the invoking player or the selected user | `quiz-profile.png`, 1120 x 560 px |
 
-Quiz cards show the question, answer choices and the initial voting duration. Their clock is static; it is neither a live countdown nor the cooldown until another random quiz. Clicking an answer, opening a private panel or finishing the quiz does not redraw the card. New renders are needed to change an already-published card's appearance.
+Quiz cards show the question, answer choices, wrong-answer Sparks penalty and the initial voting duration. The compact Wrong / Błąd penalty badge sits immediately to the left of the duration in the top-right corner. Their clock is static; it is neither a live countdown nor the cooldown until another random quiz. Clicking an answer, opening a private panel or finishing the quiz does not redraw the card. New renders are needed to change an already-published card's appearance.
 
 Quiz publishing uses text when attachment permission is missing. Both cards have a text fallback on rendering failure. Existing Discord attachments keep their original appearance after a code update.
 

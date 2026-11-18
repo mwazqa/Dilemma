@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.10.1 - 2026-11-18
+
+- Shorten the wrong-answer penalty label to Wrong / Błąd and move its value-sized badge beside the duration in the top-right corner of new quiz cards. Keep the translated label in alternative text and text fallbacks.
+- Make Report quiz / Zgłoś quiz red in active and closed quiz controls.
+- Review and synchronize the general PL/EN guides and prepare bilingual release highlights. No migration or command registration is required from v3.10.0.
+
 ## v3.10.0 - 2026-11-17
 
 - Replace the detailed PL/EN player guide with a general introduction and remove Refresh. Discover and convert legacy bot guides once.

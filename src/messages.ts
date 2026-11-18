@@ -17,7 +17,7 @@ export const messages = {
   myQuizResultButton: ["My result","Mój wynik"],
   quizRefreshButton: ["Refresh","Odśwież"],
   quizJumpButton: ["Go to quiz","Przejdź do quizu"],
-  quizWrongAnswerCost: ["Wrong answer: -{cost} ✦", "Błędna odpowiedź: -{cost} ✦"],
+  quizWrongAnswerCost: ["Wrong: -{cost} ✦", "Błąd: -{cost} ✦"],
   quizReportButton: ["Report quiz", "Zgłoś quiz"],
   quizReportTitle: ["Report a quiz issue", "Zgłoś problem z quizem"],
   quizReportReason: ["What needs checking?", "Co wymaga sprawdzenia?"],

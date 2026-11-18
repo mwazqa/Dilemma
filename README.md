@@ -10,6 +10,8 @@ New servers start in English. Onboarding and `/dilemma language` list English fi
 
 ## Current status
 
+Version v3.10.1 shortens the quiz penalty label to Wrong / Błąd, groups it beside the duration in the top-right corner of new cards and makes the Report quiz button red. No migration or command registration is required from v3.10.0.
+
 Version v3.10.0 makes the player guide a general introduction without a Refresh button and adds separate PL/EN release announcements on guide channels. Existing guides are discovered and converted once. Apply `20261117160000_guide_release_updates`, regenerate Prisma and re-register commands when deploying this update. See [Guide and release news](docs/guide-release-updates.md) for delivery and release checks.
 
 Version v3.6.1 lets everyone with access to a public player guide refresh it in place. Publishing remains restricted to Manage Server or the configured Dilemma manager role. The Polish and English guides no longer include the publishing/refresh instructions. Upgrading from v3.6.0 requires no migration or command re-registration.
@@ -20,7 +22,7 @@ Version v3.5.0 adds private My answer and My result panels, clickable 50/50 choi
 
 Version v3.4.0 requires the additive `20261029120000_random_topics_sparks` and `20261029130000_button_quiz_tools` migrations, Prisma client regeneration and Discord command registration. New random quizzes last 1-6 hours; omitted durations use the saved default capped at 6 hours. Saved topics keep their 1-24 hour range. New quizzes use persistent button votes; existing native Discord polls continue through the legacy finalized-results flow and retain Discord's visible counts and normal voting controls.
 
-Code version: `v3.10.0`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
+Code version: `v3.10.1`. AI avoids the last 64 random topics per server, alongside the existing 1460-question duplicate-check window. Saved topics keep their 365-question comparison window and the server limit remains 31 saved topics, including disabled topics. See [CHANGELOG.md](CHANGELOG.md). Earlier upgrades must also include the preceding migrations and command registration described below. `clear_ping` is available only when configuring an existing topic.
 
 Quiz cards are rendered locally in navy, lavender and gold, with the question, answer choices and voting duration. Topic and difficulty stay above the card. Two answers use one row, three use a centered final answer and four use two rows. Discord buttons below the image handle voting, withdrawal, private counts, 50/50, bets and closing. The image includes full alternative text; rendering failures or missing Attach Files permission use a complete text fallback. The duration on the image is static, not a countdown.
 

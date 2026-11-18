@@ -3,19 +3,15 @@ import { message, normalizeLanguage } from "./messages.js";
 
 export const runningVersion: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 export const playerRelease = {
-  version: "3.10.0",
+  version: "3.10.1",
   changes: {
     en: [
-      "The player guide is now a general introduction to quizzes. Check current fees and penalties in the quiz interface.",
-      "The guide no longer has a Refresh button. I'll post release news as separate messages on channels where the guide was published.",
-      "Existing guides will be converted once, and each channel receives one announcement per release.",
-      "Quiz reports sent privately to Dilemma's owner now include the reporter's account and full description. The report form explains this before you submit."
+      "New quiz cards use the shorter label Wrong for the Sparks penalty and show it beside the quiz duration in the top-right corner.",
+      "The Report quiz button is now red, making it easier to find during a quiz and after it closes."
     ],
     pl: [
-      "Poradnik jest teraz ogólnym wprowadzeniem do quizów. Aktualne opłaty i kary sprawdzisz w interfejsie quizu.",
-      "Usunęłam z poradnika przycisk Odśwież. Nowości z wydań będę publikować osobnymi wiadomościami na kanałach z poradnikiem.",
-      "Dotychczasowe poradniki zamienię jednorazowo na nową wersję. Na każdy kanał trafi jedno ogłoszenie danego wydania.",
-      "Prywatne podsumowanie zgłoszeń dla właściciela Dilemmy zawiera teraz konto zgłaszającego i pełny opis. Informację o tym znajdziesz w formularzu przed wysłaniem."
+      "Na nowych grafikach quizów kara ma krótszy podpis Błąd i znajduje się obok czasu trwania, w prawym górnym rogu.",
+      "Przycisk Zgłoś quiz jest teraz czerwony, żeby łatwiej było go znaleźć podczas quizu i po jego zakończeniu."
     ]
   }
 } as const;
