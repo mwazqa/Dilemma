@@ -1,0 +1,16 @@
+[Unit]
+Description=Check free disk space for Dilemma deployments
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /usr/local/libexec/dilemma/check-production-disk.sh 20
+TimeoutStartSec=15s
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dilemma-disk-monitor
+SyslogLevelPrefix=yes

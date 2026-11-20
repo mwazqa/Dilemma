@@ -90,3 +90,22 @@ jobs:
         run: node scripts/test-postgres-migration.mjs && node scripts/test-scoring-postgres.mjs && npm run test:topic-calendar:postgres && npm run test:random:postgres && npm run test:topic-limit:postgres && npm run test:results:postgres
       - name: Test paid quiz tools and bets
         run: npm run test:quiz-tools:postgres && npm run test:quiz-personal:postgres && npm run test:sparks-penalties:postgres && npm run test:spark-exchange:postgres && npm run test:question-history:postgres && npm run test:quiz-reports:postgres && npm run test:guide:postgres
+
+  image-preview:
+    if: github.event_name == 'pull_request'
+    needs: [check, postgres]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/container-image.yml
+    with:
+      publish: false
+
+  image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, postgres]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/container-image.yml
+    with:
+      publish: true
