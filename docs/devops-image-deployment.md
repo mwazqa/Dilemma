@@ -25,17 +25,8 @@ systemctl status dilemma-disk-monitor.timer
 journalctl -u dilemma-disk-monitor.service -p warning
 ```
 
-## Backup and restore checks
+## Pre-migration backup archives
 
-The release process keeps verified pre-migration archives in the private host backup directory. They are distinct from the image and from rollback containers. A local archive protects against a migration failure. A backup destination outside the VPS protects against losing the host.
+The release process keeps verified pre-migration archives in the private host backup directory. They are distinct from the image and from rollback containers. Previously saved daily archives remain available in their original directory.
 
-The backup verifier can restore an archive into a temporary PostgreSQL container with networking disabled and storage in RAM. It verifies the application schema and stops the disposable container. The verification does not connect the bot to the restored database or change production data.
-
-Install the host backup timer as root with `bash scripts/install-backup-timer.sh <production directory>`. It runs at 03:15 Europe/Warsaw, checks the archive and restores it to disposable PostgreSQL before adding it to the daily backups. It keeps the latest seven successful daily archives in the owner-only backup directory. Failed runs preserve prior copies. Pre-migration archives have separate retention. The timer performs no off-host transfer.
-
-```bash
-systemctl status dilemma-db-backup.timer
-journalctl -u dilemma-db-backup.service
-```
-
-Treat backup archives as production data. Before introducing an off-host destination, verify its access and encryption. Keep backups out of Git, GitHub Actions, Discord and application deployment archives.
+Treat backup archives as production data. Keep them out of Git, GitHub Actions, Discord and application deployment archives.
