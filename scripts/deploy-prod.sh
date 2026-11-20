@@ -62,6 +62,14 @@ else
   sudo -n docker build -t "$image" "$package_dir/code"
 fi
 if [[ "$migration_mode" == migrate ]]; then
+  backup_script="$package_dir/backup-production.py"
+  if [[ ! -f "$backup_script" && -z "$release_image" ]]; then
+    backup_script="$package_dir/code/scripts/backup-production.py"
+  fi
+  if ! sudo -n python3 "$backup_script" "$production_dir" --release-id "$deployment_id" >"$package_dir/backup-status.log" 2>&1; then
+    echo 'Backup verification failed. Migration was not started.' >&2
+    exit 1
+  fi
   if ! sudo -n docker run --rm --env-file "$production_dir/.env.docker" "$image" node scripts/migrate-postgres.mjs >"$package_dir/migration-apply.log" 2>&1; then
     echo 'Database migration failed. Previous production container remains running.'
     exit 1
@@ -86,15 +94,11 @@ sudo -n docker run -d --name dilemma --restart unless-stopped \
 for attempt in {1..45}; do
   if [[ "$(sudo -n docker inspect dilemma --format '{{.State.Running}} {{.RestartCount}}')" == 'true 0' ]] &&
       sudo -n docker logs --tail 300 dilemma 2>&1 | grep 'Logged in as ' >/dev/null; then
-    if [[ -n "$release_image" ]]; then
-      sudo -n docker exec dilemma node --input-type=module -e '
-        import { PrismaClient } from "@prisma/client";
-        const db = new PrismaClient();
-        try { await db.$queryRawUnsafe("SELECT 1"); } finally { await db.$disconnect(); }
-      ' >/dev/null 2>&1 || { echo 'The deployed bot could not read its database.' >&2; exit 1; }
-    else
-      sudo -n python3 "$package_dir/code/scripts/cleanup-production.py" "$(dirname "$package_dir")"
-    fi
+    sudo -n docker exec dilemma node --input-type=module -e '
+      import { PrismaClient } from "@prisma/client";
+      const db = new PrismaClient();
+      try { await db.$queryRawUnsafe("SELECT 1"); } finally { await db.$disconnect(); }
+    ' >/dev/null 2>&1 || { echo 'The deployed bot could not read its database.' >&2; exit 1; }
     echo 'Discord login confirmed. Previous container retained for rollback.'
     exit 0
   fi
