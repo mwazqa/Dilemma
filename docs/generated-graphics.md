@@ -2,14 +2,16 @@
 
 Dilemma creates two standalone image attachments during normal bot operation. Both are rendered locally with SVG/text and Sharp. AI generates quiz text, not images. Runtime images stay in memory until they are attached to a Discord message; the bot does not save them as application files.
 
+A quiz card is the complete Discord message, including its graphic, descriptions and buttons. The table below lists the images rendered in quiz cards and player profiles.
+
 ## Discord attachments
 
 | Graphic | Where it is rendered | When it is rendered | Output |
 | --- | --- | --- | --- |
-| Quiz card | [`renderQuizCard`](../src/services/quiz-card.ts), called by [`quizVotingPayload`](../src/services/quiz-voting.ts) | Once when publishing a new `/dilemma random` quiz, a scheduled topic question or an early `/dilemma run` question | `quiz.png`, 1400 px wide, height fitted to the question and 2-4 answer choices |
-| Player profile card | [`renderScoreCard` / `scoreCardSvg`](../src/services/score-card.ts), called by [`handleScore`](../src/commands/score.ts) | On each `/dilemma score profile` request, for the invoking player or the selected user | `quiz-profile.png`, 1120 x 560 px |
+| Quiz graphic | [`renderQuizCard`](../src/services/quiz-card.ts), called by [`quizVotingPayload`](../src/services/quiz-voting.ts) | Once when publishing a new `/dilemma random` quiz, a scheduled topic question or an early `/dilemma publish` question | `quiz.png`, 1400 px wide, height fitted to the question and 2-4 answer choices |
+| Player profile | [`renderScoreCard` / `scoreCardSvg`](../src/services/score-card.ts), called by [`handleScore`](../src/commands/score.ts) | On each `/dilemma profile` request, for the invoking player or the selected user | `quiz-profile.png`, 1120 x 560 px |
 
-Quiz cards show the question, answer choices, wrong-answer Sparks penalty and the initial voting duration. The compact Wrong / Błąd penalty badge sits immediately to the left of the duration in the top-right corner. Their clock is static; it is neither a live countdown nor the cooldown until another random quiz. Clicking an answer, opening a private panel or finishing the quiz does not redraw the card. New renders are needed to change an already-published card's appearance.
+The quiz graphic shows the question, answer choices, wrong-answer Sparks penalty and the initial voting duration. The compact Wrong / Błąd penalty badge sits immediately to the left of the duration in the top-right corner. Its clock is static; it is neither a live countdown nor the cooldown until another random quiz. Clicking an answer, opening a private panel or finishing the quiz does not redraw the graphic. New renders are needed to change an already-published graphic's appearance.
 
 Quiz publishing uses text when attachment permission is missing. Both cards have a text fallback on rendering failure. Existing Discord attachments keep their original appearance after a code update.
 
@@ -45,6 +47,6 @@ These scripts run only when explicitly invoked, including by tests or CI. They d
 
 ## Static artwork and native Discord views
 
-Avatars, banners, backgrounds and their design variants in `assets/` are static files. The bot's runtime does not generate those files or load them into quiz/profile cards. Their filenames alone do not establish how or when the artwork was originally authored.
+Avatars, banners, backgrounds and their design variants in `assets/` are static files. The bot's runtime does not generate those files or load them into quiz graphics or player profiles. Their filenames alone do not establish how or when the artwork was originally authored.
 
 Leaderboard, achievement list, help, player guide, topic list, My answer, My result, 50/50 and private vote counts use Discord text, embeds and components. They do not generate standalone image attachments.

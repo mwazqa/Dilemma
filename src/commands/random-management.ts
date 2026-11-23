@@ -6,7 +6,7 @@ import { scheduleEvents } from "../services/schedule-events.js";
 import { openFeedback } from "../feedback.js";
 
 export const randomResetCommand = new SlashCommandSubcommandBuilder()
-  .setName("random-reset")
+  .setName("random-cooldown-reset")
   .setDescription("Reset the random quiz cooldown; the daily limit stays unchanged.");
 
 export const randomNotificationsCommand = new SlashCommandSubcommandGroupBuilder()

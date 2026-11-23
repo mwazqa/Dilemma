@@ -98,7 +98,7 @@ try {
   const created = await invoke("create", { ...delegated, group: null, values: { name: "New" } });
   assert.notEqual(content(created), message("pl", "permission"));
   assert.equal(topicWrites, beforeCreate + 1);
-  for (const action of ["configure", "run", "enable", "disable", "delete"]) {
+  for (const action of ["edit", "publish", "enable", "disable", "delete"]) {
     const request = await invoke(action, { ...delegated, group: null, values: { name: "Missing" } });
     assert.equal(content(request), message("pl", "missing", { name: "Missing" }));
   }
@@ -110,14 +110,14 @@ try {
   assert.equal(settings.get("guild").timezone, "Europe/London");
   assert.equal(settings.get("guild").defaultPollDurationHours, original.defaultPollDurationHours);
   assert.equal(settings.get("guild").managerRoleId, roleId);
-  for (const action of ["create", "configure", "list", "run", "enable", "disable", "delete", "language", "timezone"]) {
+  for (const action of ["create", "edit", "list", "publish", "enable", "disable", "delete", "language", "timezone"]) {
     const before = { writes, topicReads, topicWrites };
     assert.equal(content(await invoke(action, { group: null, values: { name: "New" } })), message("pl", "permission"));
     assert.deepEqual({ writes, topicReads, topicWrites }, before);
   }
   for (const allowed of [true, false]) {
     const before = topicReads;
-    const request = interaction("configure", allowed ? delegated : {});
+    const request = interaction("edit", allowed ? delegated : {});
     request.options.getFocused = () => ({ name: "name", value: "" });
     request.respond = async choices => assert.equal(choices.length, allowed ? 1 : 0);
     await handleTopicAutocomplete(request);

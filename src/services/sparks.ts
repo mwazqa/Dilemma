@@ -7,7 +7,7 @@ export const minExchangeSparks = 3;
 export const maxWalletValue = 2_147_483_647;
 export const maxExchangeSparks = Math.floor(maxWalletValue / expPerSpark);
 
-export function earnedSparks(totalPoints: number, earnedPoints: number, bonusExp = 0): number {
-  const levels = experienceProgress(totalPoints, bonusExp).level - experienceProgress(totalPoints - earnedPoints, bonusExp).level;
+export function earnedSparks(totalPoints: number, earnedPoints: number, bonusExp = 0, earnedBonusExp = 0): number {
+  const levels = experienceProgress(totalPoints, bonusExp + earnedBonusExp).level - experienceProgress(totalPoints - earnedPoints, bonusExp).level;
   return earnedPoints + levels * sparksPerLevel;
 }

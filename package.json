@@ -1,6 +1,6 @@
 {
   "name": "dilemma",
-  "version": "3.10.1",
+  "version": "3.11.0",
   "private": true,
   "description": "International AI-powered Discord quiz bot",
   "type": "module",
@@ -60,6 +60,8 @@
     "test:quiz-personal:postgres": "node scripts/test-quiz-personal-postgres.mjs",
     "test:sparks-penalties:postgres": "node scripts/test-sparks-penalties-postgres.mjs",
     "test:spark-exchange:postgres": "node scripts/test-spark-exchange-postgres.mjs",
+    "test:spark-transfer:postgres": "node scripts/test-spark-transfer-postgres.mjs",
+    "test:streak-exp:postgres": "node scripts/test-streak-experience-postgres.mjs",
     "test:question-novelty": "node scripts/test-question-novelty.mjs && node scripts/test-question-novelty-ai.mjs",
     "test:question-history:postgres": "node scripts/test-question-history-postgres.mjs"
   },
@@ -83,8 +85,7 @@
   },
   "overrides": {
     "@prisma/config": {
-      "deepmerge-ts": "8.0.0",
-      "effect": "3.22.1"
+      "deepmerge-ts": "8.0.0"
     }
   },
   "engines": {

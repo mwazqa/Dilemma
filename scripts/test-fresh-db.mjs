@@ -29,7 +29,19 @@ try {
     if (migration === "20261015120000_profile_badges") {
       database.exec(`INSERT INTO "UserScore" (guildId, userId, points, answered, correct, currentStreak, bestStreak, updatedAt) VALUES ('test', 'legacy-player', 10, 12, 10, 3, 4, CURRENT_TIMESTAMP)`);
     }
+    if (migration === "20261118140000_streak_experience") {
+      database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES ('legacy-streak', 'test', 'channel', 'easy', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('legacy-streak', 'legacy-player', 'test', 1, true, 1, CURRENT_TIMESTAMP);`);
+    }
     database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+    if (migration === "20261118140000_streak_experience") {
+      assert.equal(database.prepare('SELECT streakExp FROM "QuizAnswer" WHERE messageId = ?').get("legacy-streak").streakExp, 0);
+      assert.throws(() => database.exec('UPDATE "QuizAnswer" SET streakExp = -1'));
+      database.exec('UPDATE "QuizAnswer" SET streakExp = 40');
+      assert.equal(database.prepare('SELECT streakExp FROM "QuizAnswer" WHERE messageId = ?').get("legacy-streak").streakExp, 40);
+      assert.throws(() => database.exec('UPDATE "QuizAnswer" SET streakExp = 41'));
+      database.exec('DELETE FROM "QuizSettlement" WHERE messageId = \'legacy-streak\'');
+    }
     if (migration === "20261103130000_answer_sparks_penalty") {
       assert.equal(database.prepare('SELECT sparksPenalty FROM "QuizAnswer" WHERE messageId = ?').get("legacy-penalty").sparksPenalty, 0);
       assert.equal(database.prepare('SELECT sparks FROM "UserScore" WHERE userId = ?').get("legacy-player").sparks, 0);
@@ -47,7 +59,7 @@ try {
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
   assert.equal(database.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type = 'index' AND name = 'GeneratedPoll_guildId_topicId_createdAt_idx'").get().count, 1);
-  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "DailyQuizRun", "QuizChannel", "QuizReport", "GuidePublication", "GuideReleaseNotice", "GuideDiscovery"]) {
+  for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "SparkTransfer", "DailyQuizRun", "QuizChannel", "QuizReport", "GuidePublication", "GuideReleaseNotice", "GuideDiscovery"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
   }
   const topic = database.prepare('SELECT * FROM "Topic" WHERE id = ?').get("legacy");

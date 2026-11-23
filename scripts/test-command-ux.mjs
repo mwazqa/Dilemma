@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { quizAnswers, quizDuration } from "./fixtures/native-quiz.mjs";
 import { Prisma } from "@prisma/client";
 import { quizGuild } from "./fixtures/quiz-channel.mjs";
+import { commandPaths } from "./fixtures/command-catalog.mjs";
 
 Object.assign(process.env, { DATABASE_URL: "postgresql://fixture:fixture@127.0.0.1:1/fixture", DISCORD_TOKEN: "test",
   DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test",
@@ -12,7 +13,7 @@ globalThis.fetch = (...args) => fetchFixture(...args);
 const { db } = await import("../dist/db.js");
 db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 const { handleTopic, handleTopicAutocomplete } = await import("../dist/commands/topic.js");
-const { dilemmaCommand } = await import("../dist/commands/dilemma.js");
+const { dilemmaCommand, routeCommand } = await import("../dist/commands/dilemma.js");
 const { getHelpEmbed, getHelpContent } = await import("../dist/commands/help.js");
 const { message, messageLanguages } = await import("../dist/messages.js");
 const topics = new Map();
@@ -89,14 +90,37 @@ try {
   const find = name => menu.options.find(option => option.name === name);
   const names = option => option.options.map(field => field.name);
   assert.deepEqual(names(find("create")), ["name", "channel", "ping_role", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
-  assert.deepEqual(names(find("configure")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
+  assert.deepEqual(names(find("edit")), ["name", "channel", "ping_role", "clear_ping", "start_date", "generation_time", "interval_days", "duration_hours", "difficulty", "option_count"]);
   assert.equal(find("create").options[0].autocomplete, false);
-  assert.equal(find("configure").options[0].autocomplete, true);
+  assert.equal(find("edit").options[0].autocomplete, true);
   assert.deepEqual(names(find("random")), ["option_count", "difficulty", "duration_hours"]);
   assert.ok(find("random").options.every(option => !option.required));
   assert.deepEqual(names(find("timezone")), ["value"]);
+  assert.equal(find("profile").type, 1);
+  assert.deepEqual(names(find("profile")), ["user"]);
+  assert.equal(find("profile").options[0].type, 6);
+  assert.ok(!find("profile").options[0].required);
+  assert.equal(find("score"), undefined);
+  assert.equal(find("poll"), undefined);
+  assert.deepEqual(names(find("sparks")), ["exchange", "transfer"]);
+  assert.deepEqual(names(find("badges")), ["set"]);
+  assert.deepEqual(names(find("guide")), ["publish"]);
+  assert.deepEqual(names(find("end")), ["message_id"]);
   assert.equal(find("defaults"), undefined);
-  assert.deepEqual(menu.options.map(option => option.name), ["random", "random-reset", "score", "create", "configure", "list", "run", "enable", "disable", "language", "timezone", "random-channels", "random-notifications", "permissions", "poll", "guide", "help", "ping", "delete"]);
+  assert.deepEqual(menu.options.map(option => option.name), ["random", "profile", "leaderboard", "achievements", "badges", "sparks", "end", "create", "edit", "list", "publish", "enable", "disable", "random-cooldown-reset", "random-channels", "random-notifications", "permissions", "guide", "help", "language", "timezone", "ping", "delete"]);
+  const actualPaths = menu.options.flatMap(option => option.type === 2
+    ? option.options.map(sub => `/dilemma ${option.name} ${sub.name}`) : [`/dilemma ${option.name}`]);
+  assert.equal(actualPaths.length, 30); assert.equal(new Set(actualPaths).size, 30);
+  assert.deepEqual([...actualPaths].sort(), [...commandPaths].sort(), "The public catalog matches the approved thirty commands");
+  assert.ok(actualPaths.every(path => !path.includes("quiz")));
+  const beforeRetired = { writes, reservations, requests, deliveries };
+  for (const [group, sub] of [[null, "configure"], [null, "run"], [null, "random-reset"], [null, "guide"], ["score", "transfer"], ["poll", "end"]]) {
+    const retired = request(sub, { name: "Retired" }); retired.commandName = "dilemma";
+    retired.options.getSubcommandGroup = () => group;
+    await routeCommand(retired);
+    assert.equal(retired.replies.at(-1), message("pl", "commandUnavailable"));
+    assert.deepEqual({ writes, reservations, requests, deliveries }, beforeRetired, "Retired paths cannot publish, charge or modify settings");
+  }
   function validateOptions(command) {
     if (command.description) {
       assert.ok(command.description.length <= 100);
@@ -124,21 +148,21 @@ try {
   const duplicate = await invoke("create", { name: "New", duration_hours: 1, option_count: 2 });
   assert.equal(duplicate.replies[0], message("pl", "topicExists", { name: "New" }));
   assert.deepEqual(topic, beforeDuplicate);
-  await invalid("configure", { name: "New" }, "settingsMissing");
-  const missing = await invoke("configure", { name: "Missing", duration_hours: 2 });
+  await invalid("edit", { name: "New" }, "settingsMissing");
+  const missing = await invoke("edit", { name: "Missing", duration_hours: 2 });
   assert.equal(missing.replies[0], message("pl", "missing", { name: "Missing" }));
   assert.equal(topics.size, 1);
   const denied = await invoke("create", { name: "Denied" }, false);
   assert.equal(denied.replies[0], message("pl", "permission")); assert.equal(topics.size, 1);
   topic.enabled = false; topic.lastGeneratedAt = new Date("2026-01-01T08:00:00Z"); topic.questionsGenerated = 9;
-  await invoke("configure", { name: "New", duration_hours: 3, option_count: 2 });
+  await invoke("edit", { name: "New", duration_hours: 3, option_count: 2 });
   assert.equal(topic.pollDurationHours, 3); assert.equal(topic.optionCount, 2);
   assert.equal(topic.enabled, false); assert.equal(topic.questionsGenerated, 9);
   assert.equal(+topic.lastGeneratedAt, Date.parse("2026-01-01T08:00:00Z")); assert.equal(topic.channelId, "channel");
   topic.options = "Legacy A, Legacy B";
-  await invoke("configure", { name: "New", duration_hours: 4 }); assert.equal(topic.options, "Legacy A, Legacy B");
-  await invoke("configure", { name: "New", option_count: 3 }); assert.equal(topic.options, "");
-  for (const subcommand of ["create", "configure"]) {
+  await invoke("edit", { name: "New", duration_hours: 4 }); assert.equal(topic.options, "Legacy A, Legacy B");
+  await invoke("edit", { name: "New", option_count: 3 }); assert.equal(topic.options, "");
+  for (const subcommand of ["create", "edit"]) {
     const name = subcommand === "create" ? "Invalid" : "New";
     for (const value of [1, 5, 2.5]) await invalid(subcommand, { name, option_count: value }, "optionCountInvalid");
     for (const value of [0, 31, 1.5]) await invalid(subcommand, { name, interval_days: value }, "intervalInvalid");
@@ -150,20 +174,20 @@ try {
   const calendar = [...topics.values()].at(-1);
   assert.equal(calendar.startDate, "2030-01-01"); assert.equal(calendar.generationTime, "18:30");
   assert.ok(dated.replies[0].includes("2030-01-01"));
-  await invalid("configure", { name: "Dated", generation_time: "none" }, "scheduleTimeRequired");
+  await invalid("edit", { name: "Dated", generation_time: "none" }, "scheduleTimeRequired");
   assert.equal(calendar.generationTime, "18:30");
-  await invoke("configure", { name: "Dated", start_date: "none", generation_time: "none" });
+  await invoke("edit", { name: "Dated", start_date: "none", generation_time: "none" });
   assert.equal(calendar.startDate, null); assert.equal(calendar.generationTime, null);
-  await invalid("configure", { name: "Dated", start_date: "2030-01-02" }, "scheduleTimeRequired");
+  await invalid("edit", { name: "Dated", start_date: "2030-01-02" }, "scheduleTimeRequired");
   calendar.generationTime = "18:30";
   beforeUpdate = () => { calendar.generationTime = null; };
-  await invalid("configure", { name: "Dated", start_date: "2030-01-02" }, "topicChanged");
+  await invalid("edit", { name: "Dated", start_date: "2030-01-02" }, "topicChanged");
   assert.equal(calendar.startDate, null); assert.equal(calendar.generationTime, null);
   beforeUpdate = () => {};
   const noTime = await invoke("create", { name: "Manual", generation_time: "none" });
   assert.ok(noTime.replies[0].includes(message("pl", "manualPublication"))); assert.equal([...topics.values()].at(-1).generationTime, null);
   await invalid("create", { name: "Missing time", start_date: "2030-01-01", generation_time: "none" }, "scheduleTimeRequired");
-  await invalid("run", { name: "New", duration_hours: 25 }, "durationInvalid");
+  await invalid("publish", { name: "New", duration_hours: 25 }, "durationInvalid");
   await invalid("random", { options: "Yes, No", option_count: 2 }, "randomCustomAnswersUnavailable");
   await invalid("random", { option_count: 1 }, "optionCountInvalid");
   for (const duration of [0, 7, 24, 25, 1.5]) await invalid("random", { duration_hours: duration }, "randomDurationInvalid");
@@ -190,9 +214,9 @@ try {
   assert.equal(wrong.replies.at(-1), message("pl", "aiInvalidResponse"));
   assert.equal(deliveries, beforeWrongAnswers.deliveries); assert.ok(releases > beforeWrongAnswers.releases);
   const successfulFetch = fetchFixture;
-  for (const subcommand of ["random", "run"]) {
+  for (const subcommand of ["random", "publish"]) {
     topic.lastGeneratedAt = null;
-    const values = subcommand === "run" ? { name: "New" } : {};
+    const values = subcommand === "publish" ? { name: "New" } : {};
     for (const [status, key] of [[404, "aiUnavailable"], [429, "quota"], [401, "aiConfiguration"], [403, "aiConfiguration"]]) {
       const before = { deliveries, releases };
       fetchFixture = async () => new Response(JSON.stringify({ error: { message: "Fixture private provider details" } }), {
@@ -206,8 +230,8 @@ try {
   }
   fetchFixture = successfulFetch; generatedAnswers = ["A", "B", "C", "D"]; topic.optionCount = 4;
   const successfulSend = channel.send;
-  for (const subcommand of ["random", "run"]) {
-    const values = subcommand === "run" ? { name: "New" } : {};
+  for (const subcommand of ["random", "publish"]) {
+    const values = subcommand === "publish" ? { name: "New" } : {};
     for (const code of [50013, 50001, 50000]) {
       channel.send = async () => { deliveries++; throw { code, message: "Fixture private Discord details" }; };
       const before = { requests, deliveries, releases };
@@ -235,13 +259,13 @@ try {
   const blocked = await invoke("create", { name: "Overflow" });
   assert.equal(blocked.replies.at(-1), message("pl", "topicLimit", { limit: 31 }));
   assert.equal(writes, beforeLimit + 1, "Disabled quizzes count toward the limit");
-  await invoke("configure", { name: "Last slot", duration_hours: 12 });
+  await invoke("edit", { name: "Last slot", duration_hours: 12 });
   assert.equal([...topics.values()].find(topic => topic.name === "Last slot").pollDurationHours, 12, "Configuration works at the limit");
   await invoke("delete", { name: "Last slot" });
   await invoke("create", { name: "Replacement" });
   assert.equal([...topics.values()].filter(topic => topic.guildId === "guild").length, 31, "Deleting a quiz frees a slot");
   topics.set("legacy-extra", { id: "legacy-extra", guildId: "guild", name: "Legacy extra", enabled: false });
-  await invoke("configure", { name: "Replacement", duration_hours: 8 });
+  await invoke("edit", { name: "Replacement", duration_hours: 8 });
   assert.equal([...topics.values()].find(topic => topic.name === "Replacement").pollDurationHours, 8, "Existing servers above the limit remain configurable");
   const legacyBlocked = await invoke("create", { name: "Legacy overflow" });
   assert.equal(legacyBlocked.replies.at(-1), message("pl", "topicLimit", { limit: 31 }));

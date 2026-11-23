@@ -89,28 +89,28 @@ try {
   await command("create", { name: "Quiz", option_count: 2 });
   const topic = [...topics.values()][0]; assert.equal(topic.pingRoleId, null);
   const deniedBefore = { writes, roleReads };
-  assert.equal(await command("configure", { name: "Quiz", ping_role: { id: roleA } }, false), message("pl", "permission"));
+  assert.equal(await command("edit", { name: "Quiz", ping_role: { id: roleA } }, false), message("pl", "permission"));
   assert.deepEqual({ writes, roleReads }, deniedBefore);
-  assert.equal(await command("configure", { name: "Quiz", ping_role: { id: roleA }, clear_ping: true }), message("pl", "quizPingConflict"));
+  assert.equal(await command("edit", { name: "Quiz", ping_role: { id: roleA }, clear_ping: true }), message("pl", "quizPingConflict"));
   assert.equal(writes, deniedBefore.writes);
   for (const id of [guildId, "deleted", "foreign"]) {
     roles.set("foreign", { id: "foreign", guild: { id: "another" }, mentionable: true });
-    assert.equal(await command("configure", { name: "Quiz", ping_role: { id } }), message("pl", "quizPingRoleInvalid"));
+    assert.equal(await command("edit", { name: "Quiz", ping_role: { id } }), message("pl", "quizPingRoleInvalid"));
   }
   roles.get(roleA).mentionable = false;
-  assert.equal(await command("configure", { name: "Quiz", ping_role: { id: roleA } }), message("pl", "quizPingPermissions"));
+  assert.equal(await command("edit", { name: "Quiz", ping_role: { id: roleA } }), message("pl", "quizPingPermissions"));
   assert.equal(topic.pingRoleId, null);
   mentionAll = true;
-  assert.ok((await command("configure", { name: "Quiz", ping_role: { id: roleA } })).includes(`<@&${roleA}>`));
+  assert.ok((await command("edit", { name: "Quiz", ping_role: { id: roleA } })).includes(`<@&${roleA}>`));
   assert.equal(topic.pingRoleId, roleA);
-  await command("configure", { name: "Quiz", duration_hours: 3 }); assert.equal(topic.pingRoleId, roleA);
+  await command("edit", { name: "Quiz", duration_hours: 3 }); assert.equal(topic.pingRoleId, roleA);
   mentionAll = false;
-  assert.equal(await command("configure", { name: "Quiz", channel: secondChannel }), message("pl", "quizPingPermissions"));
+  assert.equal(await command("edit", { name: "Quiz", channel: secondChannel }), message("pl", "quizPingPermissions"));
   assert.equal(topic.channelId, channelId);
-  await command("configure", { name: "Quiz", channel: secondChannel, clear_ping: true });
+  await command("edit", { name: "Quiz", channel: secondChannel, clear_ping: true });
   assert.equal(topic.channelId, secondChannelId); assert.equal(topic.pingRoleId, null);
   roles.get(roleA).mentionable = true;
-  await command("configure", { name: "Quiz", channel, ping_role: { id: roleA } });
+  await command("edit", { name: "Quiz", channel, ping_role: { id: roleA } });
   console.log = () => {};
   await runDueTopics({ channels: { fetch: async () => channel } });
   console.log = realLog;
@@ -118,7 +118,7 @@ try {
   assert.ok(sent[0].content.startsWith(`<@&${roleA}>\n`));
   assert.deepEqual(sent[0].allowedMentions, { parse: [], roles: [roleA], users: [], repliedUser: false });
   topic.lastGeneratedAt = null;
-  await command("run", { name: "Quiz" });
+  await command("publish", { name: "Quiz" });
   assert.equal(sent.length, 2); assert.deepEqual(sent[1].allowedMentions.roles, [roleA]);
   await disablePollControls({ rest: { patch: async (_, payload) => patches.push(payload.body) } }, channelId, settlements.at(-1).messageId, "pl");
   assert.equal(patches.length, 1); assert.deepEqual(patches[0].allowed_mentions.parse, []);
@@ -150,7 +150,7 @@ try {
   assert.equal(roleReads, beforeRandom);
   assert.deepEqual(sent.at(-1).allowedMentions.parse, []);
   assert.doesNotMatch(sent.at(-1).content, /<@&/);
-  await command("configure", { name: "Quiz", clear_ping: true }); topic.lastGeneratedAt = null;
+  await command("edit", { name: "Quiz", clear_ping: true }); topic.lastGeneratedAt = null;
   const beforeNoPing = roleReads;
   await publishTopicQuestions({ ...topic }, channel, false);
   assert.equal(roleReads, beforeNoPing); assert.deepEqual(sent.at(-1).allowedMentions.roles, []);

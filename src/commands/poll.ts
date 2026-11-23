@@ -1,4 +1,4 @@
-import { SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { SlashCommandSubcommandBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { openFeedback } from "../feedback.js";
 import { scheduleEvents } from "../services/schedule-events.js";
@@ -10,16 +10,10 @@ import { collectFinalVotes, applyFinalVotes } from "../services/scoring.js";
 
 const closingPolls = new Set<string>();
 
-export const pollCommand = new SlashCommandSubcommandGroupBuilder()
-  .setName("poll")
-  .setDescription("Manage Dilemma polls.")
-  .addSubcommand((subcommand) => subcommand
-    .setName("end")
-    .setDescription("End a managed poll or your own random quiz immediately.")
-    .addStringOption((option) => option
-      .setName("message_id")
-      .setDescription("ID of the poll message.")
-      .setRequired(true)));
+export const endCommand = new SlashCommandSubcommandBuilder()
+  .setName("end")
+  .setDescription("End a managed quiz or your own random quiz immediately.")
+  .addStringOption(option => option.setName("message_id").setDescription("ID of the quiz message.").setRequired(true));
 
 export async function handlePoll(interaction: ChatInputCommandInteraction) {
   await endQuiz(interaction, interaction.options.getString("message_id", true).trim(), "command");

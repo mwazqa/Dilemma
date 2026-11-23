@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Routes, type Client } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, messageLink, Routes, type Client } from "discord.js";
 import { message } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
 
@@ -11,6 +11,10 @@ export function reportQuizButton(language: string) {
 export function myQuizButton(language: string, messageId?: string, finished = false) {
   return new ButtonBuilder().setCustomId(messageId ? `${MY_QUIZ_BUTTON_ID}:${messageId}:view` : MY_QUIZ_BUTTON_ID)
     .setLabel(message(language, finished ? "myQuizResultButton" : "myQuizVoteButton")).setStyle(ButtonStyle.Secondary);
+}
+export function quizJumpButton(language: string, quiz: { guildId: string; channelId: string; messageId: string }) {
+  return new ButtonBuilder().setLabel(message(language, "quizJumpButton")).setStyle(ButtonStyle.Link)
+    .setURL(messageLink(quiz.channelId, quiz.messageId, quiz.guildId));
 }
 export function pollControls(language: string, disabled = false) {
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

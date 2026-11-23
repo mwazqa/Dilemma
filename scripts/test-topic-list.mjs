@@ -47,7 +47,8 @@ const control = (payload, action) => controls(payload).find(item => item.custom_
 function component(payload, action, values = [], overrides = {}) {
   const replies = [], updates = [], followUps = [];
   const kind = action === "status" || action === "difficulty" ? "string" : action === "channel" ? "channel" : "button";
-  return { customId: control(payload, action).custom_id, user: { id: owner }, guildId, locale: "pl",
+  const customId = action === "refresh" ? control(payload, "next").custom_id.replace(/:next$/, ":refresh") : control(payload, action).custom_id;
+  return { customId, user: { id: owner }, guildId, locale: "pl",
     client: { user: { id: bot } }, message: { author: { id: bot } }, values,
     memberPermissions: { has: () => true }, member: { roles: [] },
     isStringSelectMenu: () => kind === "string", isChannelSelectMenu: () => kind === "channel", isButton: () => kind === "button",
@@ -148,6 +149,7 @@ try {
       assert.ok((data.fields ?? []).every(field => field.name.length <= 256 && field.value.length <= 1024));
       assert.doesNotMatch(JSON.stringify(data), /\{\w+\}|<\/?(?:ul|ol|li)>/);
       assert.equal(payload.components.length, 4);
+      assert.equal(control(payload, "refresh"), undefined);
       assert.ok(controls(payload).every(item => item.custom_id.length <= 100));
       assert.ok(controls(payload).flatMap(item => item.options ?? []).every(option => option.label.length <= 100));
       assert.deepEqual(payload.allowedMentions.parse, []);

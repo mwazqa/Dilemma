@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" });
 const { settlementData, scoreHistory, collectFinalVotes, applyFinalVotes, runDueSettlements } = await import("../dist/services/scoring.js");
 const { db } = await import("../dist/db.js");
-const { handleScore, scoreCommand } = await import("../dist/commands/score.js");
+const { handleScore, profileCommand, sparksCommand, badgesCommand } = await import("../dist/commands/score.js");
 const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { questionSchema } = await import("../dist/types/question.js");
 const { message } = await import("../dist/messages.js");
@@ -65,7 +65,7 @@ db.userScore.findMany = async ({ where, orderBy, take }) => { assert.equal(where
 function interaction(sub, confirm = false, guildId = "guild") {
   const replies = [];
   const payloads = [];
-  return { commandName: "dilemma", guildId, locale: "en", user: { id: "1", displayName: "Testowy gracz", username: "test-player" }, options: { getSubcommandGroup: () => "score", getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
+  return { commandName: "dilemma", guildId, locale: "en", user: { id: "1", displayName: "Testowy gracz", username: "test-player" }, options: { getSubcommandGroup: () => sub === "forget" ? "score" : null, getSubcommand: () => sub, getUser: () => null, getBoolean: () => confirm },
     deferReply: async () => {}, editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); payloads.push(payload); }, replies, payloads };
 }
 const profile = interaction("profile"); await routeCommand(profile);
@@ -107,19 +107,18 @@ const emptyLeaderboard = interaction("leaderboard"); await handleScore(emptyLead
 assert.equal(emptyLeaderboard.replies[0], null);
 assert.match(emptyLeaderboard.payloads[0].embeds[0].toJSON().description, /Jeszcze nie ma wyników/);
 db.userScore.findMany = findPlayers;
-const dm = interaction("profile", false, null); await handleScore(dm); assert.equal(dm.replies[0], message("en", "serverOnly"));
-let deletions = 0;
-db.$transaction = async cb => cb({
-  quizVote: { deleteMany: async () => { deletions++; } },
-  quizSupport: { deleteMany: async () => { deletions++; } },
-  quizWager: { deleteMany: async () => { deletions++; } },
-  quizAnswer: { deleteMany: async ({ where }) => { assert.deepEqual(where, { guildId: "guild", userId: "1" }); deletions++; } },
-  userScore: { deleteMany: async () => { deletions++; } } });
-const unconfirmed = interaction("forget");
-await routeCommand(unconfirmed); assert.equal(deletions, 0);
-assert.match(unconfirmed.replies[0], /\/dilemma score forget confirm:true/);
-const forgotten = interaction("forget", true); await routeCommand(forgotten); assert.equal(deletions, 5); assert.equal(forgotten.replies[0], message("pl", "scoreForgotten"));
-assert.deepEqual(scoreCommand.toJSON().options.map(sub => sub.name), ["profile", "leaderboard", "achievements", "exchange", "badge", "forget"]);
+const dm = interaction("profile", false, null); await routeCommand(dm); assert.equal(dm.replies[0], message("en", "serverOnly"));
+let transactions = 0;
+db.$transaction = async () => { transactions++; throw new Error("Unexpected retired command transaction"); };
+for (const confirm of [false, true]) {
+  const retired = interaction("forget", confirm); await routeCommand(retired);
+  assert.equal(retired.replies[0], message("pl", "commandUnavailable"));
+}
+assert.equal(transactions, 0, "A retired command cannot delete data or enter a transaction");
+assert.deepEqual(sparksCommand.toJSON().options.map(sub => sub.name), ["exchange", "transfer"]);
+assert.deepEqual(badgesCommand.toJSON().options.map(sub => sub.name), ["set"]);
+assert.equal(profileCommand.toJSON().name, "profile");
+assert.deepEqual(profileCommand.toJSON().options.map(option => option.name), ["user"]);
 let checkUpdates = 0;
 db.quizSettlement.findMany = async ({ where }) => { assert.ok(where.nextCheckAt); return [quiz]; };
 db.quizSettlement.updateMany = async () => { checkUpdates++; };
@@ -127,4 +126,4 @@ finalized = false;
 await runDueSettlements(client);
 assert.equal(checkUpdates, 2, "Pending polls reschedule without blocking the queue");
 await db.$disconnect();
-console.log("PASS: score rules, answer ID mapping, pagination, finalized votes, bot filtering, idempotence, guild scope, privacy deletion and retry scheduling");
+console.log("PASS: score rules, answer ID mapping, pagination, finalized votes, bot filtering, idempotence, guild scope, retired command safety and retry scheduling");

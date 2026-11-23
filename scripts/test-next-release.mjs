@@ -24,7 +24,6 @@ const friendlyFeedbackKeys = [
   "helpIntro", "welcome", "topicCreated", "topicExists", "topicChanged", "nameInvalid",
   "optionCountInvalid", "intervalInvalid", "durationInvalid", "timezoneInvalid", "manualPublication", "scoreEmpty", "partial"
 ];
-const permanentDeletionWords = { en: /permanent/i, pl: /trwale/i };
 assert.ok(Object.keys(feedbackKaomoji).length >= 20);
 assert.ok(new Set(Object.values(feedbackKaomoji)).size >= 12);
 for (const language of messageLanguages) {
@@ -44,12 +43,6 @@ for (const language of messageLanguages) {
     assert.ok(message(language, key).includes("~"), `${key} keeps the shared feedback voice in ${language}`);
     assert.ok(message(language, key).length <= 2000);
   }
-  for (const key of ["forgetConfirm", "scoreForgotten"]) {
-    assert.equal(feedbackKaomoji[key], undefined);
-    assert.doesNotMatch(message(language, key), /[~♡✧]/, "Permanent-deletion warnings are not decorated");
-    assert.match(message(language, key), permanentDeletionWords[language]);
-  }
-  assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
   for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scorePoints", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
     assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Short labels remain readable");
@@ -67,16 +60,19 @@ for (const language of messageLanguages) {
   assert.ok(getHelpContent(language).length < 4000);
   const card = getHelpEmbed(language).toJSON();
   assert.equal(card.title, message(language, "helpIntro"));
-  assert.equal(card.fields.length, 5);
+  assert.equal(card.fields.length, 7);
   assert.ok(card.fields.every(field => field.value.length <= 1024));
   const commands = card.fields.map(field => field.value).join("\n");
   assert.doesNotMatch(commands, /option_count|difficulty:|confirm:true|\/dilemma (?:rename|help)/);
-  for (const command of ["create", "configure", "enable", "disable", "run", "random", "list", "delete"]) {
+  for (const command of ["create", "edit", "enable", "disable", "publish", "random", "list", "delete"]) {
     assert.ok(commands.includes(`/dilemma ${command}`));
   }
-  assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma timezone") && commands.includes("/dilemma poll end") && commands.includes("/dilemma score"));
+  assert.ok(commands.includes("/dilemma language") && commands.includes("/dilemma timezone") && commands.includes("/dilemma end") && commands.includes("/dilemma sparks"));
   assert.doesNotMatch(commands, /`\/(?:settings|help|score|poll|ping)(?: |`)/);
-  for (const sub of ["profile", "leaderboard", "achievements", "badge", "forget"]) assert.ok(commands.includes(`/dilemma score ${sub}`));
+  assert.ok(commands.includes("/dilemma profile"));
+  assert.ok(!commands.includes("/dilemma score profile"));
+  assert.ok(!commands.includes("/dilemma score forget"));
+  for (const path of ["leaderboard", "achievements", "badges set"]) assert.ok(commands.includes(`/dilemma ${path}`));
 }
 assert.equal(normalizeLanguage("pl-PL"), "pl");
 assert.equal(normalizeLanguage("en-GB"), "en");
@@ -155,7 +151,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "configure", "enable", "disable", "delete", "list", "guide", "help", "random", "random-reset", "run", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "score", "poll"].sort());
+  ["create", "edit", "enable", "disable", "delete", "list", "guide", "help", "random", "random-cooldown-reset", "publish", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "profile", "leaderboard", "achievements", "badges", "sparks", "end"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);
@@ -169,7 +165,6 @@ for (const language of messageLanguages) {
     }
   }
   for (const match of fields.matchAll(/`(\/[^`]+)`/g)) assert.ok(match[1].startsWith("/dilemma "));
-  assert.ok(message(language, "forgetConfirm").includes("/dilemma score forget confirm:true"));
 }
 const { handleSettings } = await import("../dist/commands/settings.js");
 const { publishTopicQuestions } = await import("../dist/services/poll-publisher.js");
@@ -230,11 +225,11 @@ assert.equal(topic.generationTime, null, "No schedule is enabled until a default
 const originalInterval = topic.intervalDays;
 topic.lastGeneratedAt = new Date();
 const lastRun = topic.lastGeneratedAt;
-await handleTopic(interaction("configure", { name: "Test", generation_time: "18:00", duration_hours: 3 }));
+await handleTopic(interaction("edit", { name: "Test", generation_time: "18:00", duration_hours: 3 }));
 assert.equal(topic.lastGeneratedAt, lastRun, "Schedule changes never reset the last run");
 assert.equal(topic.pollDurationHours, 3);
 resetTopicDay();
-await handleTopic(interaction("configure", { name: "Test", difficulty: "easy" }));
+await handleTopic(interaction("edit", { name: "Test", difficulty: "easy" }));
 assert.equal(topic.difficulty, "easy");
 assert.equal(topic.intervalDays, originalInterval);
 await handleTopic(interaction("create", { name: "Test", option_count: 4 }));
@@ -244,9 +239,9 @@ assert.match(lastPrompt, /Difficulty: easy/);
 assert.equal(generatedPoll.difficulty, "easy");
 assertPublishedAnswers(generatedPoll);
 resetTopicDay();
-await handleTopic(interaction("run", { name: "Test" }));
+await handleTopic(interaction("publish", { name: "Test" }));
 assert.equal(generatedPoll.difficulty, "easy");
-const denied = interaction("run", { name: "Test" }, false);
+const denied = interaction("publish", { name: "Test" }, false);
 const requestsBefore = counter;
 await handleTopic(denied);
 assert.equal(counter, requestsBefore);
@@ -281,7 +276,7 @@ await routeCommand(currentZone);
 assert.equal(currentZone.replies[0], message("pl", "timezoneCurrent", { timezone: "Europe/London" }));
 const retiredDefaults = interaction("defaults", { duration_hours: 3 });
 await routeCommand(retiredDefaults);
-assert.deepEqual(retiredDefaults.replies[0].embeds[0].toJSON(), getHelpEmbed("pl").toJSON());
+assert.equal(retiredDefaults.replies[0], message("pl", "commandUnavailable"));
 for (const zone of ["", "Invalid/Zone", "18:30", "+02:00"]) {
   const before = { ...settings };
   const invalidZone = interaction("timezone", { value: zone });
@@ -297,7 +292,7 @@ assert.equal(topic.generationTime, "18:30");
 assert.equal(topic.intervalDays, 4);
 assert.equal(isTopicDue(topic, new Date("2026-10-12T16:29:00Z")), false);
 assert.equal(isTopicDue(topic, new Date("2026-10-12T16:30:00Z")), true);
-await routeCommand(interaction("configure", { name: "Scheduled", generation_time: "19:45" }));
+await routeCommand(interaction("edit", { name: "Scheduled", generation_time: "19:45" }));
 assert.equal(topic.generationTime, "19:45");
 topic = existingTopic;
 await handleSettings(interaction("language", { value: "en" }));
@@ -305,7 +300,7 @@ topic.language = "pl";
 const savedDuration = topic.pollDurationHours;
 const savedDifficulty = topic.difficulty;
 resetTopicDay();
-await handleTopic(interaction("run", { name: "Test" }));
+await handleTopic(interaction("publish", { name: "Test" }));
 assert.match(lastPrompt, / in en\./, "Run uses global language, not stale topic language");
 assert.match(sent.content, new RegExp(message("en", "difficulty", { difficulty: message("en", savedDifficulty) })));
 resetTopicDay();
@@ -340,7 +335,7 @@ assert.equal(counter, callsAtLimit);
 db.dailyQuizRun.create = createRun;
 resetTopicDay();
 db.dailyQuizRun.create = async () => { throw new DailyQuizLimitError("topic"); };
-const topicLimited = interaction("run", { name: "Test" });
+const topicLimited = interaction("publish", { name: "Test" });
 await handleTopic(topicLimited);
 assert.equal(topicLimited.replies.at(-1), message("en", "topicDailyLimit"));
 assert.equal(counter, callsAtLimit);
@@ -361,7 +356,7 @@ for (const command of [dilemmaCommand.toJSON()]) {
     const duration = sub.options?.find(option => option.name === "duration_hours");
     if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, sub.name === "random" ? 6 : 24); }
   }
-  for (const sub of command.options.filter(sub => ["create", "configure", "random"].includes(sub.name))) {
+  for (const sub of command.options.filter(sub => ["create", "edit", "random"].includes(sub.name))) {
     const option = sub.options.find(option => option.name === "difficulty");
     assert.deepEqual(option.choices.map(choice => choice.value), ["easy", "medium", "hard"]);
     assert.ok(!option.required);
@@ -374,7 +369,7 @@ assert.deepEqual(routedHelp.replies[0].embeds[0].toJSON(), getHelpEmbed("en").to
 const routedPing = interaction("ping", {}, false);
 await routeCommand(routedPing);
 assert.equal(routedPing.replies[0], message("en", "ping"));
-for (const sub of ["language", "timezone", "create", "configure", "enable", "disable", "delete", "run", "list"]) {
+for (const sub of ["language", "timezone", "create", "edit", "enable", "disable", "delete", "publish", "list"]) {
   const deniedRoute = interaction(sub, { value: "en", name: "Test" }, false);
   const topicBefore = { ...topic };
   const settingsBefore = { ...settings };

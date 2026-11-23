@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: October 29, 2026
+Last updated: November 23, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 
@@ -9,9 +9,12 @@ This policy explains what data Dilemma processes when used on a Discord server.
 Dilemma stores Discord server IDs, channel IDs, topic configuration, generated
 questions, poll options, results, and timestamps. For quiz scoring, it stores
 Discord user IDs, final answer selections, points, accuracy and correct-answer
-streaks. Levels and EXP are calculated from settled points, without storing additional personal data.
+streaks. Dilemma records bonus EXP from correct-answer streaks and includes it
+alongside EXP from points and Spark exchanges when calculating levels.
 Dilemma also stores the player's server-specific Sparks balance and which quizzes
 have a purchased count preview or 50/50 hint, including its two remaining choices.
+For Spark transfers, Dilemma stores the server, sender, recipient and Discord
+interaction IDs, the amount and timestamp so each transfer is processed once.
 For bets, it stores the player's answer, stake and final payout on the current server.
 Changing the vote moves the bet. Withdrawing refunds the stake with a 1-Spark
 withdrawal fee. Bet payouts are calculated only after closing.
@@ -76,13 +79,8 @@ of quiz generation requests.
 
 Data is used to configure scheduled generation, publish polls, prevent duplicate
 questions, show results, and calculate server-specific scores and streaks.
-Use `/dilemma score forget confirm:true` to permanently delete your stored answers and
-score on the current server, including Sparks, purchased tool unlocks and bets.
-This also withdraws stored button votes. Active bets are deleted together with the
-balance, without a refund or later payout. It cannot withdraw a vote from a legacy
-native Discord poll. Unscored legacy polls and future votes can create new
-records. Already scored polls are not scored again after deletion. Aggregate
-final count snapshots remain with the quiz record.
+To request deletion of your stored player data, contact the bot operator as
+described below. Previously published aggregate counts remain with the quiz record.
 User IDs and votes are not sent to the AI provider for quiz generation.
 The operator may delete stored server data by
 removing the bot and deleting its database records. Retention depends on the
@@ -95,6 +93,7 @@ data under its own Privacy Policy and Terms of Service.
 
 ## Contact
 
-For privacy questions or deletion requests, contact the bot operator through
-the project repository:
+For privacy questions or deletion requests, ask the bot operator for a private
+contact channel through the project repository. Keep user IDs and request details
+out of public issues.
 https://github.com/mwazqa/Dilemma/issues

@@ -127,7 +127,8 @@ try {
   assert.equal(deliveryState.reviewedAt, null); assert.equal(deliveryState.reviewNote, null);
   const firstNonce = deliveredBodies[0].nonce;
   deliveredBodies.length = 0;
-  const send = async body => { assert.deepEqual(body.allowed_mentions, { parse: [] }); assert.equal(body.enforce_nonce, true); deliveredBodies.push(body); };
+  const send = async body => { assert.deepEqual(body.allowed_mentions, { parse: [] }); assert.equal(body.enforce_nonce, true);
+    assert.equal(body.flags, undefined); deliveredBodies.push(body); };
   const delivery = await deliverQuizReportReview(deliveryDatabase, deliveryInput, send, intro);
   assert.equal(delivery.status, "delivered"); assert.equal(delivery.reviewed, 1);
   assert.equal(deliveredBodies[0].nonce, firstNonce); assert.ok(firstNonce.length <= 25);

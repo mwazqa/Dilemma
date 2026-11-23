@@ -87,7 +87,7 @@ function interaction({ permitted = true, guildId = "guild", customId = END_QUIZ_
   let deferred = false;
   return { user: { id: userId }, commandName: "dilemma", guildId, customId, locale: "en", channel, message: { id: "poll" }, client, member: { roles },
     memberPermissions: { has: permission => { assert.equal(permission, PermissionFlagsBits.ManageGuild); return permitted; } },
-    options: { getSubcommandGroup: () => "poll", getSubcommand: () => "end", getString: () => "poll" },
+    options: { getSubcommandGroup: () => null, getSubcommand: () => "end", getString: () => "poll" },
     deferReply: async payload => { assert.equal(payload.flags, MessageFlags.Ephemeral); deferred = true; },
     editReply: async payload => { assert.ok(deferred); assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload.content); },
     replies };

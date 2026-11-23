@@ -79,7 +79,6 @@ export function topicListView(topics: ListTopic[], state: ListState, language: s
       .setStyle(ButtonStyle.Secondary).setDisabled(state.page === 0),
     new ButtonBuilder().setCustomId(componentId(state, "next")).setLabel(text("topicListNext"))
       .setStyle(ButtonStyle.Secondary).setDisabled(state.page === pages - 1),
-    new ButtonBuilder().setCustomId(componentId(state, "refresh")).setLabel(text("topicListRefresh")).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(componentId(state, "reset")).setLabel(text("topicListReset"))
       .setStyle(ButtonStyle.Secondary).setDisabled(state.status === "all" && state.difficulty === "all" && state.channel === "all")
   );

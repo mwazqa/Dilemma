@@ -1,11 +1,13 @@
-import { ComponentType, MessageFlags, SlashCommandSubcommandBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { ComponentType, MessageFlags, SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { openFeedback } from "../feedback.js";
 import { canManageDilemma } from "../services/management-permissions.js";
 import { getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_BUTTON_ID } from "../services/player-guide.js";
 import { registerGuidePublication } from "../services/guide-publications.js";
 
-export const guideCommand = new SlashCommandSubcommandBuilder().setName("guide")
-  .setDescription("Publish the guide and release news here. Requires server management or the Dilemma manager role.");
+export const guideCommand = new SlashCommandSubcommandGroupBuilder().setName("guide")
+  .setDescription("Publish the player guide and register this channel for release news.")
+  .addSubcommand(sub => sub.setName("publish")
+    .setDescription("Publish the guide and release news here. Requires server management or the Dilemma manager role."));
 
 export async function handleGuide(interaction: ChatInputCommandInteraction) {
   const { language, settings, text, reply } = await openFeedback(interaction);

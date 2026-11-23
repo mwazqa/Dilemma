@@ -21,7 +21,7 @@ import { QuizPingError, resolveQuizPingRole } from "../services/quiz-notificatio
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
   subcommand
-    .addStringOption(option => option.setName("name").setDescription(creating ? "Name for a new topic; use configure for an existing topic." : "Existing topic to update; omitted settings remain unchanged.").setRequired(true).setMaxLength(80).setAutocomplete(!creating))
+    .addStringOption(option => option.setName("name").setDescription(creating ? "Name for a new topic; use edit for an existing topic." : "Existing topic to update; omitted settings remain unchanged.").setRequired(true).setMaxLength(80).setAutocomplete(!creating))
     .addChannelOption(option => option.setName("channel").setDescription(creating ? "Quiz destination; defaults to this channel." : "New quiz destination; omitted keeps the saved channel.")
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
     .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to notify when this saved quiz starts; omitted means no ping." : "Role to notify when this saved quiz starts; omitted keeps the saved role."));
@@ -42,7 +42,7 @@ export const topicCommand = new SlashCommandBuilder()
     .setName("create")
     .setDescription("Create a new quiz topic with optional schedule and voting settings."), true))
   .addSubcommand((subcommand) => topicOptions(subcommand
-    .setName("configure")
+    .setName("edit")
     .setDescription("Update an existing quiz topic; omitted settings remain unchanged."), false))
   .addSubcommand((subcommand) => subcommand
     .setName("enable")
@@ -69,12 +69,12 @@ export const topicCommand = new SlashCommandBuilder()
     .addStringOption(difficultyOption)
     .addIntegerOption((option) => option.setName("duration_hours").setDescription("Voting duration in hours (1-6); default at most 6 hours.").setRequired(false).setMinValue(1).setMaxValue(RANDOM_MAX_DURATION_HOURS)))
   .addSubcommand((subcommand) => subcommand
-    .setName("run")
+    .setName("publish")
     .setDescription("Publish an available quiz slot early without shifting fixed repeat dates.")
     .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
-    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional duration override for this poll (1-24 hours).").setRequired(false).setMinValue(1).setMaxValue(24)));
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional duration override for this quiz (1-24 hours).").setRequired(false).setMinValue(1).setMaxValue(24)));
 
-const topicSubcommands = new Set(topicCommand.toJSON().options?.map(sub => sub.name));
+export const topicSubcommands = new Set(topicCommand.toJSON().options?.map(sub => sub.name));
 
 export async function handleTopic(interaction: ChatInputCommandInteraction) {
   const { language, settings: managementSettings, text, reply } = await openFeedback(interaction);
@@ -143,7 +143,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
   if (!name || name.length > 80 || /[\r\n]/.test(name)) { await reply(text("nameInvalid")); return; }
   const settings = await ensureGuildSettings(interaction.guildId);
 
-  if (subcommand === "create" || subcommand === "configure") {
+  if (subcommand === "create" || subcommand === "edit") {
     const creating = subcommand === "create";
     const existingTopic = await db.topic.findUnique({ where: { guildId_name: { guildId: interaction.guildId, name } } });
     if (creating && existingTopic) { await reply(text("topicExists", { name })); return; }
@@ -254,7 +254,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  if (subcommand === "run") {
+  if (subcommand === "publish") {
     const duration = interaction.options.getInteger("duration_hours");
     const invalid = numberError(duration, 1, 24, "durationInvalid");
     if (invalid) { await reply(text(invalid)); return; }

@@ -6,7 +6,7 @@ import { inlineText, textPages } from "../formatting.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { quizDayBounds } from "./quiz-limits.js";
-import { analyzeQuizReports, reportAnalysisSchema } from "./quiz-report-analysis.js";
+import { analyzeQuizReports, reportAnalysisCacheSchema, reportAnalysisSchema, reportAnalysisScopeKey, type ReportAnalysis } from "./quiz-report-analysis.js";
 import { deliverQuizReportReview, safeReportText } from "./quiz-report-review.js";
 
 export const REPORT_REVIEW_TIMEZONE = "Europe/Warsaw";
@@ -21,7 +21,7 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
       explanation: true, reason: true, analysis: true } });
   const groups = new Map<string, typeof reports>();
   for (const report of reports) {
-    const key = report.messageId + ":" + (report.analysis ?? "");
+    const key = report.messageId + ":" + reportAnalysisScopeKey(report);
     const group = groups.get(key) ?? []; group.push(report); groups.set(key, group);
   }
   const language = env.QUIZ_REPORT_REVIEW_LANGUAGE;
@@ -50,11 +50,17 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
   for (const group of [...groups.values()].slice(0, 4)) {
     if (!current()) return false;
     const first = group[0];
-    let cached;
-    try { cached = first.analysis ? reportAnalysisSchema.safeParse(JSON.parse(first.analysis)) : null; } catch { cached = null; }
-    const analysis = cached?.success ? cached.data : await analyze(group);
+    const scopeKey = reportAnalysisScopeKey(first);
+    let cached: ReportAnalysis | undefined;
+    for (const report of group) {
+      try {
+        const parsed = report.analysis ? reportAnalysisCacheSchema.safeParse(JSON.parse(report.analysis)) : null;
+        if (parsed?.success && parsed.data.scopeKey === scopeKey) { cached = parsed.data.analysis; break; }
+      } catch {}
+    }
+    const analysis = reportAnalysisSchema.parse(cached ?? await analyze(group));
     if (!current()) return false;
-    const note = JSON.stringify(analysis);
+    const note = JSON.stringify({ scopeKey, analysis });
     await db.quizReport.updateMany({ where: { id: { in: group.map(report => report.id) }, reviewedAt: null },
       data: { analysis: note, analyzedAt: new Date() } });
     const verdict = analysis.verdict === "confirmed" ? "quizReportReviewConfirmed"
@@ -66,7 +72,7 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
       `**${message(language, "quizReportReviewSuggestion")}:** ${safeReportText(analysis.suggestion)}`,
       analysis.sources.length ? `**${message(language, "quizReportReviewSources")}:**\n` + analysis.sources.map(source =>
         `[${inlineText(source.title)}](${source.url.replace(/[()]/g, character => encodeURIComponent(character))})`).join("\n")
-        : message(language, "quizReportReviewNoSources")];
+        : message(language, analysis.kind === "wording" ? "quizReportReviewTextEvidence" : "quizReportReviewNoSources")];
     let channel: { id: string } | undefined;
     for (let offset = 0; offset < group.length; offset += 5) {
       if (!current()) return false;

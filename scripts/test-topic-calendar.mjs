@@ -99,19 +99,19 @@ try {
   }
   assert.equal(topics.size, 7);
   const first = [...topics.values()][0];
-  await handleTopic(request("configure", { name: first.name, interval_days: 3 }));
+  await handleTopic(request("edit", { name: first.name, interval_days: 3 }));
   assert.equal(first.startDate, "2026-10-22"); assert.equal(first.intervalDays, 3);
   const duplicate = request("create", { name: first.name, option_count: 2 });
   await handleTopic(duplicate);
   assert.equal(duplicate.replies.at(-1), message("pl", "topicExists", { name: first.name }));
   assert.equal(first.startDate, "2026-10-22"); assert.equal(first.intervalDays, 3); assert.equal(first.generationTime, "18:00");
   const before = { ...first };
-  await handleTopic(request("configure", { name: first.name, start_date: "2026-02-30" }));
+  await handleTopic(request("edit", { name: first.name, start_date: "2026-02-30" }));
   assert.deepEqual(first, before);
-  const denied = request("configure", { name: first.name, start_date: "2026-10-30" }, false);
+  const denied = request("edit", { name: first.name, start_date: "2026-10-30" }, false);
   await handleTopic(denied); assert.deepEqual(first, before);
   const listing = request("list", {}); await handleTopic(listing); assert.ok(listing.replies[0].embeds[0].toJSON().fields.some(field => field.name.includes("2026-10-22")));
-  const blocked = request("run", { name: first.name });
+  const blocked = request("publish", { name: first.name });
   await handleTopic(blocked); assert.equal(blocked.replies.at(-1), message("pl", "topicScheduleUnavailable"));
   assert.equal(runs.size, 0);
   now = Date.parse("2026-10-22T08:00:00Z");
@@ -127,7 +127,7 @@ try {
   assert.equal(lateLease.cycleRun.day, "2026-10-22");
   first.lastGeneratedAt = new Date();
   assert.equal(nextTopicRunAt(first), Date.parse("2026-10-25T17:00:00Z"));
-  await handleTopic(request("configure", { name: first.name, start_date: "none" }));
+  await handleTopic(request("edit", { name: first.name, start_date: "none" }));
   assert.equal(first.startDate, null); assert.equal(first.lastGeneratedAt.getTime(), now);
   const backlog = { ...first, id: "backlog-calendar", startDate: "2026-10-19", intervalDays: 7, lastGeneratedAt: null };
   topics.set(backlog.id, backlog);
@@ -140,10 +140,10 @@ try {
   await releaseQuizRun(early);
   for (const language of messageLanguages) {
     assert.ok(getHelpContent(language).includes("/dilemma create"));
-    assert.ok(getHelpContent(language).includes("/dilemma configure"));
+    assert.ok(getHelpContent(language).includes("/dilemma edit"));
     for (const key of ["dateInvalid", "scheduleTimeRequired", "topicScheduleUnavailable"]) assert.ok(message(language, key).includes("~"));
   }
-  for (const command of ["create", "configure"]) assert.ok(topicCommand.toJSON().options.find(option => option.name === command).options.some(option => option.name === "start_date"));
+  for (const command of ["create", "edit"]) assert.ok(topicCommand.toJSON().options.find(option => option.name === command).options.some(option => option.name === "start_date"));
   const readme = readFileSync("README.md", "utf8");
   assert.ok(readme.includes("start_date") && readme.includes("20261021120000_topic_start_date"));
   console.log(JSON.stringify({ ok: true, sevenIndependentDates: true, fixedRecurrence: true, dst: true, cycleReservations: true, permissions: true, localizedHelp: true }));

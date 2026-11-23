@@ -90,6 +90,8 @@ jobs:
         run: node scripts/test-postgres-migration.mjs && node scripts/test-scoring-postgres.mjs && npm run test:topic-calendar:postgres && npm run test:random:postgres && npm run test:topic-limit:postgres && npm run test:results:postgres
       - name: Test paid quiz tools and bets
         run: npm run test:quiz-tools:postgres && npm run test:quiz-personal:postgres && npm run test:sparks-penalties:postgres && npm run test:spark-exchange:postgres && npm run test:question-history:postgres && npm run test:quiz-reports:postgres && npm run test:guide:postgres
+      - name: Test Sparks transfers and streak EXP
+        run: npm run test:spark-transfer:postgres && npm run test:streak-exp:postgres
 
   image-preview:
     if: github.event_name == 'pull_request'

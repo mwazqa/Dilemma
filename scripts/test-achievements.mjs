@@ -67,26 +67,22 @@ db.userScore.updateMany = async ({ where, data }) => {
   Object.assign(player, data);
   return { count: 1 };
 };
-db.userScore.deleteMany = async ({ where }) => ({ count: Number(players.delete(key(where.guildId, where.userId))) });
-db.quizAnswer.deleteMany = async ({ where }) => { assert.equal(where.guildId, "guild"); assert.equal(where.userId, "player"); return { count: 0 }; };
-db.quizVote.deleteMany = db.quizSupport.deleteMany = db.quizWager.deleteMany = async ({where}) => {
-  assert.equal(where.guildId,"guild"); assert.equal(where.userId,"player"); return {count:0};
-};
 db.$transaction = async callback => callback(db);
 function interaction(sub, values = {}, guildId = "guild", userId = "player") {
   const replies = [];
   return { commandName: "dilemma", guildId, locale: "en-US", user: { id: userId, displayName: "Test" },
-    options: { getSubcommandGroup: () => "score", getSubcommand: () => sub, getUser: () => values.user ?? null,
+    options: { getSubcommandGroup: () => sub === "badge" ? "badges" : sub === "forget" ? "score" : null,
+      getSubcommand: () => sub === "badge" ? "set" : sub, getUser: () => values.user ?? null,
       getString: name => values[name] ?? null, getBoolean: name => values[name] ?? false,
       getFocused: () => ({ name: values.focus ?? "achievement", value: values.search ?? "" }) },
     deferReply: async options => assert.equal(options.flags, 64),
     editReply: async payload => { assert.deepEqual(payload.allowedMentions.parse, []); replies.push(payload); },
     respond: async choices => replies.push(choices), replies };
 }
-const group = dilemmaCommand.toJSON().options.find(option => option.name === "score");
-assert.equal(group.options.find(option => option.name === "badge").options[0].autocomplete, true);
-assert.equal(group.options.find(option => option.name === "badge").options[0].required, true);
-const badgeOptions = group.options.find(option => option.name === "badge").options;
+const group = dilemmaCommand.toJSON().options.find(option => option.name === "badges");
+assert.equal(group.options.find(option => option.name === "set").options[0].autocomplete, true);
+assert.equal(group.options.find(option => option.name === "set").options[0].required, true);
+const badgeOptions = group.options.find(option => option.name === "set").options;
 assert.deepEqual(badgeOptions.map(option => option.name), [...badgeOptionNames]);
 assert.ok(badgeOptions.every(option => option.autocomplete && option.max_length === 32));
 assert.ok(badgeOptions.slice(1).every(option => !option.required));
@@ -220,24 +216,30 @@ assert.equal(achievementProgress(players.get(key("guild", "player"))).filter(ite
 players.get(key("guild", "player")).selectedBadge = encodeSelectedBadges(threeIds);
 db.quizSettlement.updateMany = async () => ({ count: 1 });
 db.quizAnswer.create = async ({ data }) => data;
-db.quizAnswer.findMany = async () => [{ points: 1, correct: true }];
+db.quizAnswer.findMany = async () => [{ messageId: "quiz", finishedAt: new Date(0), points: 1, correct: true }];
 db.userScore.upsert = async ({ where, create, update }) => {
   const id = key(where.guildId_userId.guildId, where.guildId_userId.userId);
-  players.set(id, players.has(id) ? { ...players.get(id), ...update } : create);
+  const previous = players.get(id);
+  players.set(id, previous ? { ...previous, ...update,
+    sparks: (previous.sparks ?? 0) + update.sparks.increment,
+    bonusExp: (previous.bonusExp ?? 0) + update.bonusExp.increment } : create);
 };
 await applyFinalVotes({ guildId: "guild", messageId: "quiz", correctAnswerId: 1, answerIds: "1,2", difficulty: "easy" }, [{ userId: "player", answerId: 1 }], new Date(0));
 assert.equal(players.get(key("guild", "player")).selectedBadge, encodeSelectedBadges(threeIds));
 assert.deepEqual(selectedAchievements(players.get(key("guild", "player"))).map(item => item.id), ["first_answer"], "Never display badges no longer earned after score recalculation");
-const forget = interaction("forget", { confirm: true }); await routeCommand(forget);
-assert.ok(!players.has(key("guild", "player")));
+const beforeRetired = structuredClone(players.get(key("guild", "player")));
+const retired = interaction("forget", { confirm: true }); await routeCommand(retired);
+assert.equal(retired.replies[0].content, message("pl", "commandUnavailable"));
+assert.deepEqual(players.get(key("guild", "player")), beforeRetired);
 assert.equal(players.get(key("other-guild", "player")).selectedBadge, "level_5");
-const afterForget = interaction("badge", { achievement: "first_answer" }); await routeCommand(afterForget);
-assert.equal(afterForget.replies[0].content, message("pl", "badgeLocked"));
-assert.ok(!players.has(key("guild", "player")), "Badge writes never recreate a forgotten score");
+players.delete(key("guild", "player"));
+const missingProfile = interaction("badge", { achievement: "first_answer" }); await routeCommand(missingProfile);
+assert.equal(missingProfile.replies[0].content, message("pl", "badgeLocked"));
+assert.ok(!players.has(key("guild", "player")), "Badge writes never create a missing profile");
 const beforeDm = queries;
 const dm = interaction("achievements", {}, null); await routeCommand(dm);
 assert.equal(queries, beforeDm);
 const dmChoices = interaction("badge", {}, null); await routeAutocomplete(dmChoices);
 assert.deepEqual(dmChoices.replies[0], []);
 await db.$disconnect();
-console.log("PASS: supported-locale achievements, up to three distinct icons, legacy selection, atomic eligibility, autocomplete, guild isolation, scoring preservation, PNG/fallback and privacy deletion");
+console.log("PASS: supported-locale achievements, up to three distinct icons, legacy selection, atomic eligibility, autocomplete, guild isolation, scoring preservation, PNG/fallback and retired command safety");

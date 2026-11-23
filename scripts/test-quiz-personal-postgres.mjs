@@ -27,7 +27,9 @@ const press = async (...args) => { deferred = updated = 0; await handleQuizVote(
 const buttons = payload => payload.components.flatMap(row => row.toJSON().components);
 const choices = payload => buttons(payload).filter(button => button.custom_id?.includes(":vote:"));
 const checkQuizLink = (payload, language) => {
-  const links = buttons(payload).filter(button => button.style === ButtonStyle.Link);
+  const controls = buttons(payload);
+  assert.ok(controls.every(button => !button.custom_id?.endsWith(":view")), "Private panels have no refresh button");
+  const links = controls.filter(button => button.style === ButtonStyle.Link);
   assert.equal(links.length, 1);
   assert.equal(links[0].url, `https://discord.com/channels/${identity.guildId}/${identity.channelId}/${identity.messageId}`);
   assert.equal(links[0].label, message(language, "quizJumpButton"));
@@ -123,6 +125,7 @@ try {
   assert.equal(await wallet("alice"), 2);
   assert.ok(panel.content.includes(message("en", "quizActiveWager", { stake: 10, payout: 20 })));
   assert.ok(buttons(panel).find(button => button.custom_id?.endsWith(":wager")).disabled);
+  checkQuizLink(panel, "en");
   const savedWager = await db.quizWager.findUnique({ where: { messageId_userId: { messageId: quiz.messageId, userId: "alice" } } });
   assert.equal(savedWager.answerId, 1); assert.equal(savedWager.messageId, quiz.messageId);
   await submit(10);
@@ -135,6 +138,11 @@ try {
   assert.equal(choices(panel).length, 0);
   assert.ok(!buttons(panel).some(button => button.custom_id?.endsWith(":wager")), "Closed panels do not offer betting");
   checkQuizLink(panel, "en");
+  for (const language of messageLanguages) {
+    const pending = await quizPersonalPayload(identity, "alice", language);
+    assert.deepEqual(buttons(pending).map(button => button.label), [message(language, "quizJumpButton")]);
+    assert.ok(pending.content.includes(`**${message(language, "myQuizResultButton")}**`));
+  }
   assert.ok(!panel.content.includes(message("en", "quizCorrectAnswer", { answer: "1. Alpha" })));
   await applyFinalVotes(quiz, [], new Date());
   stage = "settled-result";

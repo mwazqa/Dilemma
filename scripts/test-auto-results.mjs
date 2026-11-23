@@ -67,6 +67,12 @@ const client = { user: { id: "bot" }, rest: {
   post: async (route, { body }) => {
     assert.equal(route, "/channels/channel/messages"); assert.deepEqual(body.allowed_mentions.parse, []);
     assert.equal(body.enforce_nonce, true); assert.ok(body.nonce.length <= 25);
+    const controls = body.components.flatMap(row => row.components);
+    assert.equal(controls[0].label, message(language, "myQuizResultButton"));
+    const jump = controls.find(button => button.style === 5);
+    assert.equal(jump.label, message(language, "quizJumpButton"));
+    assert.equal(jump.url, `https://discord.com/channels/${quiz.guildId}/${quiz.channelId}/${quiz.messageId}`);
+    assert.equal(jump.custom_id, undefined, "Jumping to a quiz cannot submit an answer or purchase");
     if (failPost) throw new Error("Synthetic Discord send failure");
     if (!delivered.has(body.nonce)) { delivered.set(body.nonce, { id: "result" }); results.push(body.content); }
     return delivered.get(body.nonce);
@@ -116,7 +122,10 @@ try {
   reset(); failCommit = true; await runDueSettlements(client);
   assert.equal(results.length, 1, "Retry after a Discord acknowledgement uses the same nonce"); assert.equal(quiz.resultsPending, false);
   reset();
-  const manualSend = payload => client.rest.post("/channels/channel/messages", { body: { content: payload.content, allowed_mentions: payload.allowedMentions, nonce: payload.nonce, enforce_nonce: payload.enforceNonce } });
+  const manualSend = payload => client.rest.post("/channels/channel/messages", { body: {
+    content: payload.content, components: payload.components.map(row => row.toJSON()),
+    allowed_mentions: payload.allowedMentions, nonce: payload.nonce, enforce_nonce: payload.enforceNonce
+  } });
   await Promise.all([publishQuizResults(client, quiz, language, manualSend), runDueSettlements(client)]);
   assert.equal(results.length, 1, "Manual and automatic closing share one result claim"); assert.equal(answers.length, 1);
   assert.equal(settlementDeadline({ ...quiz, scoredAt: new Date(), resultsPending: true, nextCheckAt: new Date(123) }), 123);

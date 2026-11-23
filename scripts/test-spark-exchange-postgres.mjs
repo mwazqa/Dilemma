@@ -25,7 +25,8 @@ async function command(sub, userId, options = {}) {
     id: options.id ?? receiptId(), commandName: "dilemma", guildId: options.guildId === null ? null : guildId, locale: "pl",
     user: { id: userId, displayName: "Synthetic player" },
     options: {
-      getSubcommandGroup: () => "score", getSubcommand: () => sub, getUser: () => null,
+      getSubcommandGroup: () => sub === "profile" ? null : sub === "badge" ? "badges" : sub === "forget" ? "score" : "sparks",
+      getSubcommand: () => sub === "badge" ? "set" : sub, getUser: () => null,
       getInteger: () => options.amount, getBoolean: () => options.confirm, getString: name => name === "achievement" ? options.badge : null
     },
     deferReply: async payload => assert.equal(payload.flags, MessageFlags.Ephemeral),
@@ -54,17 +55,19 @@ try {
     assert.equal(tooSmall.content, message("pl", "scoreExchangeInvalid", { min: 3, max: maxExchangeSparks }));
   }
   assert.equal((await player(quizPlayer)).sparks, 8);
-  assert.equal((await player(quizPlayer)).bonusExp, 0);
+  assert.equal((await player(quizPlayer)).bonusExp, 5, "The third correct answer earns the first streak bonus");
   const progressCost = 4;
   const purchasedExp = 12;
   const success = await command("exchange", quizPlayer, { amount: progressCost });
-  assert.equal(success.content, message("pl", "scoreExchangeDone", { amount: progressCost, exp: purchasedExp, balance: 8 - progressCost, level: 1 }));
+  assert.equal(success.content, message("pl", "scoreExchangeDone", {
+    amount: progressCost, exp: purchasedExp, balance: 8 - progressCost, level: 1
+  }));
   const profile = await command("profile", quizPlayer);
-  assert.ok((profile.files?.[0]?.description ?? profile.embeds[0].toJSON().description).includes(`${80 + purchasedExp} / 100 EXP`));
+  assert.ok((profile.files?.[0]?.description ?? profile.embeds[0].toJSON().description).includes(`${80 + 5 + purchasedExp} / 100 EXP`));
   assert.equal((await player(quizPlayer)).points, 8);
   await scoreQuiz(quizPlayer, "easy", 4);
   const scored = await player(quizPlayer);
-  assert.deepEqual([scored.points, scored.sparks, scored.bonusExp], [9, 9 - progressCost + sparksPerLevel, purchasedExp]);
+  assert.deepEqual([scored.points, scored.sparks, scored.bonusExp], [9, 9 - progressCost + sparksPerLevel, purchasedExp + 15]);
 
   stage = "concurrent-replay-and-level-up";
   const buyer = "buyer";
@@ -112,13 +115,16 @@ try {
   assert.deepEqual(await exchangeSparks(legacyReceipt.interactionId, guildId, legacyUser, 2), { status: "exchanged", receipt: legacyReceipt });
   assert.equal((await player(legacyUser)).sparks, 8);
 
-  stage = "integer-limit-and-forget";
+  stage = "integer-limit-and-retired-command";
   await db.userScore.create({ data: { guildId, userId: "limit", sparks: 10, bonusExp: maxWalletValue - 1 } });
   assert.equal((await exchangeSparks(receiptId(), guildId, "limit", 3)).status, "limit");
   assert.equal((await player("limit")).sparks, 10);
-  await command("forget", buyer, { confirm: true });
-  assert.equal(await player(buyer), null);
-  assert.equal(await db.sparkExchange.count({ where: { guildId, userId: buyer } }), 0);
+  const beforeRetired = await player(buyer);
+  const receiptsBefore = await db.sparkExchange.count({ where: { guildId, userId: buyer } });
+  const retired = await command("forget", buyer, { confirm: true });
+  assert.equal(retired.content, message("pl", "commandUnavailable"));
+  assert.deepEqual(await player(buyer), beforeRetired);
+  assert.equal(await db.sparkExchange.count({ where: { guildId, userId: buyer } }), receiptsBefore);
   assert.equal((await player(buyer, otherGuild)).sparks, 30);
   console.log(JSON.stringify({ check: "spark-exchange-postgres", passed: true }));
 } catch (error) {

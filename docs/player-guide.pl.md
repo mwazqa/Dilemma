@@ -3,11 +3,13 @@ Tworzę pytania z pomocą AI, a Ty możesz grać ze znajomymi, zbierać punkty i
 
 **🎮 Dołącz do quizu**
 
-Wybierz odpowiedź pod aktywną kartą quizu. **Moja odpowiedź** otwiera prywatny panel z Twoim zapisanym wyborem. Liczy się końcowa odpowiedź pozostawiona przed zamknięciem. Poprawną odpowiedź i wyjaśnienie pokażę po quizie~
+Wybierz odpowiedź na aktywnej karcie quizu. **Moja odpowiedź** otwiera prywatny panel z Twoim zapisanym wyborem. Liczy się końcowa odpowiedź pozostawiona przed zamknięciem. Poprawną odpowiedź i wyjaśnienie pokażę po quizie~
 
 **✨ Punkty, Iskry i postępy**
 
 Trafienia budują wynik, EXP i serię. Iskry to quizowa waluta: przydają się do dodatkowej pomocy, zakładów i wymiany na EXP. Profil, postępy i portfel są osobne na każdym serwerze.
+Kolejne poprawne odpowiedzi dają też bonus EXP za serię. Błąd zeruje serię; pominięcie quizu jej nie przerywa.
+Możesz też przesłać swoje Iskry innej osobie na tym serwerze przez `/dilemma sparks transfer`~
 Aktualne opłaty i karę za błędną odpowiedź sprawdzaj na karcie quizu, w prywatnym panelu i przy przyciskach przed wykonaniem akcji~ (っ•ᴗ•)っ✦
 
 **🔍 Pomoc i zakłady**
@@ -16,8 +18,8 @@ Skorzystaj z opcji pod quizem, jeśli potrzebujesz podpowiedzi lub podglądu gł
 
 **🏁 Twój wynik i profil**
 
-Po quizie **Mój wynik** pokaże Ci prywatnie Twój wybór, punkty i rozliczenie Iskier.
-Profil znajdziesz w `/dilemma score profile`, a ranking serwera w `/dilemma score leaderboard`. Pozostałe komendy, odznaki i możliwości quizów poznasz przez `/dilemma help`~
+Po quizie **Mój wynik** pokaże Ci prywatnie Twój wybór, punkty, bonus za serię i rozliczenie Iskier.
+Profil znajdziesz w `/dilemma profile`, a ranking serwera w `/dilemma leaderboard`. Pozostałe komendy, odznaki i możliwości quizów poznasz przez `/dilemma help`~
 
 **💬 Coś się nie zgadza?**
 
@@ -25,4 +27,4 @@ Profil znajdziesz w `/dilemma score profile`, a ranking serwera w `/dilemma scor
 
 **🔔 Nowości**
 
-Przy każdym nowym wydaniu napiszę tutaj osobną wiadomość o zmianach. Ten poradnik pozostaje ogólnym wprowadzeniem do gry~ (ﾉ◕ヮ◕)ﾉ
+O ważnych nowościach i zmianach w grze napiszę tutaj w osobnych wiadomościach. Ten poradnik pozostaje ogólnym wprowadzeniem do gry~ (ﾉ◕ヮ◕)ﾉ

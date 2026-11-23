@@ -14,6 +14,10 @@ const { routeCommand, dilemmaCommand } = await import("../dist/commands/dilemma.
 const { registerGuidePublication, publishGuideReleaseNotice } = await import("../dist/services/guide-publications.js");
 const { discoverGuidePage, discoverArchivedGuideThreads, migrateLegacyGuide, startGuideUpdatesScheduler } = await import("../dist/services/guide-updates.js");
 const { getReleaseNoticePayload, isCurrentReleasePublished, runningVersion, playerRelease } = await import("../dist/player-release.js");
+const testRelease = { version: runningVersion, changes: { en: ["You can now transfer Sparks to other players."], pl: ["Możesz przesyłać Iskry innym graczom."] } };
+const testReleasePayload = language => getReleaseNoticePayload(language, testRelease);
+const publishTestReleaseNotice = (client, guildId, channelId, isPublished) =>
+  publishGuideReleaseNotice(client, guildId, channelId, isPublished, () => true, testReleasePayload);
 const { scheduleEvents } = await import("../dist/services/schedule-events.js");
 const id = number => String(100000000000000000n + BigInt(number));
 const guildId = id(1), channelId = id(2), botId = id(3), managerRoleId = id(4);
@@ -80,7 +84,7 @@ function request(options = {}) {
   clearGuildSettingsCache();
   return { id: "guide-invocation", commandName: "dilemma", guildId: requestGuild, channelId, locale: language === "pl" ? "en" : "pl",
     user: { id: id(5) }, member: { roles }, memberPermissions: new PermissionsBitField(permission), client: { user: { id: botId } },
-    customId: options.customId ?? LEGACY_GUIDE_REFRESH_BUTTON_ID, options: { getSubcommandGroup: () => null, getSubcommand: () => "guide" },
+    customId: options.customId ?? LEGACY_GUIDE_REFRESH_BUTTON_ID, options: { getSubcommandGroup: () => "guide", getSubcommand: () => "publish" },
     channel: { id: channelId, isTextBased: () => true, isSendable: () => sendable, send: async payload => {
       if (failSend) throw Error("Synthetic send failure"); result.sent.push(payload);
       return { id: id(6), delete: async () => { result.deleted++; } };
@@ -100,14 +104,34 @@ try {
     const content = getPlayerGuideText(language), payload = getPlayerGuidePayload(language);
     assert.ok(content.length > 700 && content.replace(/\n/g, "\r\n").length <= 4000);
     assert.doesNotMatch(content, /\{\w+\}|^#{1,6}\s|<@|@everyone|@here|\b\d+\s*(?:Sparks|Iskier|EXP)\b/m);
-    assert.ok(!content.includes("/dilemma guide"));
+    assert.ok(!content.includes("/dilemma guide publish"));
+    assert.ok(content.includes("/dilemma profile"));
+    assert.ok(!content.includes("/dilemma score profile"));
     for (const key of ["myQuizVoteButton", "myQuizResultButton", "quizReportButton"]) assert.ok(content.includes(message(language, key)));
     assert.equal(payload.embeds[0].toJSON().description, content); assert.deepEqual(payload.components, []);
     assert.deepEqual(payload.allowedMentions.parse, []);
     assert.equal(readFileSync(`docs/player-guide.${language}.md`, "utf8").replace(/\r\n/g, "\n"), content + "\n");
     const news = getReleaseNoticePayload(language);
-    assert.ok(news.content.includes(runningVersion)); assert.ok(news.content.includes(feedbackKaomoji.releaseUpdateHeading));
-    assert.ok(news.content.length <= 2000); assert.deepEqual(news.allowed_mentions.parse, []);
+    if (!playerRelease.changes[language].length) assert.equal(news, null);
+    else {
+      assert.ok(news.content.includes(runningVersion)); assert.ok(news.content.includes(feedbackKaomoji.releaseUpdateHeading));
+      assert.ok(news.content.length <= 2000); assert.deepEqual(news.allowed_mentions.parse, []);
+    }
+    const fixtureNews = testReleasePayload(language);
+    assert.ok(fixtureNews.content.includes(testRelease.changes[language][0]));
+    assert.ok(fixtureNews.content.includes(feedbackKaomoji.releaseUpdateHeading));
+    assert.deepEqual(fixtureNews.allowed_mentions.parse, []);
+  }
+  stage = "release-highlights";
+  const quietRelease = { version: runningVersion, changes: { en: [], pl: [] } };
+  for (const language of messageLanguages) assert.equal(getReleaseNoticePayload(language, quietRelease), null);
+  assert.throws(() => getReleaseNoticePayload("en", { ...quietRelease, version: "0.0.0" }), /need review/);
+  for (const changes of [{ en: ["New player feature"], pl: [] }, { en: [], pl: ["Nowa funkcja dla graczy"] }]) {
+    assert.throws(() => getReleaseNoticePayload("en", { version: runningVersion, changes }), /both languages/);
+  }
+  for (const language of messageLanguages) {
+    const changes = { en: [" "], pl: ["Nowa funkcja dla graczy"] };
+    assert.throws(() => getReleaseNoticePayload(language, { version: runningVersion, changes }), /cannot be blank/);
   }
   stage = "publishing";
   for (const language of messageLanguages) for (const access of [{ permission: PermissionFlagsBits.ManageGuild },
@@ -153,16 +177,28 @@ try {
     assert.equal(route, `/channels/${channelId}/messages`); assert.deepEqual(body.allowed_mentions.parse, []);
     assert.equal(body.enforce_nonce, true); assert.ok(body.nonce.length <= 25); posts.push(body); return { id: id(12) };
   } } };
-  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => false), "unpublished"); assert.equal(posts.length, 0);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true), "sent");
-  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true), "done");
+  assert.equal(await publishTestReleaseNotice(client, guildId, channelId, async () => false), "unpublished"); assert.equal(posts.length, 0);
+  assert.equal(await publishTestReleaseNotice(client, guildId, channelId, async () => true), "sent");
+  assert.equal(await publishTestReleaseNotice(client, guildId, channelId, async () => true), "done");
   assert.equal(posts.length, 1); assert.equal(receipts.size, 1, "Multiple guides in one channel produce one release message");
   reset(); await registerGuidePublication(identity, true);
-  await assert.rejects(publishGuideReleaseNotice({ rest: { post: async () => { throw Error("Synthetic delivery failure"); } } }, guildId, channelId, async () => true));
-  assert.equal(receipts.size, 0); assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true), "sent");
+  await assert.rejects(publishTestReleaseNotice({ rest: { post: async () => { throw Error("Synthetic delivery failure"); } } }, guildId, channelId, async () => true));
+  assert.equal(receipts.size, 0); assert.equal(await publishTestReleaseNotice(client, guildId, channelId, async () => true), "sent");
   reset(); await registerGuidePublication(identity, true);
-  assert.equal(await publishGuideReleaseNotice({ rest: { post: async () => { throw { code: 10003 }; } } }, guildId, channelId, async () => true), "empty");
+  assert.equal(await publishTestReleaseNotice({ rest: { post: async () => { throw { code: 10003 }; } } }, guildId, channelId, async () => true), "empty");
   assert.equal(publications.get(identity.messageId).active, false, "Deleted channels stop receiving retries");
+  stage = "quiet-release";
+  reset(); await registerGuidePublication(identity, true);
+  const postsBeforeQuiet = posts.length, noHighlights = () => null;
+  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => false, () => true, noHighlights), "unpublished");
+  assert.equal(receipts.size, 0, "A quiet release still waits for GitHub publication");
+  await assert.rejects(publishGuideReleaseNotice(client, guildId, channelId, async () => true, () => false, noHighlights), /Guide update stopped/);
+  assert.equal(receipts.size, 0, "Stopping before processing leaves the quiet release resumable");
+  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true, () => true, noHighlights), "skipped");
+  const quietReceipt = [...receipts.values()][0];
+  assert.ok(quietReceipt.deliveredAt); assert.equal(quietReceipt.messageId, null);
+  assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true, () => true, noHighlights), "done");
+  assert.equal(posts.length, postsBeforeQuiet, "Minor-only releases never send a guide-channel message");
   stage = "history-discovery";
   reset(); await db.guideDiscovery.upsert({ where: { channelId_kind: { channelId, kind: "messages" } }, create: { channelId, kind: "messages", guildId }, update: {} });
   const legacy = number => ({ id: id(number), channel_id: channelId, author: { id: botId }, components: [{ type: 1, components: [{ type: 2, custom_id: LEGACY_GUIDE_REFRESH_BUTTON_ID }] }] });
@@ -210,10 +246,12 @@ try {
       assert.ok(++count < 100); time = timer.at; timers.delete(timer.id); timer.callback(); await new Promise(resolve => setImmediate(resolve)); }
     time = end; await new Promise(resolve => setImmediate(resolve)); }
   stop = startGuideUpdatesScheduler(worker); await advance(0);
-  assert.equal(posts.length, 3); const idleRequests = requests; await advance(86400000); assert.equal(requests, idleRequests);
+  assert.equal(posts.length, 2 + Number(Boolean(playerRelease.changes.en.length)));
+  assert.ok([...receipts.values()][0].deliveredAt);
+  const idleRequests = requests; await advance(86400000); assert.equal(requests, idleRequests);
   stop(); assert.equal(timers.size, 0); assert.equal(scheduleEvents.listenerCount("guidePublished"), 0);
   console.log(JSON.stringify({ check: "guide", passed: true, genericCopy: true, noRefreshButton: true, permissions: true, subscriptions: true,
-    legacyDiscovery: true, migrationResumes: true, releaseGate: true, oneNoticePerChannel: true, idleScheduler: true }));
+    legacyDiscovery: true, migrationResumes: true, releaseGate: true, oneNoticePerChannel: true, quietReleases: true, idleScheduler: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "guide", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation",
     line: Number(error.stack?.match(/test-guide\.mjs:(\d+)/)?.[1] || 0),

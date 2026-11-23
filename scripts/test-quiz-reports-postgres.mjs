@@ -7,6 +7,7 @@ Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", O
 const { db } = await import("../dist/db.js");
 const { recordQuizReport } = await import("../dist/services/quiz-reports.js");
 const { processQuizReportBatch } = await import("../dist/services/quiz-report-scheduler.js");
+const { reportAnalysisScopeKey } = await import("../dist/services/quiz-report-analysis.js");
 const guildId = "reports-test-" + randomUUID();
 const identity = { guildId, channelId: "test-channel", messageId: guildId + "-random" };
 let stage = "create";
@@ -48,7 +49,8 @@ try {
   const afterFailure = await db.quizReport.findMany({ where: { guildId, reviewedAt: null } });
   assert.equal(afterFailure.length, awaiting.length); assert.ok(afterFailure.every(row => row.reviewNote === null));
   let sends = 0;
-  const sent = await deliverQuizReportReview(db, deliveryInput, async body => { sends++; assert.equal(body.enforce_nonce, true); assert.deepEqual(body.allowed_mentions, { parse: [] }); }, "Synthetic review header.");
+  const sent = await deliverQuizReportReview(db, deliveryInput, async body => { sends++; assert.equal(body.enforce_nonce, true);
+    assert.deepEqual(body.allowed_mentions, { parse: [] }); assert.equal(body.flags, undefined); }, "Synthetic review header.");
   assert.equal(sent.status, "delivered"); assert.equal(sent.reviewed, awaiting.length);
   assert.equal((await deliverQuizReportReview(db, deliveryInput, async () => { throw Error("Duplicate DM"); }, "Synthetic review header.")).status, "already-delivered");
   assert.equal(sends, 2); assert.equal(await db.quizReport.count({ where: { guildId, reviewedAt: null } }), 0);
@@ -61,9 +63,10 @@ try {
     return { verdict: "uncertain", finding: "The synthetic report needs independent verification.",
       suggestion: "Check the evidence before changing the quiz.", sources: [] };
   };
-  const client = { rest: { post: async route => {
+  const client = { rest: { post: async (route, { body }) => {
     if (route === "/users/@me/channels") return { id: "direct" };
     assert.equal(route, "/channels/direct/messages");
+    assert.equal(body.flags, undefined);
     if (dmBlocked) throw Error("Synthetic blocked DM");
     return { id: "private-message" };
   } } };
@@ -75,6 +78,24 @@ try {
   await processQuizReportBatch(client, cutoff, () => true, analyze);
   assert.equal(analyses, 1, "A persisted analysis survives delivery failure and is reused");
   assert.ok((await db.quizReport.findUniqueOrThrow({ where: { id: cached.id } })).reviewedAt);
+  stage = "separate-issues-and-legacy-cache";
+  const reasons = ["The reported word has a spelling error.", "The saved factual answer needs verification."];
+  for (const [index, reason] of reasons.entries()) assert.equal(await recordQuizReport(topicIdentity, "scoped-" + index, reason), "saved");
+  await db.quizReport.updateMany({ where: { guildId, reporterUserId: { in: ["scoped-0", "scoped-1"] } },
+    data: { analysis: JSON.stringify({ verdict: "confirmed", finding: "Old whole-quiz analysis.", suggestion: "Old broad suggestion.", sources: [] }) } });
+  let scopedAnalyses = 0;
+  await processQuizReportBatch(client, cutoff, () => true, async reports => {
+    scopedAnalyses++; assert.equal(reports.length, 1);
+    return { kind: "unclear", verdict: "uncertain", finding: reports[0].reason,
+      suggestion: "Only investigate the issue described in this report.", sources: [] };
+  });
+  assert.equal(scopedAnalyses, 2);
+  const scoped = await db.quizReport.findMany({ where: { guildId, reporterUserId: { in: ["scoped-0", "scoped-1"] } } });
+  for (const report of scoped) {
+    assert.ok(report.reviewedAt); assert.ok(report.reviewNote.includes(report.reason));
+    assert.equal(JSON.parse(report.analysis).scopeKey, reportAnalysisScopeKey(report));
+    assert.ok(!report.reviewNote.includes(reasons.find(reason => reason !== report.reason)));
+  }
   console.log(JSON.stringify({ check: "quiz-reports-postgres", passed: true, concurrentDuplicates: true, snapshotRetained: true, reviewAcknowledgement: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "quiz-reports-postgres", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation", line: Number(error.stack?.match(/test-quiz-reports-postgres\.mjs:(\d+)/)?.[1] || 0) }));

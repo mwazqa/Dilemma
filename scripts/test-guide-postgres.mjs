@@ -9,7 +9,11 @@ const { db } = await import("../dist/db.js");
 const { registerGuidePublication, publishGuideReleaseNotice } = await import("../dist/services/guide-publications.js");
 const { discoverGuidePage, migrateLegacyGuide } = await import("../dist/services/guide-updates.js");
 const { LEGACY_GUIDE_REFRESH_BUTTON_ID, getPlayerGuideText } = await import("../dist/services/player-guide.js");
-const { runningVersion } = await import("../dist/player-release.js");
+const { runningVersion, getReleaseNoticePayload } = await import("../dist/player-release.js");
+const testRelease = { version: runningVersion, changes: { en: ["You can now transfer Sparks to other players."], pl: ["Możesz przesyłać Iskry innym graczom."] } };
+const testReleasePayload = language => getReleaseNoticePayload(language, testRelease);
+const publishTestReleaseNotice = (client, guildId, channelId, isPublished) =>
+  publishGuideReleaseNotice(client, guildId, channelId, isPublished, () => true, testReleasePayload);
 const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 const guildId = "guide-test-" + randomUUID();
 const base = 100000000000000000n + BigInt("0x" + createHash("sha256").update(guildId).digest("hex").slice(0, 12));
@@ -26,28 +30,45 @@ try {
   const newGuide = { guildId, channelId: id(1), messageId: id(2) };
   await registerGuidePublication(newGuide);
   assert.equal(await db.guidePublication.count({ where: { guildId } }), 1);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, newGuide.channelId, async () => true), "done");
+  assert.equal(await publishTestReleaseNotice(client, guildId, newGuide.channelId, async () => true), "done");
   assert.equal(attempts, 0, "A new guide does not immediately replay the current release");
   await assert.rejects(registerGuidePublication({ ...newGuide, guildId: "other-test-guild" }), /Guide identity mismatch/);
   assert.equal(await db.guidePublication.count({ where: { guildId: "other-test-guild", messageId: newGuide.messageId } }), 0);
   stage = "concurrent-notices";
   const legacy = { guildId, channelId: id(3), messageId: id(4) };
   await registerGuidePublication(legacy, true); await registerGuidePublication({ ...legacy, messageId: id(5) }, true);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, legacy.channelId, async () => false), "unpublished");
-  const notices = await Promise.all(Array.from({ length: 3 }, () => publishGuideReleaseNotice(client, guildId, legacy.channelId, async () => true)));
+  assert.equal(await publishTestReleaseNotice(client, guildId, legacy.channelId, async () => false), "unpublished");
+  const notices = await Promise.all(Array.from({ length: 3 }, () => publishTestReleaseNotice(client, guildId, legacy.channelId, async () => true)));
   assert.equal(notices.filter(value => value === "sent").length, 1); assert.equal(published.size, 1);
   const receipt = await db.guideReleaseNotice.findUniqueOrThrow({ where: { guildId_channelId_version: { guildId, channelId: legacy.channelId, version: runningVersion } } });
   assert.ok(receipt.deliveredAt); assert.ok(receipt.messageId);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, legacy.channelId, async () => true), "done");
+  assert.equal(await publishTestReleaseNotice(client, guildId, legacy.channelId, async () => true), "done");
   assert.equal(published.size, 1);
   stage = "delivery-failure";
   const failed = { guildId, channelId: id(6), messageId: id(7) };
   await registerGuidePublication(failed, true);
   const before = await db.guideReleaseNotice.count({ where: { guildId } });
-  await assert.rejects(publishGuideReleaseNotice({ rest: { post: async () => { throw Error("Synthetic send failure"); } } }, guildId, failed.channelId, async () => true));
+  await assert.rejects(publishTestReleaseNotice({ rest: { post: async () => { throw Error("Synthetic send failure"); } } }, guildId, failed.channelId, async () => true));
   assert.equal(await db.guideReleaseNotice.count({ where: { guildId } }), before);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, failed.channelId, async () => true), "sent");
+  assert.equal(await publishTestReleaseNotice(client, guildId, failed.channelId, async () => true), "sent");
   assert.equal(published.size, 2);
+  stage = "quiet-release";
+  const quiet = { guildId, channelId: id(10), messageId: id(11) }, noHighlights = () => null;
+  await registerGuidePublication(quiet, true);
+  const attemptsBeforeQuiet = attempts, receiptsBeforeQuiet = await db.guideReleaseNotice.count({ where: { guildId } });
+  assert.equal(await publishGuideReleaseNotice(client, guildId, quiet.channelId, async () => false, () => true, noHighlights), "unpublished");
+  assert.equal(await db.guideReleaseNotice.count({ where: { guildId } }), receiptsBeforeQuiet);
+  const quietResults = await Promise.all(Array.from({ length: 3 }, () =>
+    publishGuideReleaseNotice(client, guildId, quiet.channelId, async () => true, () => true, noHighlights)));
+  assert.equal(quietResults.filter(value => value === "skipped").length, 1);
+  assert.ok(quietResults.every(value => value === "skipped" || value === "done"));
+  const quietReceipt = await db.guideReleaseNotice.findUniqueOrThrow({ where: {
+    guildId_channelId_version: { guildId, channelId: quiet.channelId, version: runningVersion }
+  } });
+  assert.ok(quietReceipt.deliveredAt); assert.equal(quietReceipt.messageId, null);
+  assert.equal(await publishGuideReleaseNotice(client, guildId, quiet.channelId, async () => true, () => true, noHighlights), "done");
+  assert.equal(attempts, attemptsBeforeQuiet, "A processed quiet release never sends a Discord message");
+  assert.equal(await db.guideReleaseNotice.count({ where: { guildId } }), receiptsBeforeQuiet + 1);
   stage = "saved-history-cursor";
   const historyChannel = id(8), messageId = id(9);
   await db.guideDiscovery.create({ data: { channelId: historyChannel, guildId } });
@@ -65,10 +86,10 @@ try {
   assert.equal((await db.guidePublication.findUniqueOrThrow({ where: { messageId } })).genericAt, null);
   await migrateLegacyGuide(historyClient, messageId); await migrateLegacyGuide(historyClient, messageId);
   assert.equal(patches, 1); assert.ok((await db.guidePublication.findUniqueOrThrow({ where: { messageId } })).genericAt);
-  assert.equal(await publishGuideReleaseNotice(client, guildId, historyChannel, async () => true), "sent");
+  assert.equal(await publishTestReleaseNotice(client, guildId, historyChannel, async () => true), "sent");
   assert.equal(published.size, 3);
   console.log(JSON.stringify({ check: "guide-postgres", passed: true, subscriptionBaseline: true, concurrentAnnouncements: true,
-    failedSendRetained: true, historyCursorPersisted: true, legacyConversionOnce: true }));
+    failedSendRetained: true, quietReleases: true, historyCursorPersisted: true, legacyConversionOnce: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "guide-postgres", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation",
     line: Number(error.stack?.match(/test-guide-postgres\.mjs:(\d+)/)?.[1] || 0) })); process.exitCode = 1;

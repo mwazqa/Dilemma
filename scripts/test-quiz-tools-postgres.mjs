@@ -136,14 +136,15 @@ try{
   const submit={guildId,channelId:modal.channelId,customId:`quiz:wager:${modal.messageId}`,message:{id:modal.messageId,author:{id:"bot"}},client,locale:"en",user:{id:"modal",bot:false},fields:{getTextInputValue:()=>"10"},
     deferReply:async payload=>assert.equal(payload.flags,MessageFlags.Ephemeral),editReply:async payload=>{assert.deepEqual(payload.allowedMentions.parse,[]);modalReplies.push(payload.content);}};
   await handleWagerModal(submit); await handleWagerModal(submit); assert.equal(await balance("modal"),10); assert.equal(modalReplies.length,2);
-  stage="privacy";
-  const forgotten=await createQuiz("forgotten"); await seed("forget",10); await castQuizVote(forgotten,"forget",1);
-  await placeQuizWager(forgotten,"forget",5); await useQuizTool(forgotten,"forget","reveal"); await close(forgotten);
-  const stale=await collectFinalVotes(client,forgotten);
-  await handleScore({guildId,locale:"en",user:{id:"forget"},options:{getSubcommand:()=>"forget",getBoolean:()=>true},deferReply:async()=>{},editReply:async()=>{}});
-  for(const table of ["quizVote","quizSupport","quizWager","quizAnswer"])assert.equal(await db[table].count({where:{guildId,userId:"forget"}}),0);
-  await applyFinalVotes(forgotten,stale.votes,stale.finishedAt); assert.equal(await player("forget"),null);
-  assert.equal((await db.quizSettlement.findUnique({where:{messageId:forgotten.messageId}})).finalCounts,"[0,0,0,0]");
+  stage="retired-command";
+  const retiredQuiz=await createQuiz("retired-command"); await seed("retired-player",10); await castQuizVote(retiredQuiz,"retired-player",1);
+  await placeQuizWager(retiredQuiz,"retired-player",5); await useQuizTool(retiredQuiz,"retired-player","reveal"); await close(retiredQuiz);
+  const stale=await collectFinalVotes(client,retiredQuiz), profileBeforeRetired=await player("retired-player");
+  await handleScore({guildId,locale:"en",user:{id:"retired-player"},options:{getSubcommand:()=>"forget",getBoolean:()=>true},deferReply:async()=>{},editReply:async payload=>assert.ok(payload.content.includes("/dilemma help"))});
+  assert.deepEqual(await player("retired-player"),profileBeforeRetired);
+  for(const table of ["quizVote","quizSupport","quizWager"])assert.equal(await db[table].count({where:{guildId,userId:"retired-player"}}),1);
+  await applyFinalVotes(retiredQuiz,stale.votes,stale.finishedAt); assert.ok(await player("retired-player"));
+  assert.equal((await db.quizSettlement.findUnique({where:{messageId:retiredQuiz.messageId}})).finalCounts,"[1,0,0,0]");
   stage="close-button";
   const manual=await createQuiz("manual"); await db.randomPoll.update({where:{messageId:manual.messageId},data:{creatorUserId:"starter"}});
   await castQuizVote(manual,"starter",1);
@@ -167,7 +168,7 @@ try{
   const race=await createQuiz("race"); await seed("racer",20); await castQuizVote(race,"racer",1);
   await Promise.all([placeQuizWager(race,"racer",10),close(race)]);
   assert.equal((await castQuizVote(race,"racer",2)).status,"closed"); assert.equal((await placeQuizWager(race,"racer",5)).status,"closed");
-  console.log(JSON.stringify({check:"quiz-tools-postgres",passed:true,paidWithdrawal:true,firstVoteFree:true,fiftyStable:true,privatePreview:true,wagerBounds:true,wagerFollowsVote:true,refundAtomic:true,payoutOnce:true,rollback:true,guildIsolation:true,privacy:true,automaticRetry:true,manualClosing:true}));
+  console.log(JSON.stringify({check:"quiz-tools-postgres",passed:true,paidWithdrawal:true,firstVoteFree:true,fiftyStable:true,privatePreview:true,wagerBounds:true,wagerFollowsVote:true,refundAtomic:true,payoutOnce:true,rollback:true,guildIsolation:true,retiredCommandSafe:true,automaticRetry:true,manualClosing:true}));
 }catch(error){
   console.error(JSON.stringify({check:"quiz-tools-postgres",passed:false,stage,category:error instanceof assert.AssertionError?"assertion":"test-error",line:Number(error.stack?.match(/test-quiz-tools-postgres\.mjs:(\d+)/)?.[1]??0)}));process.exitCode=1;
 }finally{

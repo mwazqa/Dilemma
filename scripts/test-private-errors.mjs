@@ -51,8 +51,11 @@ for (const global of [true, false]) {
     assert.deepEqual(calls[0].body.map(command => command.name), ['dilemma']);
     assert.equal(calls[0].body[0].default_member_permissions, undefined);
     assert.ok(calls[0].body[0].options.some(option => option.name === 'language' && option.type === 1));
-    assert.ok(calls[0].body[0].options.some(option => option.name === 'score' && option.type === 2));
-    assert.ok(calls[0].body[0].options.some(option => option.name === 'poll' && option.type === 2));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'sparks' && option.type === 2));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'badges' && option.type === 2));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'guide' && option.type === 2));
+    assert.ok(calls[0].body[0].options.some(option => option.name === 'end' && option.type === 1));
+    assert.ok(!calls[0].body[0].options.some(option => option.name === 'score' || option.name === 'poll'));
     assert.equal(calls[0].route, ${global ? "'/applications/test/commands'" : "'/applications/test/guilds/test-guild/commands'"});
     ${global ? "assert.deepEqual(calls[1].body, []); assert.equal(calls[1].route, '/applications/test/guilds/test-guild/commands');" : ""}
   `], { encoding: "utf8" });

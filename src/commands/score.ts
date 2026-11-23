@@ -1,34 +1,47 @@
-import { AttachmentBuilder, EmbedBuilder, SlashCommandSubcommandGroupBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
+import { AttachmentBuilder, EmbedBuilder, SlashCommandSubcommandBuilder, SlashCommandSubcommandGroupBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { getGuildSettings } from "../services/guild-settings.js";
 import { bulletList, inlineText } from "../formatting.js";
 import { openFeedback } from "../feedback.js";
 import { experienceProgress } from "../services/experience.js";
 import { exchangeSparks } from "../services/spark-exchange.js";
+import { maxTransferSparks, minTransferSparks, transferSparks } from "../services/spark-transfer.js";
 import { expPerSpark, maxExchangeSparks, minExchangeSparks } from "../services/sparks.js";
 import { boundedText, renderScoreCard } from "../services/score-card.js";
 import { serverRank } from "../services/score-ranking.js";
 import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSelectedBadges, isAchievementId, maxDisplayedBadges, selectedAchievements } from "../services/achievements.js";
 import { message, normalizeLanguage } from "../messages.js";
 
-export const scoreCommand = new SlashCommandSubcommandGroupBuilder().setName("score").setDescription("Your Dilemma score and server leaderboard.")
-  .addSubcommand(sub => sub.setName("profile").setDescription("Show quiz level, EXP, points, Sparks, accuracy and correct-answer streaks.")
-    .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
-  .addSubcommand(sub => sub.setName("leaderboard").setDescription("Show this server's top ten players."))
-  .addSubcommand(sub => sub.setName("achievements").setDescription("Show unlocked quiz achievements and progress on this server.")
-    .addUserOption(option => option.setName("user").setDescription("Player; defaults to you.")))
+export const profileCommand = new SlashCommandSubcommandBuilder().setName("profile")
+  .setDescription("Show a player's profile: level, EXP, points, Sparks, accuracy and streaks.")
+  .addUserOption(option => option.setName("user").setDescription("Player; defaults to you."));
+
+export const leaderboardCommand = new SlashCommandSubcommandBuilder().setName("leaderboard")
+  .setDescription("Show this server's top ten players.");
+
+export const achievementsCommand = new SlashCommandSubcommandBuilder().setName("achievements")
+  .setDescription("Show unlocked quiz achievements and progress on this server.")
+  .addUserOption(option => option.setName("user").setDescription("Player; defaults to you."));
+
+export const sparksCommand = new SlashCommandSubcommandGroupBuilder().setName("sparks")
+  .setDescription("Exchange your Sparks for EXP or send Sparks to another player.")
   .addSubcommand(sub => sub.setName("exchange").setDescription(`Spend Sparks for EXP. Each Spark gives ${expPerSpark} EXP.`)
     .addIntegerOption(option => option.setName("amount").setDescription(`Number of Sparks to spend now (minimum ${minExchangeSparks}).`)
       .setRequired(true).setMinValue(minExchangeSparks).setMaxValue(maxExchangeSparks)))
-  .addSubcommand(sub => sub.setName("badge").setDescription("Choose up to three unlocked profile badges, or hide all badges.")
+  .addSubcommand(sub => sub.setName("transfer").setDescription("Send your Sparks to another player on this server, without a fee.")
+    .addUserOption(option => option.setName("user").setDescription("Player on this server who receives your Sparks.").setRequired(true))
+    .addIntegerOption(option => option.setName("amount").setDescription("Whole number of Sparks to send.")
+      .setRequired(true).setMinValue(minTransferSparks).setMaxValue(maxTransferSparks)));
+
+export const badgesCommand = new SlashCommandSubcommandGroupBuilder().setName("badges")
+  .setDescription("Choose the badges displayed on your player profile.")
+  .addSubcommand(sub => sub.setName("set").setDescription("Choose up to three unlocked profile badges, or hide all badges.")
     .addStringOption(option => option.setName("achievement").setDescription("Choose an unlocked achievement, or no badge.")
       .setRequired(true).setAutocomplete(true).setMaxLength(32))
     .addStringOption(option => option.setName("achievement_2").setDescription("Second unlocked badge; omit to show fewer badges.")
       .setAutocomplete(true).setMaxLength(32))
     .addStringOption(option => option.setName("achievement_3").setDescription("Third unlocked badge; omit to show fewer badges.")
-      .setAutocomplete(true).setMaxLength(32)))
-  .addSubcommand(sub => sub.setName("forget").setDescription("Delete your answers, score, Sparks, tools and bets on this server.")
-    .addBooleanOption(option => option.setName("confirm").setDescription("Confirm permanent deletion. Future votes can earn points again.").setRequired(true)));
+      .setAutocomplete(true).setMaxLength(32)));
 
 const rankMarkers = ["✦ **1.**", "✧ **2.**", "⋆ **3.**"];
 
@@ -41,11 +54,35 @@ function avatarUrl(user: { displayAvatarURL?: (options: { size: number; extensio
   return user.displayAvatarURL?.({ size: 128, extension: "png", forceStatic: true });
 }
 
-export async function handleScore(interaction: ChatInputCommandInteraction) {
+export async function handleScore(interaction: ChatInputCommandInteraction, action = interaction.options.getSubcommand()) {
   const { text, reply } = await openFeedback(interaction);
   if (!interaction.guildId) { await reply(text("serverOnly")); return; }
   const guildId = interaction.guildId;
-  const sub = interaction.options.getSubcommand();
+  const sub = action;
+  if (!["profile", "leaderboard", "achievements", "exchange", "transfer", "badge"].includes(sub)) {
+    await reply(text("commandUnavailable")); return;
+  }
+  if (sub === "transfer") {
+    const recipient = interaction.options.getUser("user", true);
+    const amount = interaction.options.getInteger("amount", true);
+    if (!Number.isSafeInteger(amount) || amount < minTransferSparks || amount > maxTransferSparks) { await reply(text("scoreTransferInvalid")); return; }
+    if (recipient.id === interaction.user.id) { await reply(text("scoreTransferSelf")); return; }
+    if (recipient.bot || interaction.user.bot) { await reply(text("scoreTransferBot")); return; }
+    let member;
+    try { member = await interaction.guild?.members.fetch({ user: recipient.id, force: true, cache: false }); }
+    catch (error) {
+      const missing = error && typeof error === "object" && "code" in error && error.code === 10007;
+      await reply(text(missing ? "scoreTransferMemberOnly" : "scoreTransferUnavailable")); return;
+    }
+    if (!member || member.id !== recipient.id || member.guild.id !== guildId) { await reply(text("scoreTransferMemberOnly")); return; }
+    const result = await transferSparks(interaction.id, guildId, interaction.user.id, recipient.id, amount);
+    if (result.status === "invalid") { await reply(text("scoreTransferInvalid")); return; }
+    if (result.status === "self") { await reply(text("scoreTransferSelf")); return; }
+    if (result.status === "insufficient") { await reply(text("scoreTransferInsufficient", { amount, balance: result.balance })); return; }
+    if (result.status === "limit") { await reply(text("scoreTransferLimit")); return; }
+    await reply(text("scoreTransferDone", { amount: result.receipt.amount, user: `<@${recipient.id}>` }));
+    return;
+  }
   if (sub === "exchange") {
     const amount = interaction.options.getInteger("amount", true);
     const result = await exchangeSparks(interaction.id, guildId, interaction.user.id, amount);
@@ -78,18 +115,6 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
     if (!saved.count) { await reply(text("badgeLocked")); return; }
     const progress = achievementProgress(null);
     await reply(text("badgeSet", { badge: bulletList(ids.map(id => inlineText(text(progress.find(item => item.id === id)!.name)))) }));
-    return;
-  }
-  if (sub === "forget") {
-    if (!interaction.options.getBoolean("confirm", true)) { await reply(text("forgetConfirm")); return; }
-    await db.$transaction(async tx => {
-      await tx.quizVote.deleteMany({ where: { guildId, userId: interaction.user.id } });
-      await tx.quizSupport.deleteMany({ where: { guildId, userId: interaction.user.id } });
-      await tx.quizWager.deleteMany({ where: { guildId, userId: interaction.user.id } });
-      await tx.quizAnswer.deleteMany({ where: { guildId, userId: interaction.user.id } });
-      await tx.userScore.deleteMany({ where: { guildId, userId: interaction.user.id } });
-    }, { isolationLevel: "Serializable" });
-    await reply(text("scoreForgotten"));
     return;
   }
   if (sub === "leaderboard") {
@@ -178,7 +203,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction) {
 
 export async function handleScoreAutocomplete(interaction: AutocompleteInteraction) {
   const focused = interaction.options.getFocused(true);
-  if (!interaction.guildId || interaction.options.getSubcommand() !== "badge" || !badgeOptionNames.some(name => name === focused.name)) {
+  if (!interaction.guildId || interaction.options.getSubcommand() !== "set" || !badgeOptionNames.some(name => name === focused.name)) {
     await interaction.respond([]);
     return;
   }

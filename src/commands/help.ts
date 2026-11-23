@@ -11,19 +11,23 @@ export function getHelpContent(language = "en"): string {
 export function getHelpEmbed(language = "en"): EmbedBuilder {
   const sections: { title: MessageKey; commands: [string, MessageKey][] }[] = [
     { title: "helpQuizzes", commands: [
-      ["/dilemma random", "helpRandom"], ["/dilemma random-reset", "helpRandomReset"],
-      ["/dilemma run", "helpRun"], ["/dilemma poll end", "helpPoll"], ["/dilemma guide", "helpPlayerGuide"]
+      ["/dilemma random", "helpRandom"], ["/dilemma end", "helpPoll"]
+    ] },
+    { title: "helpPlayerProgress", commands: [
+      ["/dilemma profile", "helpProfile"], ["/dilemma leaderboard", "helpLeaderboard"],
+      ["/dilemma achievements", "helpAchievements"], ["/dilemma badges set", "helpBadge"]
+    ] },
+    { title: "helpSparks", commands: [
+      ["/dilemma sparks exchange", "helpExchange"], ["/dilemma sparks transfer", "helpTransfer"]
     ] },
     { title: "helpTopics", commands: [
-      ["/dilemma create", "helpCreate"], ["/dilemma configure", "helpConfigure"],
+      ["/dilemma create", "helpCreate"], ["/dilemma edit", "helpConfigure"], ["/dilemma publish", "helpRun"],
       ["/dilemma list", "helpList"], ["/dilemma enable` / `/dilemma disable", "helpToggle"],
       ["/dilemma delete", "helpManage"]
     ] },
-    { title: "helpSettingsScores", commands: [["/dilemma language", "helpLanguage"], ["/dilemma timezone", "helpTimezone"],
-      ["/dilemma score profile", "helpProfile"], ["/dilemma score leaderboard", "helpLeaderboard"],
-      ["/dilemma score achievements", "helpAchievements"], ["/dilemma score badge", "helpBadge"],
-      ["/dilemma score exchange", "helpExchange"],
-      ["/dilemma ping", "helpPing"], ["/dilemma score forget", "helpForget"]] },
+    { title: "helpSettings", commands: [["/dilemma language", "helpLanguage"], ["/dilemma timezone", "helpTimezone"],
+      ["/dilemma random-cooldown-reset", "helpRandomReset"], ["/dilemma guide publish", "helpPlayerGuide"],
+      ["/dilemma ping", "helpPing"]] },
     { title: "helpChannelsTitle", commands: [
       ["/dilemma random-channels add", "helpChannelsAdd"], ["/dilemma random-channels remove", "helpChannelsRemove"],
       ["/dilemma random-channels list", "helpChannelsList"],

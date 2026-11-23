@@ -1,8 +1,8 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, messageLink } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { db } from "../db.js";
 import { inlineText } from "../formatting.js";
 import { message } from "../messages.js";
-import { MY_QUIZ_BUTTON_ID } from "./poll-controls.js";
+import { MY_QUIZ_BUTTON_ID, quizJumpButton } from "./poll-controls.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { WITHDRAW_COST } from "./quiz-voting.js";
 
@@ -53,6 +53,7 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
     if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", {
       points: answer.points, penalty: answer.sparksPenalty
     }));
+    if (answer?.streakExp) lines.push(message(language, "quizStreakBonus", { exp: answer.streakExp }));
     if (wager?.payout !== null && wager?.payout !== undefined) {
       const net = wager.payout - wager.amount;
       lines.push(message(language, "quizWagerResult", { stake: wager.amount, payout: wager.payout, net: `${net > 0 ? "+" : ""}${net}` }));
@@ -65,12 +66,7 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
     new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:wager`)
       .setLabel(message(language, "wagerButton")).setStyle(ButtonStyle.Secondary).setDisabled(selected === null || Boolean(wager))
   );
-  controls.addComponents(
-    new ButtonBuilder().setCustomId(`${MY_QUIZ_BUTTON_ID}:${quiz.messageId}:view`)
-      .setLabel(message(language, "quizRefreshButton")).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel(message(language, "quizJumpButton")).setStyle(ButtonStyle.Link)
-      .setURL(messageLink(quiz.channelId, quiz.messageId, quiz.guildId))
-  );
+  controls.addComponents(quizJumpButton(language, quiz));
   components.push(controls);
   return { content: lines.join("\n\n"), components };
 }

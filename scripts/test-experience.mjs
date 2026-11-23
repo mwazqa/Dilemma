@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" });
-const { experienceProgress, levelThreshold } = await import("../dist/services/experience.js");
+const { experienceProgress, levelThreshold, streakExperience } = await import("../dist/services/experience.js");
+const { earnedSparks } = await import("../dist/services/sparks.js");
 const { scoreHistory } = await import("../dist/services/scoring.js");
 const { handleScore } = await import("../dist/commands/score.js");
 const { db } = await import("../dist/db.js");
@@ -16,6 +17,10 @@ assert.equal(experienceProgress(12).earned, 20, "Surplus EXP carries into the ne
 assert.equal(experienceProgress(30).level, 3);
 assert.equal(experienceProgress(60).level, 4);
 assert.equal(experienceProgress(2147483647).totalExp, 21474836470);
+assert.deepEqual(Array.from({ length: 14 }, (_, streak) => streakExperience(streak)), [0, 0, 0, 5, 10, 15, 20, 25, 30, 35, 40, 40, 40, 40]);
+assert.equal(streakExperience(Number.MAX_SAFE_INTEGER), 40);
+for (const streak of [-1, 0.5, NaN, Infinity]) assert.throws(() => streakExperience(streak));
+assert.equal(earnedSparks(9, 1, 8, 5), 6, "Streak EXP can cross a level and award its five Sparks once");
 for (const level of [1, 2, 3, 4, 10, 100, 1000]) {
   const threshold = levelThreshold(level);
   assert.equal(experienceProgress(threshold / 10).level, level);

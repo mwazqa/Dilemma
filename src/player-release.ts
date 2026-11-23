@@ -2,25 +2,34 @@ import { readFileSync } from "node:fs";
 import { message, normalizeLanguage } from "./messages.js";
 
 export const runningVersion: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
-export const playerRelease = {
-  version: "3.10.1",
+export type PlayerReleaseHighlights = { version: string; changes: { en: readonly string[]; pl: readonly string[] } };
+
+export const playerRelease: PlayerReleaseHighlights = {
+  version: "3.11.0",
   changes: {
     en: [
-      "New quiz cards use the shorter label Wrong for the Sparks penalty and show it beside the quiz duration in the top-right corner.",
-      "The Report quiz button is now red, making it easier to find during a quiz and after it closes."
+      "Commands have simpler names. Open your profile with `/dilemma profile`, view the ranking with `/dilemma leaderboard`, and find the full list in `/dilemma help`.",
+      "Send Sparks to other players on the same server with `/dilemma sparks transfer`, with no fee.",
+      "Correct-answer streaks earn bonus EXP from the third correct answer. The bonus increases by 5 EXP per correct answer up to +40 from the tenth onward. See your bonus in My result.",
+      "The public results message now links back to the quiz with Go to quiz."
     ],
     pl: [
-      "Na nowych grafikach quizów kara ma krótszy podpis Błąd i znajduje się obok czasu trwania, w prawym górnym rogu.",
-      "Przycisk Zgłoś quiz jest teraz czerwony, żeby łatwiej było go znaleźć podczas quizu i po jego zakończeniu."
+      "Komendy mają krótsze nazwy. Profil otworzysz przez `/dilemma profile`, ranking przez `/dilemma leaderboard`, a pełną listę znajdziesz w `/dilemma help`.",
+      "Przesyłaj Iskry innym graczom na tym samym serwerze przez `/dilemma sparks transfer`, bez prowizji.",
+      "Seria poprawnych odpowiedzi daje dodatkowy EXP od 3. trafienia. Bonus rośnie co 5 EXP do +40 od 10. trafienia. Zobaczysz go w panelu Mój wynik.",
+      "Z publicznego podsumowania wrócisz do karty przyciskiem Przejdź do quizu."
     ]
   }
-} as const;
+};
 
-export function getReleaseNoticePayload(language: string) {
-  if (runningVersion !== playerRelease.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(runningVersion)) throw Error("Player release notes need review");
-  const changes = playerRelease.changes[normalizeLanguage(language)];
+export function getReleaseNoticePayload(language: string, release = playerRelease) {
+  if (runningVersion !== release.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(runningVersion)) throw Error("Player release notes need review");
+  if (Boolean(release.changes.en.length) !== Boolean(release.changes.pl.length)) throw Error("Player release highlights need both languages");
+  if (Object.values(release.changes).some(list => list.some(change => !change.trim()))) throw Error("Player release highlights cannot be blank");
+  const changes = release.changes[normalizeLanguage(language)];
+  if (!changes.length) return null;
   const content = message(language, "releaseUpdateHeading", { version: runningVersion }) + "\n\n" + changes.map(change => `- ${change}`).join("\n");
-  if (content.length > 2000 || !changes.length) throw Error("Player release notes exceed the message budget");
+  if (content.length > 2000) throw Error("Player release notes exceed the message budget");
   return { content, allowed_mentions: { parse: [] } };
 }
 

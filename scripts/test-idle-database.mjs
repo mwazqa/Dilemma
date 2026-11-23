@@ -303,7 +303,7 @@ try {
   await advance(86_400_000);
   assert.equal(topicReads, beforeDisabled, "Disabling cancels the next run");
   assert.equal(sent, 1);
-  await handleTopic(interaction("configure", { name: topic.name, generation_time: "16:00" }));
+  await handleTopic(interaction("edit", { name: topic.name, generation_time: "16:00" }));
   assert.equal(topic.enabled, false, "Configuring a disabled topic must not enable it");
   await handleTopic(interaction("enable", { name: topic.name }));
   await advance(2 * 3_600_000);

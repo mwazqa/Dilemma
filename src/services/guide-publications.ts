@@ -24,13 +24,13 @@ export async function registerGuidePublication(identity: GuideIdentity, legacy =
 }
 
 export async function publishGuideReleaseNotice(client: Client, guildId: string, channelId: string,
-  isPublished = isCurrentReleasePublished, current = () => true) {
+  isPublished = isCurrentReleasePublished, current = () => true, getPayload = getReleaseNoticePayload) {
   const key = { guildId, channelId, version: runningVersion };
   if ((await db.guideReleaseNotice.findUnique({ where: { guildId_channelId_version: key } }))?.deliveredAt) return "done" as const;
   if (!await db.guidePublication.count({ where: { guildId, channelId, active: true, genericAt: { not: null } } })) return "empty" as const;
   if (!await isPublished()) return "unpublished" as const;
   const language = normalizeLanguage((await getGuildSettings(guildId))?.language ?? "en");
-  const payload = getReleaseNoticePayload(language);
+  const payload = getPayload(language);
   for (let attempt = 0; ; attempt++) {
     try {
       return await db.$transaction(async tx => {
@@ -40,6 +40,10 @@ export async function publishGuideReleaseNotice(client: Client, guildId: string,
         const receipt = await tx.guideReleaseNotice.findUnique({ where: { guildId_channelId_version: key } });
         if (receipt?.deliveredAt) return "done" as const;
         if (!current()) throw Error("Guide update stopped");
+        if (!payload) {
+          await tx.guideReleaseNotice.update({ where: { guildId_channelId_version: key }, data: { messageId: null, deliveredAt: new Date() } });
+          return "skipped" as const;
+        }
         const nonce = createHash("sha256").update(`guide-release:${runningVersion}:${guildId}:${channelId}`).digest("hex").slice(0, 25);
         const sent = await client.rest.post(Routes.channelMessages(channelId), { body: { ...payload, nonce, enforce_nonce: true },
           signal: AbortSignal.timeout(10000) }) as { id: string };

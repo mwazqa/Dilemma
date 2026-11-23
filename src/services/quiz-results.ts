@@ -6,7 +6,7 @@ import { getResultMessage } from "../brand.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { quizClosureSummary } from "./quiz-closure.js";
 import { voteBreakdown } from "./quiz-voting.js";
-import { myQuizButton } from "./poll-controls.js";
+import { myQuizButton, quizJumpButton } from "./poll-controls.js";
 
 type ResultQuiz = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
@@ -33,7 +33,8 @@ export async function publishQuizResults(client: Client, quiz: ResultQuiz, langu
             + (counts ? `\n\n${voteBreakdown(language, storedQuizOptions(poll.options), counts)}` : "")
             + `\n\n${quizClosureSummary(language, closure)}`;
           const nonce = createHash("sha256").update(`quiz-result:${quiz.messageId}`).digest("hex").slice(0, 25);
-          const components = [new ActionRowBuilder<ButtonBuilder>().addComponents(myQuizButton(language, quiz.messageId, true))];
+          const components = [new ActionRowBuilder<ButtonBuilder>().addComponents(
+            myQuizButton(language, quiz.messageId, true), quizJumpButton(language, quiz))];
           if (send) await send({ content, components, allowedMentions: { parse: [] }, nonce, enforceNonce: true });
           else await client.rest.post(Routes.channelMessages(quiz.channelId), {
             body: { content, components: components.map(row => row.toJSON()), allowed_mentions: { parse: [] }, nonce, enforce_nonce: true }, signal: AbortSignal.timeout(10_000)

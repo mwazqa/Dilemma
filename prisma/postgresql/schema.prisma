@@ -40,6 +40,7 @@ model QuizAnswer {
   correct    Boolean
   points     Int
   sparksPenalty Int @default(0)
+  streakExp  Int @default(0)
   finishedAt DateTime
   settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
 
@@ -79,6 +80,18 @@ model SparkExchange {
   @@index([guildId, userId])
 }
 
+
+model SparkTransfer {
+  interactionId   String   @id
+  guildId         String
+  senderUserId    String?
+  recipientUserId String?
+  amount          Int
+  createdAt       DateTime @default(now())
+
+  @@index([guildId, senderUserId])
+  @@index([guildId, recipientUserId])
+}
 
 model DailyQuizRun {
   guildId   String

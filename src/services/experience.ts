@@ -1,4 +1,12 @@
 export const experiencePerPoint = 10;
+export const experiencePerStreakStep = 5;
+export const streakBonusStartsAt = 3;
+export const maxStreakBonusExp = 40;
+
+export function streakExperience(streak: number): number {
+  if (!Number.isSafeInteger(streak) || streak < 0) throw new RangeError("Invalid streak");
+  return Math.min(Math.max(0, streak - streakBonusStartsAt + 1), maxStreakBonusExp / experiencePerStreakStep) * experiencePerStreakStep;
+}
 
 export function levelThreshold(level: number): number {
   if (!Number.isSafeInteger(level) || level < 1) throw new RangeError("Invalid level");
