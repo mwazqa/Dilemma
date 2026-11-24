@@ -101,7 +101,9 @@ try {
   assert.equal(reports[0].reviewedAt, null); assert.ok(reports[0].analysis); assert.ok(reports[0].analyzedAt);
   failSend = false;
   await processQuizReportBatch(client, cutoff, () => true, analyze);
-  assert.equal(sentControls[0]?.components[0]?.custom_id, `quiz:correct:${fixture(1).id}`);
+  assert.deepEqual(sentControls[0]?.components.map(button => button.custom_id), [
+    `quiz:accept-correction:${fixture(1).id}`, `quiz:correct:${fixture(1).id}`
+  ]);
   assert.equal(analyses, 1, "Retry uses persisted analysis without another AI request"); assert.ok(reports[0].reviewedAt);
   assert.ok(sentBodies.join("\n").includes("cached\\_reporter"));
   assert.ok(sentBodies.join("\n").includes(`https://discord.com/users/${fixture(1).reporterUserId}`));

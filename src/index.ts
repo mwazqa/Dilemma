@@ -34,7 +34,7 @@ import { REPORT_MODAL_PREFIX } from "./services/quiz-reports.js";
 import { startQuizReportReviewScheduler } from "./services/quiz-report-scheduler.js";
 import { startGuideUpdatesScheduler } from "./services/guide-updates.js";
 import { handleQuizCorrectionButton, handleQuizCorrectionModal } from "./commands/quiz-correction.js";
-import { CORRECTION_BUTTON_PREFIX, CORRECTION_MODAL_PREFIX } from "./services/quiz-corrections.js";
+import { CORRECTION_ACCEPT_PREFIX, CORRECTION_BUTTON_PREFIX, CORRECTION_MODAL_PREFIX } from "./services/quiz-corrections.js";
 import { startQuizCorrectionScheduler } from "./services/quiz-correction-notices.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -91,7 +91,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isModalSubmit() && interaction.customId.startsWith(REPORT_MODAL_PREFIX)) {
       await handleQuizReportModal(interaction); return;
     }
-    if (interaction.isButton() && interaction.customId.startsWith(CORRECTION_BUTTON_PREFIX)) {
+    if (interaction.isButton() && (interaction.customId.startsWith(CORRECTION_ACCEPT_PREFIX) ||
+      interaction.customId.startsWith(CORRECTION_BUTTON_PREFIX))) {
       await handleQuizCorrectionButton(interaction); return;
     }
     if (interaction.isModalSubmit() && interaction.customId.startsWith(CORRECTION_MODAL_PREFIX)) {

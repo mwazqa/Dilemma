@@ -27,8 +27,8 @@ const setBalance = (userId, sparks) => db.userScore.update({ where: { guildId_us
 const originalTransaction = db.$transaction.bind(db);
 let stage = "prepare";
 
-async function report(kind = "factual", reporterUserId = "reporter") {
-  const facts = { ...poll, reason: "Private reporter context: the stated fact is inaccurate." };
+async function report(kind = "factual", reporterUserId = "reporter", snapshot = poll) {
+  const facts = { ...snapshot, reason: "Private reporter context: the stated fact is inaccurate." };
   return db.quizReport.create({ data: { ...facts, reporterUserId, source: "random", difficulty: "medium", quizCreatedAt: new Date(),
     reviewedAt: new Date(), analysis: JSON.stringify({ scopeKey: reportAnalysisScopeKey(facts), analysis: { ...analysis, kind } }) } });
 }
@@ -45,6 +45,7 @@ try {
   assert.equal((await approveQuizCorrection(factual.id, "  ")).status, "invalid");
   assert.equal((await approveQuizCorrection("missing-report", update)).status, "unavailable");
   assert.equal((await approveQuizCorrection(factual.id, update)).status, "pending");
+  assert.equal((await approveQuizCorrection(wording.id)).status, "unavailable");
 
   stage = "charges";
   await castQuizVote(quiz, "loser", 1);
@@ -133,6 +134,32 @@ try {
   const result = await quizPersonalPayload(quiz, "loser", "en");
   assert.ok(result.content.includes(update));
   assert.ok(result.content.includes("16 ✦"));
+
+  stage = "one-click-approval";
+  const nextQuiz = { ...quiz, messageId: String(BigInt(quiz.messageId) + 10n) };
+  await db.quizSettlement.create({ data: buttonSettlementData(nextQuiz, "easy", 3, 0, new Date(Date.now() + 60 * 60_000)) });
+  const nextPoll = { ...poll, messageId: nextQuiz.messageId };
+  await db.randomPoll.create({ data: { ...nextPoll, language: "en", difficulty: "easy" } });
+  const ready = await report("factual", "other-reporter", nextPoll);
+  await db.userScore.create({ data: { guildId, userId: "direct-voter", sparks: 20 } });
+  await castQuizVote(nextQuiz, "direct-voter", 2);
+  await placeQuizWager(nextQuiz, "direct-voter", 2);
+  const nextFinishedAt = new Date();
+  const closedNext = await db.quizSettlement.update({ where: { messageId: nextQuiz.messageId }, data: { closedAt: nextFinishedAt } });
+  assert.equal(await applyFinalVotes(closedNext, [], nextFinishedAt), true);
+  assert.equal(await balance("direct-voter"), 16);
+  const click = { ...interaction, customId: `quiz:accept-correction:${ready.id}`, deferReply: async () => {},
+    showModal: async () => assert.fail("Accepting the proposal must not open a form"),
+    editReply: async value => { feedback = value.content; } };
+  await handleQuizCorrectionButton({ ...click, user: { bot: false, id: "other" } });
+  assert.equal(await balance("direct-voter"), 16);
+  await handleQuizCorrectionButton(click);
+  const approved = await db.quizCorrection.findUniqueOrThrow({ where: { messageId: nextQuiz.messageId } });
+  assert.equal(approved.text, proposal);
+  assert.equal(approved.refundedSparks, 4n);
+  assert.equal(await balance("direct-voter"), 20);
+  await handleQuizCorrectionButton(click);
+  assert.equal(await balance("direct-voter"), 20);
   console.log(JSON.stringify({ check: "quiz-corrections", passed: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "quiz-corrections", passed: false, stage,

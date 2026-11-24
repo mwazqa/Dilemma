@@ -8,7 +8,7 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { quizDayBounds } from "./quiz-limits.js";
 import { analyzeQuizReports, reportAnalysisCacheSchema, reportAnalysisSchema, reportAnalysisScopeKey, type ReportAnalysis } from "./quiz-report-analysis.js";
 import { deliverQuizReportReview, safeReportText } from "./quiz-report-review.js";
-import { CORRECTION_BUTTON_PREFIX } from "./quiz-corrections.js";
+import { CORRECTION_ACCEPT_PREFIX, CORRECTION_BUTTON_PREFIX, suggestedCorrection } from "./quiz-corrections.js";
 
 export const REPORT_REVIEW_TIMEZONE = "Europe/Warsaw";
 type BatchRunner = (client: Client, cutoff: Date, current: () => boolean) => Promise<boolean>;
@@ -66,11 +66,12 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
       data: { analysis: note, analyzedAt: new Date() } });
     const verdict = analysis.verdict === "confirmed" ? "quizReportReviewConfirmed"
       : analysis.verdict === "not-confirmed" ? "quizReportReviewNotConfirmed" : "quizReportReviewUncertain";
+    const proposal = suggestedCorrection(analysis);
     const url = [first.guildId, first.channelId, first.messageId].every(id => /^\d{17,20}$/.test(id))
       ? `https://discord.com/channels/${first.guildId}/${first.channelId}/${first.messageId}` : "";
     const findings = [
       `**${message(language, verdict)}**`, `**${message(language, "quizReportReviewFinding")}:** ${safeReportText(analysis.finding)}`,
-      `**${message(language, "quizReportReviewSuggestion")}:** ${safeReportText(analysis.suggestion)}`,
+      `**${message(language, "quizReportReviewSuggestion")}:** ${proposal || safeReportText(analysis.suggestion)}`,
       analysis.sources.length ? `**${message(language, "quizReportReviewSources")}:**\n` + analysis.sources.map(source =>
         `[${inlineText(source.title)}](${source.url.replace(/[()]/g, character => encodeURIComponent(character))})`).join("\n")
         : message(language, analysis.kind === "wording" ? "quizReportReviewTextEvidence" : "quizReportReviewNoSources")];
@@ -84,15 +85,19 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
         const reason = safeReportText(report.reason).split(/\r\n|[\r\n\u2028\u2029]/u).map(line => `> ${escapeMarkdown(line)}`).join("\n");
         reportBlocks.push(`**${message(language, "quizReportReviewAuthor")}:** ${author}\n**${message(language, "quizReportReviewReasons")}:**\n${reason}`);
       }
+      const actions = new ActionRowBuilder<ButtonBuilder>();
+      const reviewId = delivery[0].id;
+      if (proposal) actions.addComponents(new ButtonBuilder().setCustomId(`${CORRECTION_ACCEPT_PREFIX}${reviewId}`)
+        .setStyle(ButtonStyle.Success).setLabel(message(language, "quizCorrectionAcceptButton")));
+      actions.addComponents(new ButtonBuilder().setCustomId(`${CORRECTION_BUTTON_PREFIX}${reviewId}`)
+        .setStyle(ButtonStyle.Secondary).setLabel(message(language, proposal ? "quizCorrectionEditButton" : "quizCorrectionWriteButton")));
       const result = await deliverQuizReportReview(db, { recipientId: env.QUIZ_REPORT_RECIPIENT_ID,
         reviews: delivery.map(report => ({ id: report.id,
           note: [`${message(language, "quizReportReviewFinding")}: ${analysis.finding}`,
             `${message(language, "quizReportReviewSuggestion")}: ${analysis.suggestion}`,
             ...analysis.sources.map(source => source.url)].join("\n").slice(0, 3000) })),
         messages: textPages([`**${inlineText(safeReportText(first.question))}**`, url, ...reportBlocks, ...findings], 1900),
-        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`${CORRECTION_BUTTON_PREFIX}${delivery[0].id}`).setStyle(ButtonStyle.Secondary)
-            .setLabel(message(language, "quizCorrectionButton"))).toJSON()] }, async body => {
+        components: [actions.toJSON()] }, async body => {
         if (!current()) throw Error("Report review stopped");
         channel ??= await client.rest.post(Routes.userChannels(), { body: { recipient_id: env.QUIZ_REPORT_RECIPIENT_ID } }) as { id: string };
         return client.rest.post(Routes.channelMessages(channel.id), { body, signal: AbortSignal.timeout(15000) });

@@ -1,11 +1,12 @@
 import type { QuizReport } from "@prisma/client";
-import { reportAnalysisCacheSchema, reportAnalysisScopeKey } from "./quiz-report-analysis.js";
+import { reportAnalysisCacheSchema, reportAnalysisScopeKey, type ReportAnalysis } from "./quiz-report-analysis.js";
 import { safeReportText } from "./quiz-report-review.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { maxWalletValue } from "./sparks.js";
 import { walletTransaction } from "./wallet-transaction.js";
 
 export const CORRECTION_BUTTON_PREFIX = "quiz:correct:";
+export const CORRECTION_ACCEPT_PREFIX = "quiz:accept-correction:";
 export const CORRECTION_MODAL_PREFIX = "quiz:correction:";
 export const CORRECTION_TEXT_MAX = 1000;
 
@@ -24,9 +25,10 @@ function cleanCorrection(value: string) {
   return safeReportText(value.trim()).replace(/https:\/\/(?:\w+\.)?discord(?:app)?\.com\/users\/\S+/gi, "[redacted profile]");
 }
 
-export function suggestedCorrection(report: QuizReport) {
-  const analysis = correctionAnalysis(report);
-  return analysis?.kind === "factual" && analysis.verdict === "confirmed" ? cleanCorrection(analysis.suggestion) : "";
+export function suggestedCorrection(analysis: ReportAnalysis) {
+  if (analysis.kind !== "factual" || analysis.verdict !== "confirmed") return "";
+  const text = cleanCorrection(analysis.suggestion);
+  return text.length <= CORRECTION_TEXT_MAX ? text : "";
 }
 
 type Refund = { penalty: number; stake: number; fees: number };
@@ -34,12 +36,15 @@ export function refundTotal(refund: Refund) {
   return refund.penalty + refund.stake + refund.fees;
 }
 
-export async function approveQuizCorrection(reportId: string, input: string) {
-  const text = cleanCorrection(input);
-  if (!text || text.length > CORRECTION_TEXT_MAX) return { status: "invalid" as const };
+export async function approveQuizCorrection(reportId: string, input?: string) {
+  const customText = input === undefined ? undefined : cleanCorrection(input);
+  if (customText !== undefined && (!customText || customText.length > CORRECTION_TEXT_MAX)) return { status: "invalid" as const };
   const result = await walletTransaction(async tx => {
     const report = await tx.quizReport.findUnique({ where: { id: reportId } });
-    if (!report || !correctionAnalysis(report)) return { status: "unavailable" as const };
+    const analysis = report && correctionAnalysis(report);
+    if (!report || !analysis) return { status: "unavailable" as const };
+    const text = customText ?? suggestedCorrection(analysis);
+    if (!text) return { status: "unavailable" as const };
     const identity = { messageId: report.messageId, guildId: report.guildId, channelId: report.channelId };
     const quiz = await tx.quizSettlement.findUnique({ where: identity, select: { scoredAt: true, correction: true } });
     if (!quiz) return { status: "unavailable" as const };

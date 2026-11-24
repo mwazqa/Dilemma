@@ -24,7 +24,7 @@ For an explicitly requested manual review, save the completed analysis in an ign
 
 ## Corrections and refunds
 
-Open **Review correction and refund** in the owner's DM when you confirm a factual issue. The form is filled with the suggested text when the analysis confirms a factual issue. The owner can edit it or enter a correction independently. Approval is available after the quiz is settled. A pending quiz can be approved after settlement by opening the form again.
+In the owner's DM, **Accept** approves the proposed correction for a confirmed factual issue. **Edit correction** opens the proposed text for editing, and **Write a correction** opens a blank form when there is no proposal ready to accept. Submitting the form approves the owner's text. Approval triggers the refund and channel notice automatically after the quiz is settled. If the quiz is still being settled, approve the correction again once the results are ready.
 
 Approval credits affected players' recorded penalties, lost stakes and actual fees for the count preview, 50/50, vote changes and withdrawals. Players whose final answer was originally scored as correct keep their Sparks rewards and winning payouts. Refunds go to players with recorded costs whose final answer was scored as wrong, or who paid fees without leaving a final vote. A withdrawn bet contributes only the fee charged at withdrawal. The bot records fee amounts at payment time starting with this feature. Historical charges lacking a record cannot be reconstructed. Individual refunds appear in **My result**. The original points, EXP and ranking are preserved.
 
