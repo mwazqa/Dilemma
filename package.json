@@ -56,6 +56,7 @@
     "test:quiz-reports": "node scripts/test-quiz-reports.mjs",
     "test:quiz-report-scheduler": "node scripts/test-quiz-report-scheduler.mjs",
     "test:quiz-reports:postgres": "node scripts/test-quiz-reports-postgres.mjs",
+    "test:quiz-corrections:postgres": "node scripts/test-quiz-corrections-postgres.mjs",
     "test:quiz-tools:postgres": "node scripts/test-quiz-tools-postgres.mjs",
     "test:quiz-personal:postgres": "node scripts/test-quiz-personal-postgres.mjs",
     "test:sparks-penalties:postgres": "node scripts/test-sparks-penalties-postgres.mjs",

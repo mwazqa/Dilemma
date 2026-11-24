@@ -1,9 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
+import type { APIActionRowComponent, APIButtonComponent } from "discord.js";
 
 type ReviewDatabase = Pick<PrismaClient, "quizReport" | "$transaction">;
 export type ReportReviewNote = { id: string; note: string };
-export type ReviewDelivery = { recipientId: string; reviews: ReportReviewNote[]; messages: string[] };
-export type ReviewSender = (body: { content: string; nonce: string; enforce_nonce: true; allowed_mentions: { parse: [] } }) => Promise<unknown>;
+type ReviewControls = APIActionRowComponent<APIButtonComponent>[];
+export type ReviewDelivery = { recipientId: string; reviews: ReportReviewNote[]; messages: string[]; components?: ReviewControls };
+export type ReviewSender = (body: { content: string; nonce: string; enforce_nonce: true; allowed_mentions: { parse: [] };
+  components?: ReviewControls }) => Promise<unknown>;
 
 export function safeReportText(value: unknown) {
   return String(value).replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, "[redacted key]")
@@ -67,7 +70,8 @@ export async function deliverQuizReportReview(db: ReviewDatabase, input: ReviewD
     const pages = [intro, ...input.messages].map(safeReportText);
     for (const [index, content] of pages.entries()) {
       const nonce = createHash("sha256").update(batch + ":" + index).digest("hex").slice(0, 25);
-      await send({ content, nonce, enforce_nonce: true, allowed_mentions: { parse: [] } });
+      await send({ content, nonce, enforce_nonce: true, allowed_mentions: { parse: [] },
+        ...(index === pages.length - 1 && input.components ? { components: input.components } : {}) });
     }
     const reviewedAt = new Date();
     for (const item of reviews) await tx.quizReport.updateMany({ where: { id: item.id, reviewedAt: null },

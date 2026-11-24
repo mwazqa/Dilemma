@@ -3,6 +3,7 @@ import { db } from "../db.js";
 import { inlineText } from "../formatting.js";
 import { message } from "../messages.js";
 import { MY_QUIZ_BUTTON_ID, quizJumpButton } from "./poll-controls.js";
+import { refundTotal } from "./quiz-corrections.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { WITHDRAW_COST } from "./quiz-voting.js";
 
@@ -14,7 +15,9 @@ export function personalQuizAction(customId: string, sourceMessageId: string) {
 
 export async function quizPersonalPayload(identity: { messageId: string; guildId: string; channelId: string }, userId: string,
   language: string, notice?: string) {
-  const quiz = await db.quizSettlement.findUnique({ where: { messageId: identity.messageId } });
+  const quiz = await db.quizSettlement.findUnique({ where: { messageId: identity.messageId }, include: { correction: {
+    select: { text: true, refunds: { where: { userId }, select: { penalty: true, fees: true, stake: true } } }
+  } } });
   if (!quiz || quiz.guildId !== identity.guildId || quiz.channelId !== identity.channelId) return null;
   const poll = await db.generatedPoll.findUnique({ where: { messageId: identity.messageId } })
     ?? await db.randomPoll.findUnique({ where: { messageId: identity.messageId } });
@@ -49,15 +52,23 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
         .setLabel(`${index + 1}. ${options[index]}`).setStyle(selected === id ? ButtonStyle.Success : ButtonStyle.Primary)] : []));
     components.push(answers);
   } else if (quiz.scoredAt) {
-    lines.push(message(language, "quizCorrectAnswer", { answer: describe(quiz.correctAnswerId) }));
-    if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", {
-      points: answer.points, penalty: answer.sparksPenalty
-    }));
+    const correction = quiz.correction;
+    const refund = correction?.refunds[0];
+    if (correction) {
+      lines.push(message(language, "quizCorrectionPersonal", { correction: correction.text }));
+      if (answer) lines.push(message(language, "quizCorrectionOriginalScore", { points: answer.points }));
+    } else {
+      lines.push(message(language, "quizCorrectAnswer", { answer: describe(quiz.correctAnswerId) }));
+      if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", {
+        points: answer.points, penalty: answer.sparksPenalty
+      }));
+    }
     if (answer?.streakExp) lines.push(message(language, "quizStreakBonus", { exp: answer.streakExp }));
     if (wager?.payout !== null && wager?.payout !== undefined) {
-      const net = wager.payout - wager.amount;
+      const net = wager.payout - wager.amount + (refund?.stake ?? 0);
       lines.push(message(language, "quizWagerResult", { stake: wager.amount, payout: wager.payout, net: `${net > 0 ? "+" : ""}${net}` }));
     } else lines.push(message(language, "quizNoWager"));
+    if (refund) lines.push(message(language, "quizCorrectionPersonalRefund", { sparks: refundTotal(refund) }));
   }
   const controls = new ActionRowBuilder<ButtonBuilder>();
   if (active) controls.addComponents(

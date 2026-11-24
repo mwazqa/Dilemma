@@ -14,6 +14,7 @@ export const scheduleEvents = new EventEmitter<{
   settlementChanged: [quiz: SettlementSchedule];
   settlementClosed: [messageId: string, at: Date];
   guidePublished: [guildId: string, channelId: string];
+  quizCorrectionApproved: [messageId: string];
 }>();
 
 export function settlementDeadline(quiz: SettlementSchedule): number | null {

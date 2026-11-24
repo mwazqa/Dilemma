@@ -24,6 +24,7 @@ Use `/dilemma profile` for your profile and `/dilemma leaderboard` for the serve
 **💬 Something looks wrong?**
 
 **Report quiz** opens a private form for a problem with the question, answers or explanation. Describe what needs checking without sharing private details.
+When a factual correction is approved, I'll post it in the quiz channel and refund recorded costs~
 
 **🔔 What's new?**
 

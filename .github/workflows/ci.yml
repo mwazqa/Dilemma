@@ -92,6 +92,8 @@ jobs:
         run: npm run test:quiz-tools:postgres && npm run test:quiz-personal:postgres && npm run test:sparks-penalties:postgres && npm run test:spark-exchange:postgres && npm run test:question-history:postgres && npm run test:quiz-reports:postgres && npm run test:guide:postgres
       - name: Test Sparks transfers and streak EXP
         run: npm run test:spark-transfer:postgres && npm run test:streak-exp:postgres
+      - name: Test quiz correction and refunds
+        run: npm run test:quiz-corrections:postgres
 
   image-preview:
     if: github.event_name == 'pull_request'

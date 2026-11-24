@@ -13,6 +13,9 @@ streaks. Dilemma records bonus EXP from correct-answer streaks and includes it
 alongside EXP from points and Spark exchanges when calculating levels.
 Dilemma also stores the player's server-specific Sparks balance and which quizzes
 have a purchased count preview or 50/50 hint, including its two remaining choices.
+Dilemma records quiz fees and any refunds by player and quiz so the bot can
+refund recorded costs once after a factual correction is approved. The public
+correction includes the approved text and the overall refund.
 For Spark transfers, Dilemma stores the server, sender, recipient and Discord
 interaction IDs, the amount and timestamp so each transfer is processed once.
 For bets, it stores the player's answer, stake and final payout on the current server.

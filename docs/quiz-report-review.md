@@ -22,4 +22,14 @@ For an explicitly requested manual review, save the completed analysis in an ign
 
 `ack` remains available for explicit manual review without delivery. The server scheduler always uses delivery with acknowledgement after success, so a failed DM does not silently consume reports.
 
+## Corrections and refunds
+
+Open **Review correction and refund** in the owner's DM when you confirm a factual issue. The form is filled with the suggested text when the analysis confirms a factual issue. The owner can edit it or enter a correction independently. Approval is available after the quiz is settled. A pending quiz can be approved after settlement by opening the form again.
+
+Approval credits the quiz's recorded penalties, lost stakes and actual fees for the count preview, 50/50, vote changes and withdrawals. A settled winning payout already includes the stake. A withdrawn bet contributes only the fee charged at withdrawal. The bot records fee amounts at payment time starting with this feature. Historical charges lacking a record cannot be reconstructed. Individual refunds appear in **My result**. The original points, EXP and ranking are preserved.
+
+Each quiz gets one approval and one refund per affected wallet in a single database transaction. Dilemma posts the approved text as a separate message in the quiz's channel. The publication uses a durable pending record and retries independently of wallet updates. The public message includes the correction and total refund and keeps the report and author details private.
+
+Apply `20261124120000_quiz_correction_refunds` before running this feature. Use `npm run test:quiz-corrections:postgres` on disposable PostgreSQL to verify payments, duplicate approvals, and delivery retries.
+
 If the feature or migration is not deployed, the reader returns `not-deployed`. Connection failures return a generic status without exposing server configuration or credentials. Never substitute a production database connection in development tests.

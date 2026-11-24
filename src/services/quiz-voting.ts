@@ -79,6 +79,11 @@ async function spendSparks(tx: Prisma.TransactionClient, guildId: string, userId
   return paid.count > 0;
 }
 
+async function recordQuizFee(tx: Prisma.TransactionClient, key: { messageId: string; userId: string }, cost: number) {
+  await tx.quizCharge.upsert({ where: { messageId_userId: key },
+    create: { ...key, fees: cost }, update: { fees: { increment: cost } } });
+}
+
 export async function castQuizVote(identity: Identity, userId: string, answerId: number | null) {
   return walletTransaction(async tx => {
     const quiz = await lockActiveQuiz(tx, identity);
@@ -100,6 +105,7 @@ export async function castQuizVote(identity: Identity, userId: string, answerId:
         data: { sparks: { increment: refunded - cost } } });
       if (!returned.count) throw new Error("Wager wallet unavailable");
     } else if (!await spendSparks(tx, quiz.guildId, userId, cost)) return { status: "insufficient" as const, charged: 0 };
+    if (cost) await recordQuizFee(tx, key, cost);
     if (answerId === null) {
       await tx.quizVote.delete({ where: { messageId_userId: key } });
       if (wager) await tx.quizWager.delete({ where: { messageId_userId: key } });
@@ -140,6 +146,7 @@ export async function useQuizTool(identity: Identity, userId: string, kind: "rev
     let hintAnswerIds = support?.hintAnswerIds ?? null;
     if (!unlocked) {
       if (!await spendSparks(tx, quiz.guildId, userId, cost)) return { status: "insufficient" as const };
+      await recordQuizFee(tx, key, cost);
       if (kind === "fifty") {
         const wrong = answerIds.filter(id => id !== quiz.correctAnswerId);
         hintAnswerIds = [quiz.correctAnswerId, wrong[randomInt(wrong.length)]].sort((a, b) => a - b).join(",");

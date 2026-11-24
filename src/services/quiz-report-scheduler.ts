@@ -1,4 +1,4 @@
-import { escapeMarkdown, Routes, type Client } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, escapeMarkdown, Routes, type Client } from "discord.js";
 import { env } from "../config.js";
 import { db } from "../db.js";
 import { message } from "../messages.js";
@@ -8,6 +8,7 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { quizDayBounds } from "./quiz-limits.js";
 import { analyzeQuizReports, reportAnalysisCacheSchema, reportAnalysisSchema, reportAnalysisScopeKey, type ReportAnalysis } from "./quiz-report-analysis.js";
 import { deliverQuizReportReview, safeReportText } from "./quiz-report-review.js";
+import { CORRECTION_BUTTON_PREFIX } from "./quiz-corrections.js";
 
 export const REPORT_REVIEW_TIMEZONE = "Europe/Warsaw";
 type BatchRunner = (client: Client, cutoff: Date, current: () => boolean) => Promise<boolean>;
@@ -88,7 +89,10 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
           note: [`${message(language, "quizReportReviewFinding")}: ${analysis.finding}`,
             `${message(language, "quizReportReviewSuggestion")}: ${analysis.suggestion}`,
             ...analysis.sources.map(source => source.url)].join("\n").slice(0, 3000) })),
-        messages: textPages([`**${inlineText(safeReportText(first.question))}**`, url, ...reportBlocks, ...findings], 1900) }, async body => {
+        messages: textPages([`**${inlineText(safeReportText(first.question))}**`, url, ...reportBlocks, ...findings], 1900),
+        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId(`${CORRECTION_BUTTON_PREFIX}${delivery[0].id}`).setStyle(ButtonStyle.Secondary)
+            .setLabel(message(language, "quizCorrectionButton"))).toJSON()] }, async body => {
         if (!current()) throw Error("Report review stopped");
         channel ??= await client.rest.post(Routes.userChannels(), { body: { recipient_id: env.QUIZ_REPORT_RECIPIENT_ID } }) as { id: string };
         return client.rest.post(Routes.channelMessages(channel.id), { body, signal: AbortSignal.timeout(15000) });

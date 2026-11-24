@@ -24,6 +24,7 @@ Profil znajdziesz w `/dilemma profile`, a ranking serwera w `/dilemma leaderboar
 **💬 Coś się nie zgadza?**
 
 **Zgłoś quiz** otwiera prywatny formularz problemu z pytaniem, odpowiedziami lub wyjaśnieniem. Opisz, co wymaga sprawdzenia, bez danych prywatnych.
+Po zatwierdzeniu sprostowania opublikuję je na kanale quizu i zwrócę zapisane koszty~
 
 **🔔 Nowości**
 

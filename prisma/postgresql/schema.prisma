@@ -26,6 +26,8 @@ model QuizSettlement {
   votes           QuizVote[]
   supports        QuizSupport[]
   wagers          QuizWager[]
+  charges         QuizCharge[]
+  correction      QuizCorrection?
 
   @@index([scoredAt, nextCheckAt])
   @@index([resultsPending, nextCheckAt])
@@ -232,6 +234,40 @@ model QuizWager {
 
   @@id([messageId, userId])
   @@index([guildId, userId])
+}
+
+model QuizCharge {
+  messageId  String
+  userId     String
+  fees       Int
+  settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([messageId, userId])
+}
+
+model QuizCorrection {
+  messageId        String    @id
+  reportId         String
+  text             String
+  approvedAt       DateTime  @default(now())
+  publishedAt      DateTime?
+  refundedSparks   BigInt
+  refundedPlayers  Int
+  settlement       QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade, onUpdate: Cascade)
+  refunds          QuizRefund[]
+
+  @@index([publishedAt, approvedAt])
+}
+
+model QuizRefund {
+  messageId  String
+  userId     String
+  penalty    Int
+  stake      Int
+  fees       Int
+  correction QuizCorrection @relation(fields: [messageId], references: [messageId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([messageId, userId])
 }
 
 model QuizReport {

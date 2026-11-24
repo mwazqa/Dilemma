@@ -67,7 +67,7 @@ try {
     reason: "The explanation needs checking.", createdAt: new RealDate(0),
     analysis: null, analyzedAt: null, reviewNote: null, reviewedAt: null });
   let reports = [fixture(1)], analyses = 0, failSend = true, failAfterFirstGroup = false, sends = 0;
-  const sentBodies = [], lookups = [];
+  const sentBodies = [], sentControls = [], lookups = [];
   db.quizReport.findMany = async ({ where, take, select }) => {
     if (where.id) return reports.filter(row => where.id.in.includes(row.id)).map(row => ({ ...row }));
     assert.equal(take, 20); assert.ok(where.createdAt.lte instanceof RealDate); assert.equal(select.reporterUserId, true);
@@ -93,7 +93,7 @@ try {
     assert.equal(body.flags, undefined, "Owner DMs allow automatic profile link previews");
     assert.ok(body.content.length <= 1900);
     if (failSend || failAfterFirstGroup && reports.some(row => row.reviewedAt)) throw Error("Synthetic DM failure");
-    sentBodies.push(body.content); sends++; return { id: "message" };
+    sentBodies.push(body.content); sentControls.push(...(body.components ?? [])); sends++; return { id: "message" };
   } } };
   const analyze = async () => { analyses++; return analysis; };
   const cutoff = new RealDate();
@@ -101,6 +101,7 @@ try {
   assert.equal(reports[0].reviewedAt, null); assert.ok(reports[0].analysis); assert.ok(reports[0].analyzedAt);
   failSend = false;
   await processQuizReportBatch(client, cutoff, () => true, analyze);
+  assert.equal(sentControls[0]?.components[0]?.custom_id, `quiz:correct:${fixture(1).id}`);
   assert.equal(analyses, 1, "Retry uses persisted analysis without another AI request"); assert.ok(reports[0].reviewedAt);
   assert.ok(sentBodies.join("\n").includes("cached\\_reporter"));
   assert.ok(sentBodies.join("\n").includes(`https://discord.com/users/${fixture(1).reporterUserId}`));
