@@ -1,6 +1,6 @@
 # Dilemma - Privacy Policy
 
-Last updated: November 23, 2026
+Last updated: November 24, 2026
 
 This policy explains what data Dilemma processes when used on a Discord server.
 

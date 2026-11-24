@@ -5,19 +5,13 @@ export const runningVersion: string = JSON.parse(readFileSync(new URL("../packag
 export type PlayerReleaseHighlights = { version: string; changes: { en: readonly string[]; pl: readonly string[] } };
 
 export const playerRelease: PlayerReleaseHighlights = {
-  version: "3.11.0",
+  version: "3.12.0",
   changes: {
     en: [
-      "Commands have simpler names. Open your profile with `/dilemma profile`, view the ranking with `/dilemma leaderboard`, and find the full list in `/dilemma help`.",
-      "Send Sparks to other players on the same server with `/dilemma sparks transfer`, with no fee.",
-      "Correct-answer streaks earn bonus EXP from the third correct answer. The bonus increases by 5 EXP per correct answer up to +40 from the tenth onward. See your bonus in My result.",
-      "The public results message now links back to the quiz with Go to quiz."
+      "When a factual correction is approved, Dilemma posts it in the quiz channel and refunds affected players' recorded penalties, lost stakes and fees. Check your refund in **My result**."
     ],
     pl: [
-      "Komendy mają krótsze nazwy. Profil otworzysz przez `/dilemma profile`, ranking przez `/dilemma leaderboard`, a pełną listę znajdziesz w `/dilemma help`.",
-      "Przesyłaj Iskry innym graczom na tym samym serwerze przez `/dilemma sparks transfer`, bez prowizji.",
-      "Seria poprawnych odpowiedzi daje dodatkowy EXP od 3. trafienia. Bonus rośnie co 5 EXP do +40 od 10. trafienia. Zobaczysz go w panelu Mój wynik.",
-      "Z publicznego podsumowania wrócisz do karty przyciskiem Przejdź do quizu."
+      "Po zatwierdzeniu sprostowania Dilemma opublikuje je na kanale quizu i zwróci poszkodowanym zapisane kary, utracone stawki oraz opłaty. Swój zwrot sprawdzisz w panelu **Mój wynik**."
     ]
   }
 };
