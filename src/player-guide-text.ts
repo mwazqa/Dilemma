@@ -25,7 +25,7 @@ Use \`/dilemma profile\` for your profile and \`/dilemma leaderboard\` for the s
 **💬 Something looks wrong?**
 
 **{reportQuizButton}** opens a private form for a problem with the question, answers or explanation. Describe what needs checking without sharing private details.
-When a factual correction is approved, I'll post it in the quiz channel and refund recorded costs~
+When a factual correction is approved, I'll post it in the quiz channel and refund affected players' recorded costs~
 
 **🔔 What's new?**
 
@@ -56,7 +56,7 @@ Profil znajdziesz w \`/dilemma profile\`, a ranking serwera w \`/dilemma leaderb
 **💬 Coś się nie zgadza?**
 
 **{reportQuizButton}** otwiera prywatny formularz problemu z pytaniem, odpowiedziami lub wyjaśnieniem. Opisz, co wymaga sprawdzenia, bez danych prywatnych.
-Po zatwierdzeniu sprostowania opublikuję je na kanale quizu i zwrócę zapisane koszty~
+Po zatwierdzeniu sprostowania opublikuję je na kanale quizu i zwrócę poszkodowanym zapisane koszty~
 
 **🔔 Nowości**
 

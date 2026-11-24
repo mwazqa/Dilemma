@@ -48,7 +48,8 @@ export async function approveQuizCorrection(reportId: string, input: string) {
 
     const { messageId, guildId } = identity;
     const [answers, wagers, charges] = await Promise.all([
-      tx.quizAnswer.findMany({ where: { messageId, guildId, sparksPenalty: { gt: 0 } }, select: { userId: true, sparksPenalty: true } }),
+      tx.quizAnswer.findMany({ where: { messageId, guildId, OR: [{ correct: true }, { sparksPenalty: { gt: 0 } }] },
+        select: { userId: true, correct: true, sparksPenalty: true } }),
       tx.quizWager.findMany({ where: { messageId, guildId }, select: { userId: true, amount: true, payout: true } }),
       tx.quizCharge.findMany({ where: { messageId }, select: { userId: true, fees: true } })
     ]);
@@ -59,12 +60,15 @@ export async function approveQuizCorrection(reportId: string, input: string) {
       refunds.set(userId, refund);
       return refund;
     };
-    for (const answer of answers) forUser(answer.userId).penalty = answer.sparksPenalty;
     for (const wager of wagers) {
       const remainingStake = wager.amount - (wager.payout ?? wager.amount);
       if (remainingStake > 0) forUser(wager.userId).stake = remainingStake;
     }
     for (const charge of charges) forUser(charge.userId).fees = charge.fees;
+    for (const answer of answers) {
+      if (answer.correct) refunds.delete(answer.userId);
+      else forUser(answer.userId).penalty = answer.sparksPenalty;
+    }
     const players = [...refunds.keys()].sort();
     const wallets = players.length ? await tx.userScore.findMany({ where: { guildId, userId: { in: players } },
       select: { userId: true, sparks: true } }) : [];

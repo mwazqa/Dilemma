@@ -66,6 +66,8 @@ try {
   const closed = await db.quizSettlement.update({ where: { messageId: quiz.messageId }, data: { closedAt: finishedAt } });
   assert.equal(await applyFinalVotes(closed, [], finishedAt), true);
   assert.deepEqual(await Promise.all(["loser", "winner", "withdrawn", "legacy"].map(id => balance(id))), [4, 24, 19, 20]);
+  const winnerWallet = { guildId_userId: { guildId, userId: "winner" } };
+  const originalWinner = await db.userScore.findUniqueOrThrow({ where: winnerWallet });
 
   stage = "owner-confirmation";
   let modal;
@@ -99,9 +101,12 @@ try {
   assert.ok(feedback);
   const saved = await db.quizCorrection.findUniqueOrThrow({ where: { messageId: quiz.messageId } });
   assert.equal(saved.text, update);
-  assert.equal(saved.refundedSparks, 20n);
-  assert.equal(saved.refundedPlayers, 3);
-  assert.deepEqual(await Promise.all(["loser", "winner", "withdrawn", "legacy"].map(id => balance(id))), [20, 27, 20, 20]);
+  assert.equal(saved.refundedSparks, 17n);
+  assert.equal(saved.refundedPlayers, 2);
+  assert.deepEqual(await Promise.all(["loser", "winner", "withdrawn", "legacy"].map(id => balance(id))), [20, 24, 20, 20]);
+  assert.deepEqual(await db.userScore.findUniqueOrThrow({ where: winnerWallet }), originalWinner);
+  assert.equal(await db.quizRefund.findUnique({ where: { messageId_userId: { messageId: quiz.messageId, userId: "winner" } } }), null);
+  assert.equal((await db.quizWager.findUniqueOrThrow({ where: { messageId_userId: { messageId: quiz.messageId, userId: "winner" } } })).payout, 10);
   assert.equal(await balance("loser", otherGuild), 50);
   const duplicate = await approveQuizCorrection(factual.id, "A later duplicate should not change the approved correction.");
   assert.equal(duplicate.status, "already");

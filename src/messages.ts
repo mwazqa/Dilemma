@@ -33,7 +33,7 @@ export const messages = {
   quizCorrectionApproved: ["I approved the correction and refunded {sparks} ✦~ I'll post it in the quiz channel.", "Zatwierdziłam sprostowanie i zwróciłam {sparks} ✦~ Opublikuję je na kanale quizu."],
   quizCorrectionAlready: ["The correction for this quiz was already approved~ The refund has been recorded.", "Sprostowanie tego quizu jest już zatwierdzone~ Zwrot został zapisany."],
   quizCorrectionPublicHeading: ["**Quiz correction**", "**Sprostowanie quizu**"],
-  quizCorrectionPublicRefund: ["I refunded **{sparks} ✦** in recorded penalties, lost stakes and fees~", "Zwróciłam łącznie **{sparks} ✦** za zapisane kary, utracone stawki i opłaty~"],
+  quizCorrectionPublicRefund: ["I returned **{sparks} ✦** in recorded penalties, lost stakes and fees to affected players~", "Zwróciłam poszkodowanym łącznie **{sparks} ✦** za zapisane kary, utracone stawki i opłaty~"],
   quizCorrectionPublicNoRefund: ["I found no recorded costs to refund for this quiz~", "Brak zapisanych kosztów do zwrotu za ten quiz~"],
   quizCorrectionPersonal: ["**Correction**\n{correction}", "**Sprostowanie**\n{correction}"],
   quizCorrectionOriginalScore: ["Points in the original result: **{points}**", "Punkty z pierwotnego rozliczenia: **{points}**"],
