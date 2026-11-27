@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import {voteBreakdown} from "../dist/services/quiz-voting.js";
 import { Prisma } from "@prisma/client";
 
-Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
+Object.assign(process.env, { DOTENV_CONFIG_PATH: ".tools/disabled-auto-results-tests.env",
+  DATABASE_URL: "postgresql://test:test@127.0.0.1:1/dilemma_test", DATABASE_URL_UNPOOLED: "",
+  DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
+const { voteBreakdown } = await import("../dist/services/quiz-voting.js");
 const { db } = await import("../dist/db.js");
 const { runDueSettlements, startScoreScheduler } = await import("../dist/services/scoring.js");
 const { publishQuizResults } = await import("../dist/services/quiz-results.js");
