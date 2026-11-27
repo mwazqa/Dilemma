@@ -135,22 +135,18 @@ try {
   assert.equal(askedPoll.question, requestedQuestion);
   assert.equal(askedPoll.creatorUserId, "test-manager");
   assert.equal(JSON.parse(askedPoll.options)[askedPoll.correctOption], fresh.options[fresh.correctOption]);
-  await assert.rejects(publishProvided(questionGuild), RandomQuizCooldownError);
-  await assert.rejects(publishCustomTopic(questionGuild), RandomQuizCooldownError);
-  const fillPool = async (guildId, scope) => {
-    const firstSlot = await db.dailyQuizRun.findFirstOrThrow({ where: { guildId, scope } });
-    await db.dailyQuizRun.createMany({ data: Array.from({ length: RANDOM_DAILY_LIMIT - 1 }, (_, index) => ({
-      guildId, scope, day: firstSlot.day, slot: index + 2, createdAt: firstSlot.createdAt
-    })) });
-  };
-  await fillPool(questionGuild, "custom-daily");
-  await assert.rejects(publishProvided(questionGuild), error => error instanceof DailyQuizLimitError && error.kind === "custom");
+  for (const publishCustom of [publishProvided, publishCustomTopic]) {
+    await assert.rejects(publishCustom(questionGuild), error => error instanceof DailyQuizLimitError && error.kind === "custom");
+  }
   assert.equal(requests.length, 1);
   scenario([original]);
   await publishRandomQuestion(questionGuild, 4, channel(questionGuild));
   assert.equal(requests.length, 1, "An exhausted question pool still allows a random quiz");
   await assert.rejects(publishRandomQuestion(questionGuild, 4, channel(questionGuild)), RandomQuizCooldownError);
-  await fillPool(guilds[1], "random-daily");
+  const randomSlot = await db.dailyQuizRun.findFirstOrThrow({ where: { guildId: guilds[1], scope: "random-daily" } });
+  await db.dailyQuizRun.createMany({ data: Array.from({ length: RANDOM_DAILY_LIMIT - 1 }, (_, index) => ({
+    guildId: randomSlot.guildId, scope: randomSlot.scope, day: randomSlot.day, slot: index + 2, createdAt: randomSlot.createdAt
+  })) });
   await assert.rejects(publishRandomQuestion(guilds[1], 4, channel(guilds[1])), error => error instanceof DailyQuizLimitError && error.kind === "random");
   scenario([fresh]);
   await publishCustomTopic(guilds[1]);
