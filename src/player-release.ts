@@ -5,13 +5,13 @@ export const runningVersion: string = JSON.parse(readFileSync(new URL("../packag
 export type PlayerReleaseHighlights = { version: string; changes: { en: readonly string[]; pl: readonly string[] } };
 
 export const playerRelease: PlayerReleaseHighlights = {
-  version: "3.13.1",
+  version: "3.13.2",
   changes: {
     en: [
-      "Voting in a `/dilemma custom` quiz can now last **1-24 hours**. Each server can start **one custom quiz per day**. The limit resets at midnight in the server's timezone."
+      "Dilemma command descriptions and input fields are now available in Polish."
     ],
     pl: [
-      "Głosowanie w `/dilemma custom` może teraz trwać **1-24 godziny**. Każdy serwer może uruchomić **jeden taki quiz dziennie**. Limit odnawia się o północy według czasu serwera."
+      "Opisy komend Dilemmy i ich pól są teraz dostępne po polsku."
     ]
   }
 };

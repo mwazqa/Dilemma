@@ -9,6 +9,7 @@ try {
   if (result.status !== 0) throw new Error("Cannot list candidates");
   const candidates = [...new Set(result.stdout.split("\0").filter(file => /\.(png|jpe?g|webp|gif|svg|bmp|tiff?|ico|avif|heic)$/i.test(file) && existsSync(file)))];
   const reviews = existsSync("image-publication-reviews.json") ? JSON.parse(readFileSync("image-publication-reviews.json", "utf8")) : { reviewedSha256: [] };
+  const approvedMetadata = new Set(reviews.metadataApprovedSha256 ?? []);
   const inputs = candidates.map(file => readFileSync(file));
   const currentHashes = new Set(inputs.map(digest));
   const history = spawnSync("git", ["rev-list", "--objects", "--all"], { encoding: "utf8", stdio: "pipe" });
@@ -29,7 +30,9 @@ try {
     try {
       const finding = await inspectImage(input, worker);
       counts.checked++;
-      for (const category of ["metadata", "qr", "sensitive"]) if (finding[category === "metadata" ? "hiddenMetadata" : category]) counts[category]++;
+      if (finding.hiddenMetadata && (!approvedMetadata.has(finding.hash) || finding.metadataSensitive)) counts.metadata++;
+      if (finding.qr) counts.qr++;
+      if (finding.sensitive || finding.metadataSensitive) counts.sensitive++;
       if (!reviews.reviewedSha256.includes(finding.hash)) counts.visualReviewRequired++;
     } catch {
       counts.unsupported++;

@@ -1,6 +1,13 @@
 {
-  "reviewDate": "2026-10-12",
-  "reviewMethod": "Local OCR/QR/metadata checks plus visual review of artwork and generic architecture diagrams. Re-review changed image bytes. Not a guarantee against steganography.",
+  "reviewDate": "2026-11-27",
+  "reviewMethod": "Local OCR/QR/metadata checks plus visual review of artwork, generic architecture diagrams and historic Dilemma screenshots. Approved metadata was scanned for sensitive patterns and reviewed manually. Re-review changed image bytes. Not a guarantee against steganography.",
+  "metadataApprovedSha256": [
+    "035c63150747b71fd316ecc61975eed303103d0cc4dec78a61d9900d23b85c1d",
+    "053f1e769e7516738effe1365188908ca7ada42bfbe67eb2faab3add87adc703",
+    "8bb8d35b1bbca43de09166ab108b26ac6c55a8470825146c942dd98f7606d4b6",
+    "0858dd64939fc4d8d51647dd0a6fb08eaeb309bf179bb1f4bbf5a80a9918323f",
+    "796c44d1a3a5d68bac038a9cc31421df527ec99382814213d2b21929af77b6ac"
+  ],
   "reviewedSha256": [
     "2c376b92b9181ee53dee611f727b17090361176ef0f0e657a8adda5b3207d8d6",
     "874746e8606ccd8b3b2e5414e622df209403c05629f315bc1bfbc658734d82a9",
@@ -29,6 +36,11 @@
     "2cf39241d677f5b8b7c65a1760dc3b540255defeeb7823c6f79a223c7bf3f500",
     "99bdbd730fc1848f4156a8d04d8161db2daa6c6811557803eed546a8d6b6d155",
     "4661b298fe4cbf8d9cfeb5b7cfb44976c2c2894440ff4328d6803b6a9351b2e3",
-    "d28ea7bdb9ddfc4721b9e6d4c40262a190701502e4526ee57ad4a5877a35d180"
+    "d28ea7bdb9ddfc4721b9e6d4c40262a190701502e4526ee57ad4a5877a35d180",
+    "035c63150747b71fd316ecc61975eed303103d0cc4dec78a61d9900d23b85c1d",
+    "053f1e769e7516738effe1365188908ca7ada42bfbe67eb2faab3add87adc703",
+    "8bb8d35b1bbca43de09166ab108b26ac6c55a8470825146c942dd98f7606d4b6",
+    "0858dd64939fc4d8d51647dd0a6fb08eaeb309bf179bb1f4bbf5a80a9918323f",
+    "796c44d1a3a5d68bac038a9cc31421df527ec99382814213d2b21929af77b6ac"
   ]
 }

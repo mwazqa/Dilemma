@@ -40,6 +40,8 @@ export async function inspectImage(data, worker) {
   const metadata = await sharp(data, { limitInputPixels: 40_000_000 }).metadata();
   if (!["png", "jpeg", "webp"].includes(metadata.format) || (metadata.pages ?? 1) !== 1) throw new Error("Unsupported image; manual conversion required");
   const hiddenMetadata = Boolean(metadata.exif || metadata.xmp || metadata.iptc || metadata.icc || (metadata.comments?.length) || hasPngText(data));
+  const metadataText = [metadata.exif, metadata.xmp, metadata.iptc, metadata.icc].filter(Boolean)
+    .map(value => Buffer.from(value).toString("utf8")).join("\n");
   const opaque = sharp(data).flatten({ background: "#ffffff" });
   const { data: pixels, info } = await opaque.clone().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const qr = Boolean(jsQR(new Uint8ClampedArray(pixels), info.width, info.height, { inversionAttempts: "attemptBoth" }));
@@ -53,5 +55,6 @@ export async function inspectImage(data, worker) {
   if (![0, 1].includes(secretScan.status)) throw new Error("OCR secret scanner unavailable");
   const { data: darkPixels, info: darkInfo } = await sharp(dark).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const darkQr = Boolean(jsQR(new Uint8ClampedArray(darkPixels), darkInfo.width, darkInfo.height, { inversionAttempts: "attemptBoth" }));
-  return { hiddenMetadata, qr: qr || darkQr, sensitive: sensitiveText(recognized) || secretScan.status === 1, hash: digest(data) };
+  return { hiddenMetadata, metadataSensitive: sensitiveText(metadataText), qr: qr || darkQr,
+    sensitive: sensitiveText(recognized) || secretScan.status === 1, hash: digest(data) };
 }

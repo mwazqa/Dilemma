@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.13.2
+
+- Add Polish Discord localizations for every Dilemma command, command group, subcommand and input field.
+- Shorten command descriptions and correct the scope of custom quiz channels and owner-controlled quiz closing.
+- Review historic screenshot metadata and keep automated publication checks strict for unapproved or sensitive metadata.
+- Re-register Discord commands when upgrading from v3.13.1. No database migration is required.
+
 ## v3.13.1
 
 - Allow 1-24 hours of voting for `/dilemma custom` and one custom quiz per server day. Renew the separate custom quota at midnight in the server's timezone.

@@ -3,7 +3,8 @@ import { openFeedback } from "../feedback.js";
 
 export const pingCommand = new SlashCommandSubcommandBuilder()
   .setName("ping")
-  .setDescription("Check whether Dilemma is online.");
+  .setDescription("Check whether Dilemma is online.")
+  .setDescriptionLocalizations({ pl: "Sprawdź, czy Dilemma jest online." });
 
 export async function handlePing(interaction: ChatInputCommandInteraction) {
   const { text, reply } = await openFeedback(interaction);

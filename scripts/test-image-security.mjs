@@ -18,6 +18,8 @@ try {
   assert.equal(baseline.hiddenMetadata || baseline.qr || baseline.sensitive, false);
   const exif = await image.clone().withExif({ IFD0: { Artist: "synthetic-test-author" } }).png().toBuffer();
   assert.equal((await inspectImage(exif, worker)).hiddenMetadata, true);
+  const sensitiveExif = await image.clone().withExif({ IFD0: { Artist: "password=synthetic-test-value" } }).png().toBuffer();
+  assert.equal((await inspectImage(sensitiveExif, worker)).metadataSensitive, true);
   mkdirSync(".tools/image-tests", { recursive: true });
   const fixture = `.tools/image-tests/metadata-${Date.now()}.png`;
   writeFileSync(fixture, exif);

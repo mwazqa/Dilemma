@@ -6,11 +6,16 @@ import { canConfigureManagement, canManageDilemma } from "../services/management
 
 export const permissionsCommand = new SlashCommandSubcommandGroupBuilder()
   .setName("permissions")
-  .setDescription("Configure the server role allowed to manage Dilemma.")
-  .addSubcommand(command => command.setName("show").setDescription("Show the configured Dilemma management role."))
-  .addSubcommand(command => command.setName("set").setDescription("Set a management role; requires Manage Server.")
-    .addRoleOption(option => option.setName("role").setDescription("Existing server role allowed to manage Dilemma.").setRequired(true)))
-  .addSubcommand(command => command.setName("clear").setDescription("Remove delegated management access; requires Manage Server."));
+  .setDescription("Configure the Dilemma manager role.")
+  .setDescriptionLocalizations({ pl: "Skonfiguruj rolę opiekuna Dilemmy." })
+  .addSubcommand(command => command.setName("show").setDescription("Show the Dilemma manager role.")
+    .setDescriptionLocalizations({ pl: "Pokaż rolę opiekuna Dilemmy." }))
+  .addSubcommand(command => command.setName("set").setDescription("Set Dilemma manager role. Requires Manage Server.")
+    .setDescriptionLocalizations({ pl: "Ustaw rolę opiekuna Dilemmy. Wymaga Zarządzania serwerem." })
+    .addRoleOption(option => option.setName("role").setDescription("Existing role allowed to manage Dilemma.")
+      .setDescriptionLocalizations({ pl: "Istniejąca rola uprawniona do zarządzania Dilemmą." }).setRequired(true)))
+  .addSubcommand(command => command.setName("clear").setDescription("Remove Dilemma manager role. Requires Manage Server.")
+    .setDescriptionLocalizations({ pl: "Usuń rolę opiekuna Dilemmy. Wymaga Zarządzania serwerem." }));
 
 export async function handlePermissions(interaction: ChatInputCommandInteraction) {
   const { settings, text, reply } = await openFeedback(interaction);

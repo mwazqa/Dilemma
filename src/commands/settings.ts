@@ -16,17 +16,21 @@ export { supportedLanguages } from "../languages.js";
 
 export const languageCommand = new SlashCommandSubcommandBuilder()
   .setName("language")
-  .setDescription("Set the server language for all topics, questions and commands.")
+  .setDescription("Set language for bot messages and new quizzes.")
+  .setDescriptionLocalizations({ pl: "Ustaw język wiadomości bota i nowych quizów." })
   .addStringOption((option) => option
     .setName("value")
-    .setDescription("Global server language.")
+    .setDescription("Server language.")
+    .setDescriptionLocalizations({ pl: "Język serwera." })
     .setRequired(true)
     .addChoices(...supportedLanguages));
 
 export const timezoneCommand = new SlashCommandSubcommandBuilder()
   .setName("timezone")
-  .setDescription("Show or set the server timezone for schedules and daily quiz limits.")
-  .addStringOption(option => option.setName("value").setDescription("IANA timezone, such as Europe/London; omit to show the current timezone.")
+  .setDescription("Show or set timezone for schedules and daily limits.")
+  .setDescriptionLocalizations({ pl: "Pokaż lub ustaw strefę dla harmonogramów i limitów dziennych." })
+  .addStringOption(option => option.setName("value").setDescription("IANA timezone, for example Europe/London. Omit to show current timezone.")
+    .setDescriptionLocalizations({ pl: "Strefa IANA, np. Europe/Warsaw. Pomiń, aby pokazać obecną." })
     .setAutocomplete(true).setMinLength(1).setMaxLength(100));
 
 export async function handleSettings(interaction: ChatInputCommandInteraction) {

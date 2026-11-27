@@ -24,26 +24,38 @@ const maxCustomTopicLength = 80;
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
   subcommand
-    .addStringOption(option => option.setName("name").setDescription(creating ? "Name for a new topic; use edit for an existing topic." : "Existing topic to update; omitted settings remain unchanged.").setRequired(true).setMaxLength(80).setAutocomplete(!creating))
-    .addChannelOption(option => option.setName("channel").setDescription(creating ? "Quiz destination; defaults to this channel." : "New quiz destination; omitted keeps the saved channel.")
+    .addStringOption(option => option.setName("name").setDescription(creating ? "New topic name." : "Saved topic to edit.")
+      .setDescriptionLocalizations({ pl: creating ? "Nazwa nowego tematu." : "Zapisany temat do edycji." })
+      .setRequired(true).setMaxLength(80).setAutocomplete(!creating))
+    .addChannelOption(option => option.setName("channel").setDescription(creating ? "Quiz channel. Defaults to current channel." : "Quiz channel. Omitted keeps saved channel.")
+      .setDescriptionLocalizations({ pl: creating ? "Kanał quizu. Domyślnie bieżący kanał." : "Kanał quizu. Pominięcie zachowuje zapisany kanał." })
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
-    .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to notify when this saved quiz starts; omitted means no ping." : "Role to notify when this saved quiz starts; omitted keeps the saved role."));
-  if (!creating) subcommand.addBooleanOption(option => option.setName("clear_ping").setDescription("Remove the notification role; cannot be combined with ping_role."));
+    .addRoleOption(option => option.setName("ping_role").setDescription(creating ? "Role to ping when this quiz starts. Omit for no ping." : "Role to ping when this quiz starts. Omitted keeps saved role.")
+      .setDescriptionLocalizations({ pl: creating ? "Rola pingowana przy starcie quizu. Pomiń bez pingu." : "Rola pingowana przy starcie quizu. Pominięcie zachowuje zapisaną rolę." }));
+  if (!creating) subcommand.addBooleanOption(option => option.setName("clear_ping").setDescription("Remove notification role. Cannot be used with ping_role.")
+    .setDescriptionLocalizations({ pl: "Usuń rolę powiadomień. Nie łącz z ping_role." }));
   return subcommand
-    .addStringOption(option => option.setName("start_date").setDescription("First date YYYY-MM-DD; requires a publication time. Use none for rolling scheduling.").setMinLength(4).setMaxLength(10))
-    .addStringOption(option => option.setName("generation_time").setDescription("Publication time HH:mm; none clears it only when no start_date is active.").setMinLength(4).setMaxLength(5))
-    .addIntegerOption(option => option.setName("interval_days").setDescription("Repeat every 1-30 days; fixed schedules count from start_date.").setMinValue(1).setMaxValue(30))
-    .addIntegerOption(option => option.setName("duration_hours").setDescription("Voting duration in hours (1-24), independent of the publication interval.").setMinValue(1).setMaxValue(24))
+    .addStringOption(option => option.setName("start_date").setDescription("First date, YYYY-MM-DD. Use none for rolling schedule.")
+      .setDescriptionLocalizations({ pl: "Pierwsza data, RRRR-MM-DD. Użyj none dla harmonogramu bez daty." }).setMinLength(4).setMaxLength(10))
+    .addStringOption(option => option.setName("generation_time").setDescription("Publication time, HH:mm. Use none to clear it when unscheduled.")
+      .setDescriptionLocalizations({ pl: "Godzina publikacji, GG:mm. Użyj none, aby wyczyścić bez daty." }).setMinLength(4).setMaxLength(5))
+    .addIntegerOption(option => option.setName("interval_days").setDescription("Repeat every 1-30 days. Fixed schedules count from start date.")
+      .setDescriptionLocalizations({ pl: "Powtarzaj co 1-30 dni. Harmonogram liczy od daty startu." }).setMinValue(1).setMaxValue(30))
+    .addIntegerOption(option => option.setName("duration_hours").setDescription("Voting duration, 1-24 hours.")
+      .setDescriptionLocalizations({ pl: "Czas głosowania, 1-24 godziny." }).setMinValue(1).setMaxValue(24))
     .addStringOption(difficultyOption)
-    .addIntegerOption(option => option.setName("option_count").setDescription(creating ? "Number of AI-created answers (2-4); default 4." : "Number of AI-created answers (2-4); replaces any legacy fixed answers.").setMinValue(2).setMaxValue(4));
+    .addIntegerOption(option => option.setName("option_count").setDescription(creating ? "AI-generated answer count, 2-4. Defaults to 4." : "AI-generated answer count, 2-4.")
+      .setDescriptionLocalizations({ pl: creating ? "Liczba odpowiedzi AI, 2-4. Domyślnie 4." : "Liczba odpowiedzi AI, 2-4." }).setMinValue(2).setMaxValue(4));
 }
 
 function onDemandOptions(subcommand: SlashCommandSubcommandBuilder, maximumHours: number) {
   return subcommand
-    .addIntegerOption(option => option.setName("option_count").setDescription("Number of generated answers (2-4); defaults to 4.").setMinValue(2).setMaxValue(4))
+    .addIntegerOption(option => option.setName("option_count").setDescription("Generated answer count, 2-4. Defaults to 4.")
+      .setDescriptionLocalizations({ pl: "Liczba generowanych odpowiedzi, 2-4. Domyślnie 4." }).setMinValue(2).setMaxValue(4))
     .addStringOption(difficultyOption)
     .addIntegerOption(option => option.setName("duration_hours")
-      .setDescription(`Voting duration in hours (1-${maximumHours}); default at most ${maximumHours} hours.`)
+      .setDescription(`Voting duration, 1-${maximumHours} hours.`)
+      .setDescriptionLocalizations({ pl: `Czas głosowania, 1-${maximumHours} godzin.` })
       .setMinValue(1).setMaxValue(maximumHours));
 }
 
@@ -52,41 +64,58 @@ export const topicCommand = new SlashCommandBuilder()
   .setDescription("Configure Dilemma quiz topics.")
   .addSubcommand((subcommand) => topicOptions(subcommand
     .setName("create")
-    .setDescription("Create a new quiz topic with optional schedule and voting settings."), true))
+    .setDescription("Create a saved quiz topic and schedule.")
+    .setDescriptionLocalizations({ pl: "Utwórz zapisany temat quizu i harmonogram." }), true))
   .addSubcommand((subcommand) => topicOptions(subcommand
     .setName("edit")
-    .setDescription("Update an existing quiz topic; omitted settings remain unchanged."), false))
+    .setDescription("Edit a saved quiz topic.")
+    .setDescriptionLocalizations({ pl: "Edytuj zapisany temat quizu." }), false))
   .addSubcommand((subcommand) => subcommand
     .setName("enable")
-    .setDescription("Enable automatic generation for a topic.")
-    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)))
+    .setDescription("Enable automatic quizzes for a topic.")
+    .setDescriptionLocalizations({ pl: "Włącz automatyczne quizy dla tematu." })
+    .addStringOption((option) => option.setName("name").setDescription("Topic name.")
+      .setDescriptionLocalizations({ pl: "Nazwa tematu." }).setRequired(true).setMaxLength(80).setAutocomplete(true)))
   .addSubcommand((subcommand) => subcommand
     .setName("disable")
-    .setDescription("Disable automatic generation for a topic.")
-    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)))
+    .setDescription("Pause automatic quizzes for a topic.")
+    .setDescriptionLocalizations({ pl: "Wstrzymaj automatyczne quizy dla tematu." })
+    .addStringOption((option) => option.setName("name").setDescription("Topic name.")
+      .setDescriptionLocalizations({ pl: "Nazwa tematu." }).setRequired(true).setMaxLength(80).setAutocomplete(true)))
   .addSubcommand((subcommand) => subcommand
     .setName("delete")
-    .setDescription("Delete a quiz topic configuration.")
-    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true)))
+    .setDescription("Delete a saved quiz topic.")
+    .setDescriptionLocalizations({ pl: "Usuń zapisany temat quizu." })
+    .addStringOption((option) => option.setName("name").setDescription("Topic name.")
+      .setDescriptionLocalizations({ pl: "Nazwa tematu." }).setRequired(true).setMaxLength(80).setAutocomplete(true)))
   .addSubcommand((subcommand) => subcommand
     .setName("list")
-    .setDescription("Browse all saved quiz topics by start date and name, with filters."))
+    .setDescription("List saved quiz topics.")
+    .setDescriptionLocalizations({ pl: "Pokaż zapisane tematy quizów." }))
   .addSubcommand((subcommand) => subcommand
     .setName("help")
-    .setDescription("Show Dilemma commands."))
+    .setDescription("Show Dilemma commands.")
+    .setDescriptionLocalizations({ pl: "Pokaż komendy Dilemmy." }))
   .addSubcommand(subcommand => onDemandOptions(subcommand
     .setName("random")
-    .setDescription("Generate a random quiz: four per server day, at least six hours apart."), RANDOM_MAX_DURATION_HOURS))
+    .setDescription("Start a random quiz.")
+    .setDescriptionLocalizations({ pl: "Rozpocznij losowy quiz." }), RANDOM_MAX_DURATION_HOURS))
   .addSubcommand(subcommand => onDemandOptions(subcommand
     .setName("custom")
-    .setDescription("Publish a quiz from a topic or exact question. One per server day. Requires management access.")
-    .addStringOption(option => option.setName("topic").setDescription("Topic for a generated question; use topic or question.").setMaxLength(maxCustomTopicLength))
-    .addStringOption(option => option.setName("question").setDescription("Question to publish as written; use topic or question.").setMaxLength(maxQuestionLength)), CUSTOM_MAX_DURATION_HOURS))
+    .setDescription("Publish a custom quiz from a topic or exact question. Requires management access.")
+    .setDescriptionLocalizations({ pl: "Opublikuj własny quiz z tematu lub dokładnego pytania. Wymaga uprawnień." })
+    .addStringOption(option => option.setName("topic").setDescription("Topic for a generated question. Choose topic or question.")
+      .setDescriptionLocalizations({ pl: "Temat dla wygenerowanego pytania. Wybierz temat albo pytanie." }).setMaxLength(maxCustomTopicLength))
+    .addStringOption(option => option.setName("question").setDescription("Exact question to publish. Choose topic or question.")
+      .setDescriptionLocalizations({ pl: "Dokładne pytanie do publikacji. Wybierz temat albo pytanie." }).setMaxLength(maxQuestionLength)), CUSTOM_MAX_DURATION_HOURS))
   .addSubcommand((subcommand) => subcommand
     .setName("publish")
-    .setDescription("Publish an available quiz slot early without shifting fixed repeat dates.")
-    .addStringOption((option) => option.setName("name").setDescription("Topic name.").setRequired(true).setMaxLength(80).setAutocomplete(true))
-    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional duration override for this quiz (1-24 hours).").setRequired(false).setMinValue(1).setMaxValue(24)));
+    .setDescription("Publish the next saved quiz now.")
+    .setDescriptionLocalizations({ pl: "Opublikuj teraz następny zapisany quiz." })
+    .addStringOption((option) => option.setName("name").setDescription("Topic name.")
+      .setDescriptionLocalizations({ pl: "Nazwa tematu." }).setRequired(true).setMaxLength(80).setAutocomplete(true))
+    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Optional voting duration, 1-24 hours.")
+      .setDescriptionLocalizations({ pl: "Opcjonalny czas głosowania, 1-24 godziny." }).setRequired(false).setMinValue(1).setMaxValue(24)));
 
 export const topicSubcommands = new Set(topicCommand.toJSON().options?.map(sub => sub.name));
 

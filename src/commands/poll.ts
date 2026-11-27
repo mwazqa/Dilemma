@@ -12,8 +12,10 @@ const closingPolls = new Set<string>();
 
 export const endCommand = new SlashCommandSubcommandBuilder()
   .setName("end")
-  .setDescription("End a managed quiz or your own random quiz immediately.")
-  .addStringOption(option => option.setName("message_id").setDescription("ID of the quiz message.").setRequired(true));
+  .setDescription("End a managed quiz or your own random/custom quiz.")
+  .setDescriptionLocalizations({ pl: "Zakończ zarządzany quiz lub własny random albo custom." })
+  .addStringOption(option => option.setName("message_id").setDescription("Message ID of the quiz.")
+    .setDescriptionLocalizations({ pl: "ID wiadomości quizu." }).setRequired(true));
 
 export async function handlePoll(interaction: ChatInputCommandInteraction) {
   await endQuiz(interaction, interaction.options.getString("message_id", true).trim(), "command");

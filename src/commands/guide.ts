@@ -5,9 +5,11 @@ import { getPlayerGuideContentHash, getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_
 import { registerGuidePublication } from "../services/guide-publications.js";
 
 export const guideCommand = new SlashCommandSubcommandGroupBuilder().setName("guide")
-  .setDescription("Publish the player guide and register this channel for release news.")
+  .setDescription("Publish player guide and register this channel for major release updates.")
+  .setDescriptionLocalizations({ pl: "Opublikuj poradnik i zarejestruj kanał dla ważnych aktualizacji wydań." })
   .addSubcommand(sub => sub.setName("publish")
-    .setDescription("Publish the guide and release news here. Requires server management or the Dilemma manager role."));
+    .setDescription("Publish player guide and major release updates here.")
+    .setDescriptionLocalizations({ pl: "Opublikuj tu poradnik i ważne aktualizacje wydań." }));
 
 export async function handleGuide(interaction: ChatInputCommandInteraction) {
   const { language, settings, text, reply } = await openFeedback(interaction);

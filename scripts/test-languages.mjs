@@ -6,11 +6,12 @@ const { MessageFlags } = await import("discord.js");
 const { message, messages, messageLanguages } = await import("../dist/messages.js");
 const { normalizeLanguage, languageNames } = await import("../dist/languages.js");
 const { supportedLanguages, languageCommand, handleSettings } = await import("../dist/commands/settings.js");
+const { dilemmaCommand } = await import("../dist/commands/dilemma.js");
 const { difficultyOption } = await import("../dist/difficulty.js");
 const { SlashCommandStringOption } = await import("discord.js");
 const { getVotePrompt, getResultMessage } = await import("../dist/brand.js");
 const { getGuildSettings, cacheGuildSettings, clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
-let stage = "catalog", reads = 0, writes = 0;
+let stage = "catalog", reads = 0, writes = 0, localizedDescriptions = 0;
 let stored = { guildId: "language-test", language: "ja", managerRoleId: null };
 db.guildSettings.findUnique = async () => { reads++; return { ...stored }; };
 db.guildSettings.upsert = async ({ update }) => { writes++; stored = { ...stored, ...update }; return { ...stored }; };
@@ -30,6 +31,17 @@ try {
   assert.deepEqual(supportedLanguages.map(item => item.value), messageLanguages);
   const difficulty = difficultyOption(new SlashCommandStringOption()).toJSON();
   assert.ok(difficulty.choices.every(choice => Object.keys(choice.name_localizations).join() === "pl"));
+  stage = "command-description-localizations";
+  const assertPolishDescriptions = (node, path = "dilemma") => {
+    if (typeof node.description === "string") {
+      assert.ok(node.description.length > 0 && node.description.length <= 100, `${path} has a valid English description`);
+      const polish = node.description_localizations?.pl;
+      assert.ok(typeof polish === "string" && polish.length > 0 && polish.length <= 100, `${path} has a Polish description`);
+      localizedDescriptions++;
+    }
+    for (const option of node.options ?? []) assertPolishDescriptions(option, `${path} ${option.name}`);
+  };
+  assertPolishDescriptions(dilemmaCommand.toJSON());
   for (const translations of Object.values(messages)) assert.equal(translations.length, 2);
   assert.equal(message("pl", "myQuizVoteButton"), "Moja odpowiedź");
   for (const [value, expected] of [["pl", "pl"], ["PL-pl", "pl"], [" pl_PL ", "pl"], ["en-GB", "en"], ["en-US", "en"]]) {
@@ -65,7 +77,7 @@ try {
     assert.ok(reply.content.includes(supportedLanguages.find(item => item.value === language).name));
   }
   assert.equal(writes, 2);
-  console.log(JSON.stringify({ check: "languages", passed: true, locales: messageLanguages.length, legacyFallback: true, staleSelectionsRejected: true, historyPreserved: true }));
+  console.log(JSON.stringify({ check: "languages", passed: true, locales: messageLanguages.length, localizedDescriptions, legacyFallback: true, staleSelectionsRejected: true, historyPreserved: true }));
 } catch (error) {
   console.error(JSON.stringify({ check: "languages", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "test-error",
     line: Number(error.stack?.match(/test-languages\.mjs:(\d+)/)?.[1] ?? 0) }));

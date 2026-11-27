@@ -13,34 +13,50 @@ import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSe
 import { message, normalizeLanguage } from "../messages.js";
 
 export const profileCommand = new SlashCommandSubcommandBuilder().setName("profile")
-  .setDescription("Show a player's profile: level, EXP, Sparks, accuracy and streaks.")
-  .addUserOption(option => option.setName("user").setDescription("Player; defaults to you."));
+  .setDescription("Show a player's profile, EXP, Sparks and streak.")
+  .setDescriptionLocalizations({ pl: "Pokaż profil gracza, EXP, Iskry i serię." })
+  .addUserOption(option => option.setName("user").setDescription("Player. Defaults to you.")
+    .setDescriptionLocalizations({ pl: "Gracz. Domyślnie Ty." }));
 
 export const leaderboardCommand = new SlashCommandSubcommandBuilder().setName("leaderboard")
-  .setDescription("Show this server's top ten players by total EXP.");
+  .setDescription("Show this server's EXP leaderboard.")
+  .setDescriptionLocalizations({ pl: "Pokaż ranking EXP tego serwera." });
 
 export const achievementsCommand = new SlashCommandSubcommandBuilder().setName("achievements")
-  .setDescription("Show unlocked quiz achievements and progress on this server.")
-  .addUserOption(option => option.setName("user").setDescription("Player; defaults to you."));
+  .setDescription("Show achievements and progress on this server.")
+  .setDescriptionLocalizations({ pl: "Pokaż osiągnięcia i postępy na tym serwerze." })
+  .addUserOption(option => option.setName("user").setDescription("Player. Defaults to you.")
+    .setDescriptionLocalizations({ pl: "Gracz. Domyślnie Ty." }));
 
 export const sparksCommand = new SlashCommandSubcommandGroupBuilder().setName("sparks")
-  .setDescription("Exchange your Sparks for EXP or send Sparks to another player.")
-  .addSubcommand(sub => sub.setName("exchange").setDescription(`Spend Sparks for EXP. Each Spark gives ${expPerSpark} EXP.`)
-    .addIntegerOption(option => option.setName("amount").setDescription(`Number of Sparks to spend now (minimum ${minExchangeSparks}).`)
+  .setDescription("Exchange Sparks for EXP or send them to another player.")
+  .setDescriptionLocalizations({ pl: "Wymień Iskry na EXP lub wyślij je innemu graczowi." })
+  .addSubcommand(sub => sub.setName("exchange").setDescription("Exchange Sparks for EXP.")
+    .setDescriptionLocalizations({ pl: "Wymień Iskry na EXP." })
+    .addIntegerOption(option => option.setName("amount").setDescription(`Sparks to exchange. Minimum ${minExchangeSparks}.`)
+      .setDescriptionLocalizations({ pl: `Iskry do wymiany. Minimum ${minExchangeSparks}.` })
       .setRequired(true).setMinValue(minExchangeSparks).setMaxValue(maxExchangeSparks)))
-  .addSubcommand(sub => sub.setName("transfer").setDescription("Send your Sparks to another player on this server, without a fee.")
-    .addUserOption(option => option.setName("user").setDescription("Player on this server who receives your Sparks.").setRequired(true))
+  .addSubcommand(sub => sub.setName("transfer").setDescription("Send Sparks to another player on this server.")
+    .setDescriptionLocalizations({ pl: "Wyślij Iskry innemu graczowi na tym serwerze." })
+    .addUserOption(option => option.setName("user").setDescription("Player on this server who receives your Sparks.")
+      .setDescriptionLocalizations({ pl: "Gracz z tego serwera, który otrzyma Iskry." }).setRequired(true))
     .addIntegerOption(option => option.setName("amount").setDescription("Whole number of Sparks to send.")
+      .setDescriptionLocalizations({ pl: "Całkowita liczba Iskier do wysłania." })
       .setRequired(true).setMinValue(minTransferSparks).setMaxValue(maxTransferSparks)));
 
 export const badgesCommand = new SlashCommandSubcommandGroupBuilder().setName("badges")
-  .setDescription("Choose the badges displayed on your player profile.")
-  .addSubcommand(sub => sub.setName("set").setDescription("Choose up to three unlocked profile badges, or hide all badges.")
+  .setDescription("Choose badges displayed on your player profile.")
+  .setDescriptionLocalizations({ pl: "Wybierz odznaki widoczne na profilu gracza." })
+  .addSubcommand(sub => sub.setName("set").setDescription("Choose up to three badges for your profile.")
+    .setDescriptionLocalizations({ pl: "Wybierz do trzech odznak dla swojego profilu." })
     .addStringOption(option => option.setName("achievement").setDescription("Choose an unlocked achievement, or no badge.")
+      .setDescriptionLocalizations({ pl: "Wybierz zdobyte osiągnięcie albo brak odznaki." })
       .setRequired(true).setAutocomplete(true).setMaxLength(32))
-    .addStringOption(option => option.setName("achievement_2").setDescription("Second unlocked badge; omit to show fewer badges.")
+    .addStringOption(option => option.setName("achievement_2").setDescription("Second unlocked badge. Omit to show fewer badges.")
+      .setDescriptionLocalizations({ pl: "Druga zdobyta odznaka. Pomiń, aby pokazać mniej." })
       .setAutocomplete(true).setMaxLength(32))
-    .addStringOption(option => option.setName("achievement_3").setDescription("Third unlocked badge; omit to show fewer badges.")
+    .addStringOption(option => option.setName("achievement_3").setDescription("Third unlocked badge. Omit to show fewer badges.")
+      .setDescriptionLocalizations({ pl: "Trzecia zdobyta odznaka. Pomiń, aby pokazać mniej." })
       .setAutocomplete(true).setMaxLength(32)));
 
 const rankMarkers = ["✦ **1.**", "✧ **2.**", "⋆ **3.**"];

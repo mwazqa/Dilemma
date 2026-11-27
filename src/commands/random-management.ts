@@ -7,15 +7,21 @@ import { openFeedback } from "../feedback.js";
 
 export const randomResetCommand = new SlashCommandSubcommandBuilder()
   .setName("random-cooldown-reset")
-  .setDescription("Reset the random quiz cooldown; the daily limit stays unchanged.");
+  .setDescription("Reset random quiz cooldown. Daily limit stays.")
+  .setDescriptionLocalizations({ pl: "Zresetuj czas oczekiwania randomu. Limit dzienny zostaje." });
 
 export const randomNotificationsCommand = new SlashCommandSubcommandGroupBuilder()
   .setName("random-notifications")
-  .setDescription("Configure the role ping when another random quiz becomes available.")
-  .addSubcommand(command => command.setName("set").setDescription("Set the role to ping when random is ready.")
-    .addRoleOption(option => option.setName("role").setDescription("Role to notify when another random quiz is available.").setRequired(true)))
-  .addSubcommand(command => command.setName("clear").setDescription("Turn off random availability pings."))
-  .addSubcommand(command => command.setName("show").setDescription("Show the current random availability notification role."));
+  .setDescription("Set a role ping for the next available random quiz.")
+  .setDescriptionLocalizations({ pl: "Ustaw ping roli dla następnego dostępnego randomu." })
+  .addSubcommand(command => command.setName("set").setDescription("Set the role pinged when a random quiz is ready.")
+    .setDescriptionLocalizations({ pl: "Ustaw rolę pingowaną przy dostępności randomu." })
+    .addRoleOption(option => option.setName("role").setDescription("Role to notify when a random quiz is available.")
+      .setDescriptionLocalizations({ pl: "Rola powiadamiana o dostępności randomu." }).setRequired(true)))
+  .addSubcommand(command => command.setName("clear").setDescription("Turn off random quiz availability pings.")
+    .setDescriptionLocalizations({ pl: "Wyłącz powiadomienia o dostępności randomu." }))
+  .addSubcommand(command => command.setName("show").setDescription("Show the random quiz notification role.")
+    .setDescriptionLocalizations({ pl: "Pokaż rolę powiadomień o randomie." }));
 
 export async function handleRandomReset(interaction: ChatInputCommandInteraction) {
   const { settings, text, reply } = await openFeedback(interaction);

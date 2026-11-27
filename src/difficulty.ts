@@ -8,7 +8,8 @@ export function parseDifficulty(value: unknown): Difficulty {
   return difficultySchema.parse(value ?? defaultDifficulty);
 }
 export function difficultyOption(option: SlashCommandStringOption) {
-  return option.setName("difficulty").setDescription("Question difficulty; omitted uses the saved default.")
+  return option.setName("difficulty").setDescription("Question difficulty. Defaults to Medium.")
+    .setDescriptionLocalizations({ pl: "Trudność pytania. Domyślnie średnia." })
     .addChoices(
       { name: "Easy", value: "easy", name_localizations: { pl: "Łatwy" } },
       { name: "Medium", value: "medium", name_localizations: { pl: "Średni" } },

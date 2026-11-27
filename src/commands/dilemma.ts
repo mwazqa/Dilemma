@@ -12,7 +12,8 @@ import { channelsCommand, handleChannels } from "./channels.js";
 import { handleRandomNotifications, handleRandomReset, randomNotificationsCommand, randomResetCommand } from "./random-management.js";
 
 export const dilemmaCommand = topicCommand
-  .setDescription("Dilemma quizzes, profile, leaderboard and server settings.")
+  .setDescription("Dilemma quiz commands and server settings.")
+  .setDescriptionLocalizations({ pl: "Komendy quizowe Dilemmy i ustawienia serwera." })
   .addSubcommand(languageCommand)
   .addSubcommand(timezoneCommand)
   .addSubcommand(pingCommand)

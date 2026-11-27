@@ -7,14 +7,20 @@ import { assignQuizChannel, QuizChannelAccessError, resolveQuizChannel } from ".
 
 export const channelsCommand = new SlashCommandSubcommandGroupBuilder()
   .setName("random-channels")
-  .setDescription("Restrict random quizzes to selected channels; an empty list allows all channels.")
-  .addSubcommand(command => command.setName("add").setDescription("Add an allowed random-quiz channel; the first entry enables restrictions.")
-    .addChannelOption(option => option.setName("channel").setDescription("Server channel for random quizzes.").setRequired(true)
+  .setDescription("Set channels for random and custom quizzes.")
+  .setDescriptionLocalizations({ pl: "Ustaw kanały dla losowych i własnych quizów." })
+  .addSubcommand(command => command.setName("add").setDescription("Allow a channel for random and custom quizzes.")
+    .setDescriptionLocalizations({ pl: "Dodaj kanał dla losowych i własnych quizów." })
+    .addChannelOption(option => option.setName("channel").setDescription("Channel for random and custom quizzes.")
+      .setDescriptionLocalizations({ pl: "Kanał dla losowych i własnych quizów." }).setRequired(true)
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
-  .addSubcommand(command => command.setName("remove").setDescription("Remove an allowed channel; removing the last entry allows random quizzes everywhere.")
-    .addChannelOption(option => option.setName("channel").setDescription("Random-quiz channel to remove; other allowed channels stay enabled.").setRequired(true)
+  .addSubcommand(command => command.setName("remove").setDescription("Remove an allowed channel.")
+    .setDescriptionLocalizations({ pl: "Usuń dozwolony kanał." })
+    .addChannelOption(option => option.setName("channel").setDescription("Allowed quiz channel to remove.")
+      .setDescriptionLocalizations({ pl: "Dozwolony kanał quizów do usunięcia." }).setRequired(true)
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
-  .addSubcommand(command => command.setName("list").setDescription("Show this server's assigned random quiz channels."));
+  .addSubcommand(command => command.setName("list").setDescription("Show allowed random and custom quiz channels.")
+    .setDescriptionLocalizations({ pl: "Pokaż dozwolone kanały losowych i własnych quizów." }));
 
 export async function handleChannels(interaction: ChatInputCommandInteraction) {
   const { settings, text, reply, replyBlocks } = await openFeedback(interaction);
