@@ -355,7 +355,7 @@ for (const command of [dilemmaCommand.toJSON()]) {
   for (const sub of command.options) {
     assert.ok(!sub.options?.some(option => option.name === "questions_per_run"));
     const duration = sub.options?.find(option => option.name === "duration_hours");
-    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, ["random", "custom"].includes(sub.name) ? 6 : 24); }
+    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, sub.name === "random" ? 6 : 24); }
   }
   for (const sub of command.options.filter(sub => ["create", "edit", "random", "custom"].includes(sub.name))) {
     const option = sub.options.find(option => option.name === "difficulty");

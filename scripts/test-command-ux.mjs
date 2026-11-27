@@ -100,6 +100,10 @@ try {
   assert.ok(find("random").options.every(option => !option.required));
   assert.deepEqual(names(find("custom")), ["topic", "question", "option_count", "difficulty", "duration_hours"]);
   assert.ok(find("custom").options.every(option => !option.required));
+  for (const [command, max] of [["random", 6], ["custom", 24]]) {
+    const duration = find(command).options.find(option => option.name === "duration_hours");
+    assert.deepEqual([duration.min_value, duration.max_value], [1, max]);
+  }
   assert.deepEqual(names(find("timezone")), ["value"]);
   assert.equal(find("profile").type, 1);
   assert.deepEqual(names(find("profile")), ["user"]);
@@ -253,11 +257,12 @@ try {
   await invalid("custom", { topic: "Chemia", question: askedQuestion }, "customInputInvalid");
   await invalid("custom", { question: "   " }, "questionTextInvalid", { max: 300 });
   await invalid("custom", { topic: "   " }, "customTopicInvalid", { max: 80 });
+  for (const hours of [0, 25, 1.5]) await invalid("custom", { topic: "Chemia", duration_hours: hours }, "durationInvalid");
   const beforeDeniedAsk = { writes, reservations, requests, deliveries };
   const deniedAsk = await invoke("custom", { question: askedQuestion }, false);
   assert.equal(deniedAsk.replies.at(-1), message("pl", "permission"));
   assert.deepEqual({ writes, reservations, requests, deliveries }, beforeDeniedAsk);
-  const asked = request("custom", { question: askedQuestion, option_count: 3, duration_hours: 2 }, false);
+  const asked = request("custom", { question: askedQuestion, option_count: 3, duration_hours: 24 }, false);
   asked.commandName = "dilemma";
   asked.options.getSubcommandGroup = () => null;
   asked.member = { roles: ["manager-role"] };
@@ -270,13 +275,21 @@ try {
   assert.deepEqual(JSON.parse(prompt), { suppliedQuestion: askedQuestion, optionCount: 3, difficulty: "medium" });
   assert.equal(savedPoll.question, askedQuestion);
   assert.equal(JSON.parse(savedPoll.options)[savedPoll.correctOption], "Cu");
-  assert.equal(quizDuration(sent), 2);
+  assert.equal(quizDuration(sent), 24);
   const oneOff = await invoke("custom", { topic: "Pierwiastki chemiczne", option_count: 3 });
   assert.equal(oneOff.replies.at(-1), message("pl", "randomDone", { name: "Test", count: 3 }));
   assert.match(prompt, /about Pierwiastki chemiczne/);
   assert.match(savedPoll.question, /^Pytanie \d+\?$/);
   assert.equal(savedPoll.kind, "custom");
+  assert.equal(quizDuration(sent), settings.defaultPollDurationHours);
   assert.equal(writes, beforeDeniedAsk.writes, "Custom quizzes do not create saved topics");
+  const pollCount = db.randomPoll.count;
+  db.randomPoll.count = async ({ where }) => where.kind === "custom" ? 1 : 0;
+  try {
+    await invalid("custom", { topic: "Chemia" }, "customDailyLimit");
+  } finally {
+    db.randomPoll.count = pollCount;
+  }
   await handleTopicAutocomplete({ guildId: "guild", options: { getFocused: () => ({ name: "name", value: "" }), getSubcommand: () => "create" },
     respond: async choices => assert.deepEqual(choices, []) });
   const beforeRace = writes;

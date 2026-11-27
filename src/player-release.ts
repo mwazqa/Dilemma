@@ -5,21 +5,13 @@ export const runningVersion: string = JSON.parse(readFileSync(new URL("../packag
 export type PlayerReleaseHighlights = { version: string; changes: { en: readonly string[]; pl: readonly string[] } };
 
 export const playerRelease: PlayerReleaseHighlights = {
-  version: "3.13.0",
+  version: "3.13.1",
   changes: {
     en: [
-      "Your total **EXP** now determines your place on the leaderboard. Your existing progress carries over.",
-      "Server managers and Dilemma managers can start a one-off quiz with `/dilemma custom` from a topic or an exact question. Custom and random quizzes have separate limits.",
-      "The private vote preview and 50/50 are free, with one use of each per week. New bets range from 1-10 Sparks on easy, 10-25 on medium and 25-50 on hard.",
-      "Approved quiz corrections and refunds now appear in **My result**. Dilemma also restores streaks broken by the corrected quiz.",
-      "The player guide now updates in its original message when its text changes."
+      "Voting in a `/dilemma custom` quiz can now last **1-24 hours**. Each server can start **one custom quiz per day**. The limit resets at midnight in the server's timezone."
     ],
     pl: [
-      "O miejscu w rankingu decyduje teraz suma **EXP**. Dotychczasowy postęp przechodzi na nowy system.",
-      "Osoby zarządzające serwerem i opiekunowie Dilemmy mogą uruchomić quiz z tematu lub konkretnego pytania przez `/dilemma custom`. Custom i random mają osobne limity.",
-      "Podgląd i 50/50 są darmowe. Każdego koła użyjesz raz w tygodniu. Nowe stawki to 1-10 Iskier w łatwym quizie, 10-25 w średnim i 25-50 w trudnym.",
-      "Zatwierdzone poprawki i zwroty zobaczysz w panelu **Mój wynik**. Dilemma przywraca też serie przerwane przez poprawiony quiz.",
-      "Gdy zmienia się treść poradnika, Dilemma aktualizuje jego dotychczasową wiadomość."
+      "Głosowanie w `/dilemma custom` może teraz trwać **1-24 godziny**. Każdy serwer może uruchomić **jeden taki quiz dziennie**. Limit odnawia się o północy według czasu serwera."
     ]
   }
 };

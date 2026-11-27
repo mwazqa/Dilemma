@@ -8,7 +8,7 @@ import { message, normalizeLanguage } from "../messages.js";
 import { getVotePrompt } from "../brand.js";
 import { buttonSettlementData, quizVotingPayload } from "./quiz-voting.js";
 import { normalizeRandomCategory } from "./random-categories.js";
-import { claimOnDemandQuiz, claimQuizRun, quizDay, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
+import { claimOnDemandQuiz, claimQuizRun, CUSTOM_MAX_DURATION_HOURS, quizDay, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { guildTimezone } from "./timezone.js";
@@ -128,7 +128,7 @@ export async function publishCustomQuiz(guildId: string, input: CustomQuizInput,
 
 async function publishOnDemand(guildId: string, optionCount: number, channel: SendableChannels, difficulty: Difficulty,
   durationHours: number, creatorUserId: string | null, input?: CustomQuizInput): Promise<string> {
-  const duration = validatePollDuration(durationHours, RANDOM_MAX_DURATION_HOURS);
+  const duration = validatePollDuration(durationHours, input ? CUSTOM_MAX_DURATION_HOURS : RANDOM_MAX_DURATION_HOURS);
   await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
   const kind = input ? "custom" : "random";

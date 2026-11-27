@@ -10,7 +10,7 @@ import { difficultyOption, parseDifficulty } from "../difficulty.js";
 import { openFeedback } from "../feedback.js";
 import { message, type MessageKey } from "../messages.js";
 import { privateErrorSummary } from "../private-errors.js";
-import { DailyQuizLimitError, RandomQuizCooldownError, RANDOM_MAX_DURATION_HOURS, TopicScheduleNotReadyError, isGenerationTime, isScheduleDate, quizDay } from "../services/quiz-limits.js";
+import { CUSTOM_MAX_DURATION_HOURS, DailyQuizLimitError, RandomQuizCooldownError, RANDOM_MAX_DURATION_HOURS, TopicScheduleNotReadyError, isGenerationTime, isScheduleDate, quizDay } from "../services/quiz-limits.js";
 import { ensureGuildSettings, getGuildSettings } from "../services/guild-settings.js";
 import { canManageDilemma } from "../services/management-permissions.js";
 import { scheduleEvents } from "../services/schedule-events.js";
@@ -38,11 +38,13 @@ function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boole
     .addIntegerOption(option => option.setName("option_count").setDescription(creating ? "Number of AI-created answers (2-4); default 4." : "Number of AI-created answers (2-4); replaces any legacy fixed answers.").setMinValue(2).setMaxValue(4));
 }
 
-function onDemandOptions(subcommand: SlashCommandSubcommandBuilder) {
+function onDemandOptions(subcommand: SlashCommandSubcommandBuilder, maximumHours: number) {
   return subcommand
     .addIntegerOption(option => option.setName("option_count").setDescription("Number of generated answers (2-4); defaults to 4.").setMinValue(2).setMaxValue(4))
     .addStringOption(difficultyOption)
-    .addIntegerOption(option => option.setName("duration_hours").setDescription("Voting duration in hours (1-6); default at most 6 hours.").setMinValue(1).setMaxValue(RANDOM_MAX_DURATION_HOURS));
+    .addIntegerOption(option => option.setName("duration_hours")
+      .setDescription(`Voting duration in hours (1-${maximumHours}); default at most ${maximumHours} hours.`)
+      .setMinValue(1).setMaxValue(maximumHours));
 }
 
 export const topicCommand = new SlashCommandBuilder()
@@ -74,12 +76,12 @@ export const topicCommand = new SlashCommandBuilder()
     .setDescription("Show Dilemma commands."))
   .addSubcommand(subcommand => onDemandOptions(subcommand
     .setName("random")
-    .setDescription("Generate a random quiz: four per server day, at least six hours apart.")))
+    .setDescription("Generate a random quiz: four per server day, at least six hours apart."), RANDOM_MAX_DURATION_HOURS))
   .addSubcommand(subcommand => onDemandOptions(subcommand
     .setName("custom")
-    .setDescription("Publish a one-off quiz from a topic or exact question. Requires Dilemma management access.")
+    .setDescription("Publish a quiz from a topic or exact question. One per server day. Requires management access.")
     .addStringOption(option => option.setName("topic").setDescription("Topic for a generated question; use topic or question.").setMaxLength(maxCustomTopicLength))
-    .addStringOption(option => option.setName("question").setDescription("Question to publish as written; use topic or question.").setMaxLength(maxQuestionLength))))
+    .addStringOption(option => option.setName("question").setDescription("Question to publish as written; use topic or question.").setMaxLength(maxQuestionLength)), CUSTOM_MAX_DURATION_HOURS))
   .addSubcommand((subcommand) => subcommand
     .setName("publish")
     .setDescription("Publish an available quiz slot early without shifting fixed repeat dates.")
@@ -135,7 +137,9 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     }
     const requestedOptionCount = interaction.options.getInteger("option_count");
     const duration = interaction.options.getInteger("duration_hours");
-    const invalid = numberError(requestedOptionCount, 2, 4, "optionCountInvalid") ?? numberError(duration, 1, RANDOM_MAX_DURATION_HOURS, "randomDurationInvalid");
+    const maxDuration = subcommand === "custom" ? CUSTOM_MAX_DURATION_HOURS : RANDOM_MAX_DURATION_HOURS;
+    const invalid = numberError(requestedOptionCount, 2, 4, "optionCountInvalid") ??
+      numberError(duration, 1, maxDuration, subcommand === "custom" ? "durationInvalid" : "randomDurationInvalid");
     if (invalid) { await reply(text(invalid)); return; }
     const optionCount = requestedOptionCount ?? 4;
     const settings = await ensureGuildSettings(interaction.guildId);
@@ -143,7 +147,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
-      const hours = duration ?? Math.min(settings.defaultPollDurationHours, RANDOM_MAX_DURATION_HOURS);
+      const hours = duration ?? Math.min(settings.defaultPollDurationHours, maxDuration);
       const generatedTopic = customInput
         ? await publishCustomQuiz(interaction.guildId, customInput, optionCount, channel, difficulty, hours, interaction.user.id)
         : await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty, hours, interaction.user.id);
@@ -156,7 +160,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
       }
       if (error instanceof RandomQuizCooldownError) {
         const remainingMinutes = Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000));
-        await reply(text(subcommand === "custom" ? "customCooldown" : "randomCooldown",
+        await reply(text("randomCooldown",
           { hours: Math.floor(remainingMinutes / 60), minutes: remainingMinutes % 60 }));
         return;
       }

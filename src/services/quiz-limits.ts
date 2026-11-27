@@ -33,6 +33,8 @@ export class TopicScheduleNotReadyError extends Error {
 export const RANDOM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 export const RANDOM_DAILY_LIMIT = 4;
 export const RANDOM_MAX_DURATION_HOURS = 6;
+export const CUSTOM_MAX_DURATION_HOURS = 24;
+const onDemandDailyLimits = { random: RANDOM_DAILY_LIMIT, custom: 1 } as const;
 export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun; timezone?: string };
 
 export class RandomQuizCooldownError extends Error {
@@ -47,7 +49,7 @@ async function onDemandUsage(tx: Prisma.TransactionClient, guildId: string, kind
   const dailyScope = `${kind}-daily`;
   const settings = kind === "random" ? await tx.guildSettings.findUnique({ where: { guildId }, select: { randomCooldownResetAt: true } }) : null;
   const resetAt = settings?.randomCooldownResetAt?.getTime() ?? 0;
-  const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, resetAt));
+  const cutoff = new Date(kind === "custom" ? +start - 1 : Math.max(+now - RANDOM_COOLDOWN_MS, resetAt));
   const [poll, stored] = await Promise.all([
     tx.randomPoll.findFirst({ where: { guildId, kind, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
     tx.dailyQuizRun.findMany({ where: { guildId, scope: { in: [kind, dailyScope] },
@@ -62,7 +64,7 @@ async function onDemandUsage(tx: Prisma.TransactionClient, guildId: string, kind
     ...(recorded.length ? { messageId: { notIn: recorded } } : {}) } });
   const pending = today.filter(row => row.scope === kind && row.day === "cooldown" && !row.messageId &&
     !daily.some(item => !item.messageId && +item.createdAt === +row.createdAt));
-  return { day, daily, pending, used: daily.length + legacyCount + pending.length, resetAt,
+  return { day, daily, pending, used: daily.length + legacyCount + pending.length, cutoff,
     latest: Math.max(poll?.createdAt.getTime() ?? 0, ...rows.filter(row => +row.createdAt >= resetAt).map(row => +row.createdAt)) };
 }
 
@@ -76,25 +78,25 @@ export async function randomQuizReadyAt(guildId: string, now = new Date(), timez
 export async function claimOnDemandQuiz(guildId: string, kind: OnDemandQuizKind, now: Date, timezone: string): Promise<QuizRun> {
   const key = { guildId, scope: kind, day: "cooldown", slot: 1 };
   const dailyScope = `${kind}-daily`;
+  const limit = onDemandDailyLimits[kind];
   let run: QuizRun;
   try {
     run = await db.$transaction(async tx => {
       const usage = await onDemandUsage(tx, guildId, kind, now, timezone);
-      if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError(kind);
-      const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, usage.resetAt));
-      if (usage.latest > +cutoff) throw new RandomQuizCooldownError(new Date(usage.latest + RANDOM_COOLDOWN_MS));
-      const updated = await tx.dailyQuizRun.updateMany({ where: { ...key, createdAt: { lte: cutoff } },
+      if (usage.used >= limit) throw new DailyQuizLimitError(kind);
+      if (kind === "random" && usage.latest > +usage.cutoff) throw new RandomQuizCooldownError(new Date(usage.latest + RANDOM_COOLDOWN_MS));
+      const updated = await tx.dailyQuizRun.updateMany({ where: { ...key, createdAt: { lte: usage.cutoff } },
         data: { createdAt: now, messageId: null } });
       const run = updated.count ? { ...key, createdAt: now, messageId: null }
         : await tx.dailyQuizRun.create({ data: { ...key, createdAt: now } });
       const occupied = new Set(usage.daily.filter(row => row.scope === dailyScope && row.day === usage.day).map(row => row.slot));
       for (const pending of usage.pending) {
-        const slot = Array.from({ length: RANDOM_DAILY_LIMIT }, (_, index) => index + 1).find(value => !occupied.has(value));
+        const slot = Array.from({ length: limit }, (_, index) => index + 1).find(value => !occupied.has(value));
         if (!slot) throw new DailyQuizLimitError(kind);
         await tx.dailyQuizRun.create({ data: { guildId, scope: dailyScope, day: usage.day, slot, createdAt: pending.createdAt } });
         occupied.add(slot);
       }
-      for (let slot = 1; slot <= RANDOM_DAILY_LIMIT; slot++) {
+      for (let slot = 1; slot <= limit; slot++) {
         if (occupied.has(slot)) continue;
         const dailyRun = await tx.dailyQuizRun.create({ data: { guildId, scope: dailyScope, day: usage.day, slot, createdAt: now } });
         return { ...run, dailyRun, timezone };
@@ -103,6 +105,7 @@ export async function claimOnDemandQuiz(guildId: string, kind: OnDemandQuizKind,
     });
   } catch (error) {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+    if (kind === "custom") throw new DailyQuizLimitError(kind);
     const current = await db.dailyQuizRun.findUnique({ where: { guildId_scope_day_slot: key } });
     throw new RandomQuizCooldownError(new Date((current?.createdAt ?? now).getTime() + RANDOM_COOLDOWN_MS));
   }
@@ -118,9 +121,12 @@ export async function refreshRandomQuizRun(run: QuizRun, timezone = run.timezone
   const refreshed = await db.$transaction(async tx => {
     const updated = await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot,
       createdAt: run.createdAt, messageId: null }, data: { createdAt } });
-    if (!updated.count) throw new RandomQuizCooldownError(new Date(createdAt.getTime() + RANDOM_COOLDOWN_MS));
+    if (!updated.count) {
+      if (kind === "custom") throw new DailyQuizLimitError(kind);
+      throw new RandomQuizCooldownError(new Date(+createdAt + RANDOM_COOLDOWN_MS));
+    }
     const usage = await onDemandUsage(tx, run.guildId, kind, createdAt, timezone, [run, dailyRun]);
-    if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError(kind);
+    if (usage.used >= onDemandDailyLimits[kind]) throw new DailyQuizLimitError(kind);
     const refreshed = await tx.dailyQuizRun.updateMany({ where: { ...runKey(dailyRun).guildId_scope_day_slot,
       createdAt: dailyRun.createdAt, messageId: null }, data: { createdAt } });
     if (!refreshed.count) throw new Error("Random daily reservation changed");

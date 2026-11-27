@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { requireTestDatabase } from "./test-database-guard.mjs";
 
 const prefix = `random-test-${randomUUID()}`;
-const guilds = ["parallel", "other", "release", "legacy", "published"].map(name => `${prefix}-${name}`);
+const guilds = ["parallel", "other", "release", "legacy", "published", "custom", "custom-history"].map(name => `${prefix}-${name}`);
 let db;
 let originalTransaction;
 
@@ -12,7 +12,7 @@ async function main() {
   Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test" });
   ({ db } = await import("../dist/db.js"));
   originalTransaction = db.$transaction.bind(db);
-  const { claimQuizRun, refreshRandomQuizRun, releaseQuizRun, quizDayBounds, DailyQuizLimitError,
+  const { claimQuizRun, claimOnDemandQuiz, refreshRandomQuizRun, releaseQuizRun, quizDayBounds, DailyQuizLimitError,
     RandomQuizCooldownError, RANDOM_COOLDOWN_MS } = await import("../dist/services/quiz-limits.js");
   const firstAt = new Date(+quizDayBounds(new Date()).start + 3_600_000);
   const simultaneous = async (guildId, at) => {
@@ -68,7 +68,28 @@ async function main() {
   }
   await assert.rejects(claimQuizRun(guilds[4], undefined, new Date(+firstAt + RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
   assert.equal(await db.dailyQuizRun.count({ where: { guildId: guilds[4] } }), 0);
-  console.log(JSON.stringify({ ok: true, concurrentClaims: true, dailyCap: true, guildAndTopicIsolation: true,
+
+  const timezone = "Europe/Warsaw";
+  const beforeMidnight = new Date(+quizDayBounds(firstAt, timezone).end - 1);
+  const afterMidnight = new Date(+beforeMidnight + 1);
+  const customClaim = at => claimOnDemandQuiz(guilds[5], "custom", at, timezone);
+  const customAttempts = await Promise.allSettled(Array.from({ length: 10 }, () => customClaim(beforeMidnight)));
+  assert.equal(customAttempts.filter(result => result.status === "fulfilled").length, 1);
+  assert.ok(customAttempts.filter(result => result.status === "rejected").every(result =>
+    result.reason instanceof DailyQuizLimitError && result.reason.kind === "custom"));
+  await claimQuizRun(guilds[5], undefined, beforeMidnight, true, timezone);
+  const nextCustom = await customClaim(afterMidnight);
+  assert.notEqual(nextCustom.dailyRun.day, customAttempts.find(result => result.status === "fulfilled").value.dailyRun.day);
+  await assert.rejects(customClaim(new Date(+afterMidnight + RANDOM_COOLDOWN_MS)), DailyQuizLimitError);
+  await assert.rejects(claimQuizRun(guilds[5], undefined, afterMidnight, true, timezone), RandomQuizCooldownError);
+  await releaseQuizRun(nextCustom);
+  await customClaim(afterMidnight);
+
+  await db.randomPoll.create({ data: { guildId: guilds[6], kind: "custom", language: "en", messageId: `${prefix}-custom-history`,
+    channelId: "test-only", question: "Test?", options: "A||B", correctOption: 0, explanation: "Test.", createdAt: beforeMidnight } });
+  await assert.rejects(claimOnDemandQuiz(guilds[6], "custom", beforeMidnight, timezone), DailyQuizLimitError);
+  await claimOnDemandQuiz(guilds[6], "custom", afterMidnight, timezone);
+  console.log(JSON.stringify({ ok: true, concurrentClaims: true, dailyCap: true, customDailyCap: true, guildAndTopicIsolation: true,
     rollback: true, failureRelease: true, upgradeHistory: true }));
 }
 

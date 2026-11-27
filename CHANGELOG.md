@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.13.1
+
+- Allow 1-24 hours of voting for `/dilemma custom` and one custom quiz per server day. Renew the separate custom quota at midnight in the server's timezone.
+- Update Discord command options and both help translations. Re-register the commands after upgrading from v3.13.0.
+
 ## v3.13.0 - 2026-11-27
 
 - Rank players by total EXP across correct answers, streak bonuses and Spark exchanges. Convert every existing score and answer award to EXP.
