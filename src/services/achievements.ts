@@ -1,8 +1,7 @@
-import { experiencePerPoint, experienceProgress, levelThreshold } from "./experience.js";
+import { experienceProgress, levelThreshold } from "./experience.js";
 
 export interface AchievementScore {
-  points: number;
-  bonusExp?: number;
+  exp: bigint;
   answered: number;
   correct: number;
   bestStreak: number;
@@ -42,8 +41,8 @@ export function encodeSelectedBadges(ids: readonly AchievementId[]): string | nu
 }
 
 export function achievementProgress(score: AchievementScore | null) {
-  const stats = score ?? { points: 0, answered: 0, correct: 0, bestStreak: 0 };
-  const level = experienceProgress(stats.points, stats.bonusExp).level;
+  const stats = score ?? { exp: 0n, answered: 0, correct: 0, bestStreak: 0 };
+  const level = experienceProgress(stats.exp).level;
   return achievements.map(achievement => {
     const value = achievement.metric === "level" ? level : stats[achievement.metric];
     return { ...achievement, current: Math.min(value, achievement.target), unlocked: value >= achievement.target };
@@ -58,14 +57,9 @@ export function selectedAchievements(score: (AchievementScore & { selectedBadge?
   });
 }
 
-export function achievementRequirement(id: string, bonusExp = 0) {
+export function achievementRequirement(id: string) {
   const achievement = achievements.find(item => item.id === id);
   if (!achievement) return null;
   if (achievement.metric !== "level") return { [achievement.metric]: { gte: achievement.target } };
-  const threshold = levelThreshold(achievement.target);
-  const countedBonus = Math.min(bonusExp, threshold);
-  return {
-    points: { gte: Math.ceil((threshold - countedBonus) / experiencePerPoint) },
-    ...(countedBonus > 0 ? { bonusExp: { gte: countedBonus } } : {})
-  };
+  return { exp: { gte: BigInt(levelThreshold(achievement.target)) } };
 }

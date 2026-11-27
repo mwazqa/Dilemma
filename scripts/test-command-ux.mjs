@@ -53,6 +53,7 @@ db.randomPoll.count = async () => 0;
 db.generatedPoll.count = async () => 0;
 db.randomPoll.findMany = async () => [];
 db.generatedPoll.findMany = async () => [];
+db.quizGenerationRule.findMany = async () => [];
 db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => { savedPoll = data; return data; };
 db.quizSettlement.create = async ({ data }) => data;
@@ -61,7 +62,9 @@ fetchFixture = async (_, options) => {
   requests++;
   const body = JSON.parse(options.body);
   prompt = body.input;
-  const question = { language: "pl", topic: "Test", question: `Pytanie ${requests}?`, options: generatedAnswers,
+  const suppliedQuestion = body.text.format.schema.properties.answerable && JSON.parse(body.input).suppliedQuestion;
+  const question = { language: "pl", topic: "Test", question: suppliedQuestion || `Pytanie ${requests}?`, options: generatedAnswers,
+    ...(suppliedQuestion ? { answerable: true } : {}),
     topicEmoji: "", optionEmojis: generatedAnswers.map(() => ""), correctOption: generatedAnswers.length - 1, explanation: "Krótki fakt." };
   return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(question) }] }] }), { headers: { "content-type": "application/json" } });
 };
@@ -79,10 +82,10 @@ function request(subcommand, values = {}, permitted = true) {
 async function invoke(subcommand, values = {}, permitted = true) {
   const interaction = request(subcommand, values, permitted); await handleTopic(interaction); return interaction;
 }
-async function invalid(subcommand, values, key) {
+async function invalid(subcommand, values, key, feedbackValues) {
   const before = { writes, reservations, requests, deliveries };
   const interaction = await invoke(subcommand, values);
-  assert.equal(interaction.replies.at(-1), message("pl", key));
+  assert.equal(interaction.replies.at(-1), message("pl", key, feedbackValues));
   assert.deepEqual({ writes, reservations, requests, deliveries }, before);
 }
 try {
@@ -95,6 +98,8 @@ try {
   assert.equal(find("edit").options[0].autocomplete, true);
   assert.deepEqual(names(find("random")), ["option_count", "difficulty", "duration_hours"]);
   assert.ok(find("random").options.every(option => !option.required));
+  assert.deepEqual(names(find("custom")), ["topic", "question", "option_count", "difficulty", "duration_hours"]);
+  assert.ok(find("custom").options.every(option => !option.required));
   assert.deepEqual(names(find("timezone")), ["value"]);
   assert.equal(find("profile").type, 1);
   assert.deepEqual(names(find("profile")), ["user"]);
@@ -107,11 +112,11 @@ try {
   assert.deepEqual(names(find("guide")), ["publish"]);
   assert.deepEqual(names(find("end")), ["message_id"]);
   assert.equal(find("defaults"), undefined);
-  assert.deepEqual(menu.options.map(option => option.name), ["random", "profile", "leaderboard", "achievements", "badges", "sparks", "end", "create", "edit", "list", "publish", "enable", "disable", "random-cooldown-reset", "random-channels", "random-notifications", "permissions", "guide", "help", "language", "timezone", "ping", "delete"]);
+  assert.deepEqual(menu.options.map(option => option.name), ["random", "custom", "profile", "leaderboard", "achievements", "badges", "sparks", "end", "create", "edit", "list", "publish", "enable", "disable", "random-cooldown-reset", "random-channels", "random-notifications", "permissions", "guide", "help", "language", "timezone", "ping", "delete"]);
   const actualPaths = menu.options.flatMap(option => option.type === 2
     ? option.options.map(sub => `/dilemma ${option.name} ${sub.name}`) : [`/dilemma ${option.name}`]);
-  assert.equal(actualPaths.length, 30); assert.equal(new Set(actualPaths).size, 30);
-  assert.deepEqual([...actualPaths].sort(), [...commandPaths].sort(), "The public catalog matches the approved thirty commands");
+  assert.equal(actualPaths.length, commandPaths.length); assert.equal(new Set(actualPaths).size, commandPaths.length);
+  assert.deepEqual([...actualPaths].sort(), [...commandPaths].sort(), "The public catalog matches the approved commands");
   assert.ok(actualPaths.every(path => !path.includes("quiz")));
   const beforeRetired = { writes, reservations, requests, deliveries };
   for (const [group, sub] of [[null, "configure"], [null, "run"], [null, "random-reset"], [null, "guide"], ["score", "transfer"], ["poll", "end"]]) {
@@ -243,6 +248,35 @@ try {
     }
   }
   channel.send = successfulSend;
+  const askedQuestion = "Który symbol oznacza miedź?";
+  await invalid("custom", {}, "customInputInvalid");
+  await invalid("custom", { topic: "Chemia", question: askedQuestion }, "customInputInvalid");
+  await invalid("custom", { question: "   " }, "questionTextInvalid", { max: 300 });
+  await invalid("custom", { topic: "   " }, "customTopicInvalid", { max: 80 });
+  const beforeDeniedAsk = { writes, reservations, requests, deliveries };
+  const deniedAsk = await invoke("custom", { question: askedQuestion }, false);
+  assert.equal(deniedAsk.replies.at(-1), message("pl", "permission"));
+  assert.deepEqual({ writes, reservations, requests, deliveries }, beforeDeniedAsk);
+  const asked = request("custom", { question: askedQuestion, option_count: 3, duration_hours: 2 }, false);
+  asked.commandName = "dilemma";
+  asked.options.getSubcommandGroup = () => null;
+  asked.member = { roles: ["manager-role"] };
+  settings = { ...settings, managerRoleId: "manager-role" };
+  const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
+  clearGuildSettingsCache("guild");
+  generatedAnswers = ["Na", "Fe", "Cu"];
+  await routeCommand(asked);
+  assert.equal(asked.replies.at(-1), message("pl", "questionDone", { count: 3 }));
+  assert.deepEqual(JSON.parse(prompt), { suppliedQuestion: askedQuestion, optionCount: 3, difficulty: "medium" });
+  assert.equal(savedPoll.question, askedQuestion);
+  assert.equal(JSON.parse(savedPoll.options)[savedPoll.correctOption], "Cu");
+  assert.equal(quizDuration(sent), 2);
+  const oneOff = await invoke("custom", { topic: "Pierwiastki chemiczne", option_count: 3 });
+  assert.equal(oneOff.replies.at(-1), message("pl", "randomDone", { name: "Test", count: 3 }));
+  assert.match(prompt, /about Pierwiastki chemiczne/);
+  assert.match(savedPoll.question, /^Pytanie \d+\?$/);
+  assert.equal(savedPoll.kind, "custom");
+  assert.equal(writes, beforeDeniedAsk.writes, "Custom quizzes do not create saved topics");
   await handleTopicAutocomplete({ guildId: "guild", options: { getFocused: () => ({ name: "name", value: "" }), getSubcommand: () => "create" },
     respond: async choices => assert.deepEqual(choices, []) });
   const beforeRace = writes;
@@ -295,6 +329,7 @@ try {
     assert.ok(message(language, "languagePlaceholder").length <= 150);
     assert.ok(message(language, "topicLimit", { limit: 31 }).includes("31"));
     assert.ok(getHelpContent(language).includes("31"));
+    assert.ok(getHelpContent(language).includes("`/dilemma custom`"));
     for (const key of ["aiUnavailable", "aiInvalidResponse", "aiConfiguration", "publishPermission", "generationFailed"]) {
       assert.ok(message(language, key).includes("~") && message(language, key).length < 2000);
     }

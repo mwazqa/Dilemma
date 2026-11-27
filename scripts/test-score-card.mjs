@@ -8,12 +8,12 @@ const { experienceProgress } = await import("../dist/services/experience.js");
 const { handleScore } = await import("../dist/commands/score.js");
 const { db } = await import("../dist/db.js");
 const { serverRank } = await import("../dist/services/score-ranking.js");
-function data(locale = "pl", name = "Mehow", points = 3) {
-  const progress = experienceProgress(points);
+function data(locale = "pl", name = "Mehow", exp = 30) {
+  const progress = experienceProgress(exp);
   return { title: name,
     level: message(locale, "scoreLevel", { level: progress.level }),
     rank: 3,
-    points: message(locale, "scorePoints", { points }).replace(/\*\*/g, ""),
+    totalExp: message(locale, "scoreLifetimeExp", { exp }),
     sparksLabel: message(locale, "sparksName"), sparks: "42",
     experience: message(locale, "scoreExpProgress", { earned: progress.earned, required: progress.required }),
     percent: progress.percent, answersLabel: message(locale, "scoreAnswers"), answers: "1",
@@ -96,6 +96,7 @@ for (const locale of messageLanguages) {
   const localized = await scoreCardSvg(data(locale));
   assert.ok(localized.includes(">#3</text>"));
   assert.ok(localized.includes(">Mehow</text>"), "Every locale displays just the nickname");
+  assert.ok(localized.includes(message(locale, "scoreLifetimeExp", { exp: 30 })));
   assert.ok(!localized.includes('y="250"'), "No next-level label above the progress bar");
   const png = await renderScoreCard(data(locale));
   const metadata = await sharp(png).metadata();
@@ -105,7 +106,7 @@ for (const locale of messageLanguages) {
   assert.equal(metadata.exif, undefined);
   assert.ok(png.length < 1024 * 1024);
 }
-const profile = await renderScoreCard(data("pl", "Gracz", 7));
+const profile = await renderScoreCard(data("pl", "Gracz", 70));
 const roundedMask = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560"><rect width="1120" height="560" rx="80" fill="white"/></svg>');
 const roundedProfile = await sharp(profile).composite([{ input: roundedMask, blend: "dest-in" }]).png().toBuffer();
 const pixels = await sharp(profile).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -125,7 +126,7 @@ for (const [left, top] of [[0, 0], [1048, 0], [0, 488], [1048, 488]]) {
   const after = await countCornerFrame(roundedProfile, left, top);
   assert.ok(before > 100 && after >= before * 0.99, "All four purple corners survive Discord-style rounded clipping");
 }
-const zero = await scoreCardSvg(data("pl", "Mehow", 10));
+const zero = await scoreCardSvg(data("pl", "Mehow", 100));
 assert.ok(!zero.includes("Następny: poziom"));
 assert.ok(zero.includes('width="0" height="30"'));
 assert.ok(!zero.includes('q 3 13 14 16'), "No misleading progress star at zero EXP");
@@ -153,38 +154,39 @@ assert.equal(await loadAvatar(avatarUrl), undefined, "Reject active input even i
 globalThis.fetch = realFetch;
 db.guildSettings.findUnique = async () => ({ language: "pl" });
 const rows = [
-  { guildId: "test", userId: "10", points: 3, correct: 1, answered: 1 },
-  { guildId: "test", userId: "20", points: 3, correct: 1, answered: 1 },
-  { guildId: "test", userId: "30", points: 3, correct: 2, answered: 2 },
-  { guildId: "test", userId: "40", points: 6, correct: 1, answered: 1 },
-  { guildId: "test", userId: "50", points: 0, correct: 0, answered: 1 },
-  { guildId: "test", userId: "60", points: 99, correct: 99, answered: 0 },
-  { guildId: "other", userId: "70", points: 99, correct: 99, answered: 99 }
+  { guildId: "test", userId: "10", exp: 30n, correct: 1, answered: 1 },
+  { guildId: "test", userId: "20", exp: 30n, correct: 1, answered: 1 },
+  { guildId: "test", userId: "30", exp: 30n, correct: 2, answered: 2 },
+  { guildId: "test", userId: "40", exp: 60n, correct: 1, answered: 1 },
+  { guildId: "test", userId: "50", exp: 0n, correct: 0, answered: 1 },
+  { guildId: "test", userId: "60", exp: 99n, correct: 0, answered: 0 },
+  { guildId: "other", userId: "70", exp: 999n, correct: 99, answered: 99 }
 ];
+const isRanked = row => row.guildId === "test" && (row.exp > 0n || row.answered > 0);
 let rankCalls = 0;
 db.userScore.count = async ({ where }) => {
   rankCalls++;
   assert.equal(where.guildId, "test");
-  assert.deepEqual(where.answered, { gt: 0 });
-  const [points, correct, id] = where.OR;
-  return rows.filter(row => row.guildId === where.guildId && row.answered > 0 && (
-    row.points > points.points.gt ||
-    (row.points === correct.points && row.correct > correct.correct.gt) ||
-    (row.points === id.points && row.correct === id.correct && row.userId < id.userId.lt)
+  assert.deepEqual(where.OR, [{ exp: { gt: 0n } }, { answered: { gt: 0 } }]);
+  const [exp, correct, id] = where.AND.OR;
+  return rows.filter(row => isRanked(row) && (
+    row.exp > exp.exp.gt ||
+    (row.exp === correct.exp && row.correct > correct.correct.gt) ||
+    (row.exp === id.exp && row.correct === id.correct && row.userId < id.userId.lt)
   )).length;
 };
-for (const row of rows.filter(row => row.guildId === "test" && row.answered > 0)) {
-  const expected = [...rows].filter(item => item.guildId === "test" && item.answered > 0)
-    .sort((a, b) => b.points - a.points || b.correct - a.correct || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
+for (const row of rows.filter(isRanked)) {
+  const expected = rows.filter(isRanked)
+    .sort((a, b) => Number(b.exp - a.exp) || b.correct - a.correct || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
   assert.equal(await serverRank("test", row.userId, row), expected.findIndex(item => item.userId === row.userId) + 1);
 }
 const beforeUnranked = rankCalls;
 assert.equal(await serverRank("test", "new", null), null);
-assert.equal(await serverRank("test", "new", { points: 0, correct: 0, answered: 0 }), null);
+assert.equal(await serverRank("test", "new", { exp: 0n, correct: 0, answered: 0 }), null);
 assert.equal(rankCalls, beforeUnranked);
 db.userScore.count = async ({ where }) => { assert.equal(where.guildId, "test"); return 12; };
-assert.equal(await serverRank("test", "1", { points: 3, correct: 1, answered: 1 }), 13);
-db.userScore.findUnique = async () => ({ points: 3, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1, sparks: 42 });
+assert.equal(await serverRank("test", "1", { exp: 30n, correct: 1, answered: 1 }), 13);
+db.userScore.findUnique = async () => ({ exp: 30n, answered: 1, correct: 1, currentStreak: 1, bestStreak: 1, sparks: 42 });
 const replies = [];
 const interaction = { guildId: "test", locale: "pl", user: { id: "1", displayName: "Test" },
   options: { getSubcommand: () => "profile", getUser: () => null }, deferReply: async () => {}, editReply: async payload => replies.push(payload) };
@@ -195,6 +197,7 @@ try {
 } finally { sharp.prototype.png = realPng; }
 assert.equal(replies[0].files, undefined);
 assert.ok(replies[0].embeds[0].toJSON().description.includes("30 / 100 EXP"), "Rendering failure retains textual score and EXP");
+assert.ok(replies[0].embeds[0].toJSON().description.includes(message("pl", "scoreLifetimeExp", { exp: 30 })));
 assert.equal(replies[0].embeds[0].toJSON().title, "Test");
 assert.ok(replies[0].embeds[0].toJSON().description.includes("#13"));
 assert.ok(!replies[0].embeds[0].toJSON().description.includes("w rankingu serwera"));
@@ -214,7 +217,7 @@ if (process.argv.includes("--preview")) {
   if (avatarOption >= 0 && process.argv[avatarOption + 1]) {
     previewAvatar = await sharp(await readFile(process.argv[avatarOption + 1])).resize(144, 144).png().toBuffer();
   }
-  for (const [name, card] of [["profile", data("pl", "Gracz", 7)], ["zero-sparks", { ...data("pl", "Gracz", 7), sparks: "0" }], ["large-values", { ...data("pl", "Gracz", 7), sparks: "2147483647", rank: Number.MAX_SAFE_INTEGER }], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 10)],
+  for (const [name, card] of [["profile", data("pl", "Gracz", 70)], ["zero-sparks", { ...data("pl", "Gracz", 70), sparks: "0" }], ["large-values", { ...data("pl", "Gracz", 70), sparks: "2147483647", rank: Number.MAX_SAFE_INTEGER }], ["long-name", data("pl", "Bardzo długi nick 👨‍👩‍👧‍👦 Zażółć gęślą jaźń ".repeat(5))], ["level-up", data("pl", "Mehow", 100)],
     ...[1, 2, 3, 4, null].map(rank => [`rank-${rank ?? "unranked"}`, { ...data(), rank }])]) {
     await writeFile(new URL(`${name}.png`, directory), await sharp(Buffer.from(await scoreCardSvg(card, previewAvatar))).png().toBuffer());
   }

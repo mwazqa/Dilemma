@@ -51,6 +51,7 @@ db.topic.update = async ({ where, data }) => {
   return { ...topic };
 };
 db.generatedPoll.findMany = db.randomPoll.findMany = db.dailyQuizRun.findMany = async () => [];
+db.quizGenerationRule.findMany = async () => [];
 db.generatedPoll.count = db.randomPoll.count = async () => 0;
 db.randomPoll.findFirst = async () => null;
 db.guildSettings.findUnique = async () => null;

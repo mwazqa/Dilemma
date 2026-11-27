@@ -1,7 +1,7 @@
 import { ComponentType, MessageFlags, SlashCommandSubcommandGroupBuilder, type ButtonInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { openFeedback } from "../feedback.js";
 import { canManageDilemma } from "../services/management-permissions.js";
-import { getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_BUTTON_ID } from "../services/player-guide.js";
+import { getPlayerGuideContentHash, getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_BUTTON_ID } from "../services/player-guide.js";
 import { registerGuidePublication } from "../services/guide-publications.js";
 
 export const guideCommand = new SlashCommandSubcommandGroupBuilder().setName("guide")
@@ -22,7 +22,8 @@ export async function handleGuide(interaction: ChatInputCommandInteraction) {
     await reply(text("guidePublishFailed")); return;
   }
   try {
-    await registerGuidePublication({ messageId: sent.id, guildId: interaction.guildId, channelId: channel.id });
+    await registerGuidePublication({ messageId: sent.id, guildId: interaction.guildId, channelId: channel.id },
+      false, true, getPlayerGuideContentHash(language));
   } catch {
     await sent.delete().catch(() => {});
     await reply(text("guideSubscribeFailed")); return;
@@ -44,7 +45,8 @@ export async function handleLegacyGuide(interaction: ButtonInteraction) {
   try {
     await registerGuidePublication({ messageId: source.id, guildId: interaction.guildId, channelId: interaction.channelId }, true, false);
     await source.edit(getPlayerGuidePayload(language));
-    await registerGuidePublication({ messageId: source.id, guildId: interaction.guildId, channelId: interaction.channelId }, true);
+    await registerGuidePublication({ messageId: source.id, guildId: interaction.guildId, channelId: interaction.channelId },
+      true, true, getPlayerGuideContentHash(language));
   } catch {
     await reply(text("guideRefreshFailed")); return;
   }

@@ -8,7 +8,7 @@ import { message, normalizeLanguage } from "../messages.js";
 import { getVotePrompt } from "../brand.js";
 import { buttonSettlementData, quizVotingPayload } from "./quiz-voting.js";
 import { normalizeRandomCategory } from "./random-categories.js";
-import { claimQuizRun, quizDay, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
+import { claimOnDemandQuiz, claimQuizRun, quizDay, RANDOM_MAX_DURATION_HOURS, refreshRandomQuizRun, releaseQuizRun, runKey, validatePollDuration } from "./quiz-limits.js";
 import { scheduleEvents } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { guildTimezone } from "./timezone.js";
@@ -116,29 +116,35 @@ export async function publishRandomQuestion(
   durationHours = RANDOM_MAX_DURATION_HOURS,
   creatorUserId: string | null = null
 ): Promise<string> {
-  return withQuestionPublication(guildId, () => publishRandom(guildId, optionCount, channel, difficulty, durationHours, creatorUserId));
+  return withQuestionPublication(guildId, () => publishOnDemand(guildId, optionCount, channel, difficulty, durationHours, creatorUserId));
 }
 
-async function publishRandom(guildId: string, optionCount: number, channel: SendableChannels, difficulty: Difficulty,
-  durationHours: number, creatorUserId: string | null): Promise<string> {
+type CustomQuizInput = { topic: string } | { question: string };
+
+export async function publishCustomQuiz(guildId: string, input: CustomQuizInput, optionCount: number, channel: SendableChannels,
+  difficulty: Difficulty, durationHours: number, creatorUserId: string): Promise<string> {
+  return withQuestionPublication(guildId, () => publishOnDemand(guildId, optionCount, channel, difficulty, durationHours, creatorUserId, input));
+}
+
+async function publishOnDemand(guildId: string, optionCount: number, channel: SendableChannels, difficulty: Difficulty,
+  durationHours: number, creatorUserId: string | null, input?: CustomQuizInput): Promise<string> {
   const duration = validatePollDuration(durationHours, RANDOM_MAX_DURATION_HOURS);
   await requireQuizChannel(guildId, channel.id);
   const settings = await getGuildSettings(guildId);
-  let run = await claimQuizRun(guildId, undefined, new Date(), true, guildTimezone(settings));
+  const kind = input ? "custom" : "random";
+  let run = await claimOnDemandQuiz(guildId, kind, new Date(), guildTimezone(settings));
   let sendAttempted = false;
   try {
     const language = normalizeLanguage(settings?.language ?? "en");
-    const history = await loadQuestionHistory(guildId);
-    const question = await generateUniqueQuestion(
-      guildId,
-      "a freely chosen, random, surprising and family-friendly general-knowledge topic",
-      language,
-      [],
-      optionCount,
-      history.questions,
-      difficulty,
-      history.categories
-    );
+    let question;
+    if (input && "question" in input) {
+      const generationRules = await loadGenerationRules();
+      question = shuffleQuestionOptions(await generateQuestion("", language, [], optionCount, [], undefined, difficulty, [], { generationRules, requestedQuestion: input.question }));
+    } else {
+      const history = await loadQuestionHistory(guildId, undefined, kind);
+      question = await generateUniqueQuestion(guildId, input?.topic ?? "a freely chosen, random, surprising and family-friendly general-knowledge topic",
+        language, [], optionCount, history.questions, difficulty, input ? [] : history.categories);
+    }
     run = await refreshRandomQuizRun(run, guildTimezone(await getGuildSettings(guildId)));
     await requireQuizChannel(guildId, channel.id);
     const expiresAt = new Date(Date.now() + duration * 3_600_000);
@@ -153,6 +159,7 @@ async function publishRandom(guildId: string, optionCount: number, channel: Send
       await tx.randomPoll.create({
         data: {
           guildId,
+          kind,
           creatorUserId,
           difficulty,
           language,
@@ -174,7 +181,7 @@ async function publishRandom(guildId: string, optionCount: number, channel: Send
         if (!saved.count) throw new Error("Random quiz reservation changed before persistence");
       }
     });
-    scheduleEvents.emit("randomPollPublished", guildId);
+    if (kind === "random") scheduleEvents.emit("randomPollPublished", guildId);
     scheduleEvents.emit("settlementChanged", { ...settlement, closedAt: null, scoredAt: null, nextCheckAt: new Date() });
     return question.topic;
   } finally {
@@ -196,9 +203,10 @@ async function generateUniqueQuestion(
   const index = new QuestionNoveltyIndex(history);
   const recentCategories = new Set(avoidTopics.map(normalizeRandomCategory));
   const rejected: string[] = [];
+  const generationRules = await loadGenerationRules();
   const signal = AbortSignal.timeout(env.AI_GENERATION_TIMEOUT_MS);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const question = await generateQuestion(topic, language, allowedOptions, optionCount, index.prompt(topicId, rejected), signal, difficulty, avoidTopics);
+    const question = await generateQuestion(topic, language, allowedOptions, optionCount, index.prompt(topicId, rejected), signal, difficulty, avoidTopics, { generationRules });
     if (!index.hasExact(question.question) && !recentCategories.has(normalizeRandomCategory(question.topic))) {
       const candidates = index.candidates(question.question, question.options[question.correctOption]);
       if (!candidates.length || !await repeatsQuestionFact(question, await loadQuestionFacts(guildId, candidates), signal)) return shuffleQuestionOptions(question);
@@ -208,6 +216,11 @@ async function generateUniqueQuestion(
     rejected.unshift(question.question);
   }
   throw new AiGenerationError("invalid-response");
+}
+
+async function loadGenerationRules() {
+  const rules = await db.quizGenerationRule.findMany({ select: { text: true }, orderBy: { key: "asc" } });
+  return rules.map(rule => rule.text);
 }
 
 function canAttachQuizCard(channel: SendableChannels): boolean {

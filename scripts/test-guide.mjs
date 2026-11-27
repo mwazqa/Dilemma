@@ -8,11 +8,11 @@ const { ComponentType, MessageFlags, PermissionFlagsBits, PermissionsBitField } 
 const { db } = await import("../dist/db.js");
 const { message, messageLanguages, feedbackKaomoji } = await import("../dist/messages.js");
 const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
-const { getPlayerGuideText, getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_BUTTON_ID } = await import("../dist/services/player-guide.js");
+const { getPlayerGuideContentHash, getPlayerGuideText, getPlayerGuidePayload, LEGACY_GUIDE_REFRESH_BUTTON_ID } = await import("../dist/services/player-guide.js");
 const { handleLegacyGuide } = await import("../dist/commands/guide.js");
 const { routeCommand, dilemmaCommand } = await import("../dist/commands/dilemma.js");
 const { registerGuidePublication, publishGuideReleaseNotice } = await import("../dist/services/guide-publications.js");
-const { discoverGuidePage, discoverArchivedGuideThreads, migrateLegacyGuide, startGuideUpdatesScheduler } = await import("../dist/services/guide-updates.js");
+const { discoverGuidePage, discoverArchivedGuideThreads, migrateLegacyGuide, startGuideUpdatesScheduler, updatePublishedGuide } = await import("../dist/services/guide-updates.js");
 const { getReleaseNoticePayload, isCurrentReleasePublished, runningVersion, playerRelease } = await import("../dist/player-release.js");
 const testRelease = { version: runningVersion, changes: { en: ["You can now transfer Sparks to other players."], pl: ["Możesz przesyłać Iskry innym graczom."] } };
 const testReleasePayload = language => getReleaseNoticePayload(language, testRelease);
@@ -106,6 +106,7 @@ try {
     assert.doesNotMatch(content, /\{\w+\}|^#{1,6}\s|<@|@everyone|@here|\b\d+\s*(?:Sparks|Iskier|EXP)\b/m);
     assert.ok(!content.includes("/dilemma guide publish"));
     assert.ok(content.includes("/dilemma profile"));
+    assert.ok(content.includes("/dilemma sparks exchange"));
     assert.ok(!content.includes("/dilemma score profile"));
     for (const key of ["myQuizVoteButton", "myQuizResultButton", "quizReportButton"]) assert.ok(content.includes(message(language, key)));
     assert.equal(payload.embeds[0].toJSON().description, content); assert.deepEqual(payload.components, []);
@@ -141,6 +142,7 @@ try {
     assert.equal(value.result.sent[0].nonce, "guide-invocation"); assert.equal(value.result.sent[0].enforceNonce, true);
     assert.equal(value.result.replies.length, 0); assert.equal(value.result.cleaned, 1);
     assert.equal(publications.size, 1); assert.ok([...publications.values()][0].genericAt);
+    assert.equal([...publications.values()][0].contentHash, getPlayerGuideContentHash(language));
     assert.ok([...receipts.values()][0].deliveredAt, "A new channel starts with the next release");
   }
   for (const access of [{ permission: 0n }, { permission: 0n, roles: [id(8)] }, { permission: 0n, roles: [managerRoleId], managerRole: null },
@@ -199,6 +201,39 @@ try {
   assert.ok(quietReceipt.deliveredAt); assert.equal(quietReceipt.messageId, null);
   assert.equal(await publishGuideReleaseNotice(client, guildId, channelId, async () => true, () => true, noHighlights), "done");
   assert.equal(posts.length, postsBeforeQuiet, "Minor-only releases never send a guide-channel message");
+  stage = "in-place-guide-update";
+  const guideRoute = `/channels/${channelId}/messages/${identity.messageId}`;
+  const guideMessage = { id: identity.messageId, channel_id: channelId, author: { id: botId },
+    embeds: [{ description: getPlayerGuideText("en") }], components: [] };
+  let guideReads = 0, guideEdits = 0, failGuideEdit = true;
+  const guideClient = { user: client.user, rest: {
+    get: async route => { assert.equal(route, guideRoute); guideReads++; return guideMessage; },
+    patch: async (route, { body }) => {
+      assert.equal(route, guideRoute);
+      assert.deepEqual(body.components, []); assert.deepEqual(body.allowed_mentions.parse, []);
+      if (failGuideEdit) throw Error("Synthetic edit failure");
+      guideEdits++; guideMessage.embeds = body.embeds;
+    }
+  } };
+  assert.equal(await updatePublishedGuide(guideClient, identity.messageId, async () => false), "unpublished");
+  assert.equal(guideReads, 0);
+  await assert.rejects(updatePublishedGuide(guideClient, identity.messageId, async () => true), /Synthetic edit failure/);
+  assert.ok(!publications.get(identity.messageId).contentHash, "A failed edit leaves the update pending");
+  failGuideEdit = false;
+  assert.equal(await updatePublishedGuide(guideClient, identity.messageId, async () => true), "done");
+  assert.equal(guideMessage.embeds[0].description, getPlayerGuideText("pl"));
+  assert.equal(publications.get(identity.messageId).contentHash, getPlayerGuideContentHash("pl"));
+  assert.equal(await updatePublishedGuide(guideClient, identity.messageId), "done");
+  assert.equal(guideReads, 2); assert.equal(guideEdits, 1);
+  assert.equal(posts.length, postsBeforeQuiet, "A guide edit creates no release message");
+  publications.get(identity.messageId).contentHash = null;
+  assert.equal(await updatePublishedGuide(guideClient, identity.messageId, async () => true), "done");
+  assert.equal(guideReads, 3); assert.equal(guideEdits, 1, "An existing edit is recorded without sending it again");
+  publications.get(identity.messageId).contentHash = null;
+  guideMessage.author.id = id(99);
+  assert.equal(await updatePublishedGuide(guideClient, identity.messageId, async () => true), "unavailable");
+  assert.equal(publications.get(identity.messageId).active, false);
+  assert.equal(guideEdits, 1);
   stage = "history-discovery";
   reset(); await db.guideDiscovery.upsert({ where: { channelId_kind: { channelId, kind: "messages" } }, create: { channelId, kind: "messages", guildId }, update: {} });
   const legacy = number => ({ id: id(number), channel_id: channelId, author: { id: botId }, components: [{ type: 1, components: [{ type: 2, custom_id: LEGACY_GUIDE_REFRESH_BUTTON_ID }] }] });
@@ -231,6 +266,7 @@ try {
   Date.now = realNow; globalThis.fetch = async () => { throw Error("Unexpected repeated release lookup"); };
   stage = "scheduler";
   reset(); await registerGuidePublication(identity, true);
+  guideMessage.author.id = botId; guideMessage.embeds = [{ description: "Old guide text" }];
   let time = realNow(), sequence = 0, requests = 0;
   const timers = new Map();
   Date.now = () => time;
@@ -239,7 +275,11 @@ try {
   const channel = { id: channelId, guildId, type: 0, threads: {}, isTextBased: () => true, isSendable: () => true, permissionsFor: () => ({ has: () => true }) };
   const worker = { user: { id: botId }, guilds: { cache: new Map([[guildId, { id: guildId, members: { me: {} }, channels: {
     fetch: async () => new Map([[channelId, channel]]), fetchActiveThreads: async () => ({ threads: new Map() }) } }]]) }, rest: {
-      get: async route => { requests++; return route === `/channels/${channelId}/messages` ? [] : { threads: [], has_more: false }; }, post: client.rest.post
+      get: async route => {
+        requests++;
+        if (route === guideRoute) return guideClient.rest.get(route);
+        return route === `/channels/${channelId}/messages` ? [] : { threads: [], has_more: false };
+      }, patch: guideClient.rest.patch, post: client.rest.post
     } };
   async function advance(ms) { const end = time + ms; let count = 0;
     while (true) { const timer = [...timers.values()].filter(item => item.at <= end).sort((a, b) => a.at - b.at)[0]; if (!timer) break;
@@ -248,10 +288,11 @@ try {
   stop = startGuideUpdatesScheduler(worker); await advance(0);
   assert.equal(posts.length, 2 + Number(Boolean(playerRelease.changes.en.length)));
   assert.ok([...receipts.values()][0].deliveredAt);
+  assert.equal(guideEdits, 2); assert.equal(guideMessage.embeds[0].description, getPlayerGuideText("pl"));
   const idleRequests = requests; await advance(86400000); assert.equal(requests, idleRequests);
   stop(); assert.equal(timers.size, 0); assert.equal(scheduleEvents.listenerCount("guidePublished"), 0);
   console.log(JSON.stringify({ check: "guide", passed: true, genericCopy: true, noRefreshButton: true, permissions: true, subscriptions: true,
-    legacyDiscovery: true, migrationResumes: true, releaseGate: true, oneNoticePerChannel: true, quietReleases: true, idleScheduler: true }));
+    legacyDiscovery: true, migrationResumes: true, releaseGate: true, inPlaceUpdates: true, oneNoticePerChannel: true, quietReleases: true, idleScheduler: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "guide", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation",
     line: Number(error.stack?.match(/test-guide\.mjs:(\d+)/)?.[1] || 0),

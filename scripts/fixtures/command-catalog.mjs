@@ -1,5 +1,5 @@
 export const commandPaths = [
-  "/dilemma random", "/dilemma profile", "/dilemma leaderboard", "/dilemma achievements",
+  "/dilemma random", "/dilemma custom", "/dilemma profile", "/dilemma leaderboard", "/dilemma achievements",
   "/dilemma badges set", "/dilemma sparks exchange", "/dilemma sparks transfer", "/dilemma end",
   "/dilemma create", "/dilemma edit", "/dilemma list", "/dilemma publish", "/dilemma enable",
   "/dilemma disable", "/dilemma delete", "/dilemma random-cooldown-reset",

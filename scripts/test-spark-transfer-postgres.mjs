@@ -52,7 +52,7 @@ try {
     assert.equal((await command({ amount: 1, requestId })).reply, message(language, "scoreTransferDone", { amount: 1, user: "<@bob>" }));
   }
   assert.equal((await wallet("alice")).sparks, 18); assert.equal((await wallet("bob")).sparks, 2);
-  assert.equal((await wallet("bob")).points, 0); assert.equal((await wallet("bob")).bonusExp, 0); assert.equal((await wallet("bob")).answered, 0);
+  assert.equal((await wallet("bob")).exp, 0n); assert.equal((await wallet("bob")).answered, 0);
   assert.equal(await db.sparkTransfer.count({ where: { guildId } }), 2);
   stage = "invalid-amounts-and-limits";
   for (const amount of [0, -1, 0.5, NaN, Infinity, maxTransferSparks + 1]) assert.equal((await transferSparks(id(), guildId, "alice", "bob", amount)).status, "invalid");
@@ -89,7 +89,7 @@ try {
   await seed("mixed", 6);
   await Promise.all([transferSparks(id(), guildId, "mixed", "mixed-recipient", 5), exchangeSparks(id(), guildId, "mixed", 3)]);
   const mixed = await wallet("mixed"), received = (await wallet("mixed-recipient"))?.sparks ?? 0;
-  assert.equal(mixed.sparks + received + mixed.bonusExp / 3, 6); assert.ok(mixed.sparks >= 0);
+  assert.equal(mixed.sparks + received + Number(mixed.exp) / 3, 6); assert.ok(mixed.sparks >= 0);
   await seed("alice", 50, otherGuild);
   assert.equal((await wallet("alice", otherGuild)).sparks, 50);
   stage = "atomic-failure-and-retry";

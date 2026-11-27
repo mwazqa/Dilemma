@@ -11,7 +11,7 @@ export function getHelpContent(language = "en"): string {
 export function getHelpEmbed(language = "en"): EmbedBuilder {
   const sections: { title: MessageKey; commands: [string, MessageKey][] }[] = [
     { title: "helpQuizzes", commands: [
-      ["/dilemma random", "helpRandom"], ["/dilemma end", "helpPoll"]
+      ["/dilemma random", "helpRandom"], ["/dilemma custom", "helpCustom"], ["/dilemma end", "helpPoll"]
     ] },
     { title: "helpPlayerProgress", commands: [
       ["/dilemma profile", "helpProfile"], ["/dilemma leaderboard", "helpLeaderboard"],

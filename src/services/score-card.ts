@@ -6,7 +6,7 @@ export interface ScoreCardData {
   title: string;
   level: string;
   rank: number | null;
-  points: string;
+  totalExp: string;
   sparksLabel: string;
   sparks: string;
   experience: string;
@@ -106,7 +106,7 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
   const level = await fitText(data.level, 340, 32, 24);
   const badges = (data.badges ?? []).filter((badge, index, all) => isAchievementId(badge.id)
     && all.findIndex(item => item.id === badge.id) === index).slice(0, maxDisplayedBadges);
-  const points = await fitText(data.points, badges.length ? 600 : 650, 26, 20, false);
+  const totalExp = await fitText(data.totalExp, 650, 26, 20, false);
   const sparks = await fitText(data.sparks, 226, 28, 18);
   const sparksWidth = Math.ceil(await textWidth(sparks.text, sparks.size, true)) + 76;
   const sparksX = 1058 - sparksWidth;
@@ -167,7 +167,7 @@ export async function scoreCardSvg(data: ScoreCardData, avatar?: Buffer): Promis
         <rect x="${rankX}" y="60" width="${rankWidth}" height="56" rx="14" fill="url(#rank-fill)" stroke="${rankStyle.color}" stroke-opacity="${podium ? 0.9 : 0.3}" stroke-width="${podium ? 2.5 : 1}"/>
         <text x="${rankX + rankWidth / 2}" y="100" text-anchor="middle" font-size="${rank.size}" font-weight="${podium ? "bold" : "normal"}" fill="${rankStyle.color}">${escapeXml(rank.text)}</text>
       </g>
-      ${text(56, 207, points.text, points.size, "#b5a2ed")}
+      ${text(56, 207, totalExp.text, totalExp.size, "#b5a2ed")}
       <g id="sparks-wallet" role="img">
         <title>${escapeXml(data.sparksLabel)}: ${escapeXml(data.sparks)}</title>
         <rect x="${sparksX}" y="213" width="${sparksWidth}" height="44" rx="14" fill="#20223e" stroke="#ad94f3" stroke-opacity="0.45"/>

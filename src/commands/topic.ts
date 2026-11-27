@@ -1,9 +1,9 @@
 import { ChannelType, SlashCommandBuilder, type SlashCommandSubcommandBuilder, type AutocompleteInteraction, type ChatInputCommandInteraction } from "discord.js";
 import { db } from "../db.js";
 import { createTopic, MAX_TOPICS_PER_GUILD, TopicLimitError } from "../services/topic-creation.js";
-import { publishRandomQuestion, publishTopicQuestions, QuizPublicationError, TopicChannelChangedError } from "../services/poll-publisher.js";
+import { publishCustomQuiz, publishRandomQuestion, publishTopicQuestions, QuizPublicationError, TopicChannelChangedError } from "../services/poll-publisher.js";
 import { getHelpEmbed } from "./help.js";
-import { AiGenerationError } from "../services/question-generator.js";
+import { AiGenerationError, AiQuestionNotAnswerableError } from "../services/question-generator.js";
 import { env } from "../config.js";
 import { guildTimezone } from "../services/timezone.js";
 import { difficultyOption, parseDifficulty } from "../difficulty.js";
@@ -18,6 +18,9 @@ import { inlineText } from "../formatting.js";
 import { canUseRandomQuizChannel, RandomQuizChannelError, QuizChannelAccessError, resolveQuizChannel } from "../services/quiz-channels.js";
 import { showTopicList } from "./topic-list.js";
 import { QuizPingError, resolveQuizPingRole } from "../services/quiz-notifications.js";
+import { maxQuestionLength } from "../types/question.js";
+
+const maxCustomTopicLength = 80;
 
 function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boolean) {
   subcommand
@@ -33,6 +36,13 @@ function topicOptions(subcommand: SlashCommandSubcommandBuilder, creating: boole
     .addIntegerOption(option => option.setName("duration_hours").setDescription("Voting duration in hours (1-24), independent of the publication interval.").setMinValue(1).setMaxValue(24))
     .addStringOption(difficultyOption)
     .addIntegerOption(option => option.setName("option_count").setDescription(creating ? "Number of AI-created answers (2-4); default 4." : "Number of AI-created answers (2-4); replaces any legacy fixed answers.").setMinValue(2).setMaxValue(4));
+}
+
+function onDemandOptions(subcommand: SlashCommandSubcommandBuilder) {
+  return subcommand
+    .addIntegerOption(option => option.setName("option_count").setDescription("Number of generated answers (2-4); defaults to 4.").setMinValue(2).setMaxValue(4))
+    .addStringOption(difficultyOption)
+    .addIntegerOption(option => option.setName("duration_hours").setDescription("Voting duration in hours (1-6); default at most 6 hours.").setMinValue(1).setMaxValue(RANDOM_MAX_DURATION_HOURS));
 }
 
 export const topicCommand = new SlashCommandBuilder()
@@ -62,12 +72,14 @@ export const topicCommand = new SlashCommandBuilder()
   .addSubcommand((subcommand) => subcommand
     .setName("help")
     .setDescription("Show Dilemma commands."))
-  .addSubcommand((subcommand) => subcommand
+  .addSubcommand(subcommand => onDemandOptions(subcommand
     .setName("random")
-    .setDescription("Generate a random quiz: four per server day, at least six hours apart.")
-    .addIntegerOption(option => option.setName("option_count").setDescription("Number of generated answers (2-4); defaults to 4.").setMinValue(2).setMaxValue(4))
-    .addStringOption(difficultyOption)
-    .addIntegerOption((option) => option.setName("duration_hours").setDescription("Voting duration in hours (1-6); default at most 6 hours.").setRequired(false).setMinValue(1).setMaxValue(RANDOM_MAX_DURATION_HOURS)))
+    .setDescription("Generate a random quiz: four per server day, at least six hours apart.")))
+  .addSubcommand(subcommand => onDemandOptions(subcommand
+    .setName("custom")
+    .setDescription("Publish a one-off quiz from a topic or exact question. Requires Dilemma management access.")
+    .addStringOption(option => option.setName("topic").setDescription("Topic for a generated question; use topic or question.").setMaxLength(maxCustomTopicLength))
+    .addStringOption(option => option.setName("question").setDescription("Question to publish as written; use topic or question.").setMaxLength(maxQuestionLength))))
   .addSubcommand((subcommand) => subcommand
     .setName("publish")
     .setDescription("Publish an available quiz slot early without shifting fixed repeat dates.")
@@ -97,7 +109,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  if (subcommand === "random") {
+  if (subcommand === "random" || subcommand === "custom") {
     const channel = interaction.channel;
     if (!channel?.isSendable()) {
       await reply(text("channel"));
@@ -105,6 +117,22 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     }
     if (!await canUseRandomQuizChannel(interaction.guildId, channel.id)) { await reply(text("randomChannelOnly")); return; }
     if (interaction.options.getString("options") !== null) { await reply(text("randomCustomAnswersUnavailable")); return; }
+    let customInput: Parameters<typeof publishCustomQuiz>[1] | undefined;
+    if (subcommand === "custom") {
+      const customTopic = interaction.options.getString("topic")?.trim();
+      const requestedQuestion = interaction.options.getString("question")?.trim();
+      if ((customTopic === undefined) === (requestedQuestion === undefined)) {
+        await reply(text("customInputInvalid"));
+        return;
+      }
+      if (requestedQuestion !== undefined) {
+        if (!requestedQuestion || requestedQuestion.length > maxQuestionLength) { await reply(text("questionTextInvalid", { max: maxQuestionLength })); return; }
+        customInput = { question: requestedQuestion };
+      } else {
+        if (!customTopic || customTopic.length > maxCustomTopicLength) { await reply(text("customTopicInvalid", { max: maxCustomTopicLength })); return; }
+        customInput = { topic: customTopic };
+      }
+    }
     const requestedOptionCount = interaction.options.getInteger("option_count");
     const duration = interaction.options.getInteger("duration_hours");
     const invalid = numberError(requestedOptionCount, 2, 4, "optionCountInvalid") ?? numberError(duration, 1, RANDOM_MAX_DURATION_HOURS, "randomDurationInvalid");
@@ -115,17 +143,21 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
     const timeoutSeconds = Math.ceil(env.AI_GENERATION_TIMEOUT_MS / 1000);
     await reply(text("generating", { seconds: timeoutSeconds, difficulty: text(difficulty) }));
     try {
-      const generatedTopic = await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty,
-        duration ?? Math.min(settings.defaultPollDurationHours, RANDOM_MAX_DURATION_HOURS), interaction.user.id);
-      await reply(text("randomDone", { name: inlineText(generatedTopic), count: optionCount }));
+      const hours = duration ?? Math.min(settings.defaultPollDurationHours, RANDOM_MAX_DURATION_HOURS);
+      const generatedTopic = customInput
+        ? await publishCustomQuiz(interaction.guildId, customInput, optionCount, channel, difficulty, hours, interaction.user.id)
+        : await publishRandomQuestion(interaction.guildId, optionCount, channel, difficulty, hours, interaction.user.id);
+      await reply(customInput && "question" in customInput ? text("questionDone", { count: optionCount })
+        : text("randomDone", { name: inlineText(generatedTopic), count: optionCount }));
     } catch (error) {
       if (error instanceof DailyQuizLimitError) {
-        await reply(text("randomDailyLimit"));
+        await reply(text(subcommand === "custom" ? "customDailyLimit" : "randomDailyLimit"));
         return;
       }
       if (error instanceof RandomQuizCooldownError) {
         const remainingMinutes = Math.max(1, Math.ceil((error.retryAt.getTime() - Date.now()) / 60_000));
-        await reply(text("randomCooldown", { hours: Math.floor(remainingMinutes / 60), minutes: remainingMinutes % 60 }));
+        await reply(text(subcommand === "custom" ? "customCooldown" : "randomCooldown",
+          { hours: Math.floor(remainingMinutes / 60), minutes: remainingMinutes % 60 }));
         return;
       }
       const feedback = quizErrorFeedback(error);
@@ -133,7 +165,7 @@ export async function handleTopic(interaction: ChatInputCommandInteraction) {
         await reply(text(feedback));
         return;
       }
-      console.error("Random dilemma failed:", privateErrorSummary(error));
+      console.error("On-demand dilemma failed:", privateErrorSummary(error));
       await reply(text("generationFailed"));
     }
     return;
@@ -338,6 +370,7 @@ function topicSummary(topic: { name: string; enabled: boolean; intervalDays: num
 function quizErrorFeedback(error: unknown): MessageKey | null {
   if (error instanceof TopicChannelChangedError) return "topicChanged";
   if (error instanceof RandomQuizChannelError) return "randomChannelOnly";
+  if (error instanceof AiQuestionNotAnswerableError) return "questionUnanswerable";
   if (error instanceof AiGenerationError) {
     return { unavailable: "aiUnavailable", limit: "quota", configuration: "aiConfiguration", "invalid-response": "aiInvalidResponse", timeout: "timeout" }[error.kind] as MessageKey;
   }

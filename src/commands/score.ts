@@ -8,16 +8,16 @@ import { exchangeSparks } from "../services/spark-exchange.js";
 import { maxTransferSparks, minTransferSparks, transferSparks } from "../services/spark-transfer.js";
 import { expPerSpark, maxExchangeSparks, minExchangeSparks } from "../services/sparks.js";
 import { boundedText, renderScoreCard } from "../services/score-card.js";
-import { serverRank } from "../services/score-ranking.js";
+import { rankEligibility, rankOrder, serverRank } from "../services/score-ranking.js";
 import { achievementProgress, achievementRequirement, badgeOptionNames, encodeSelectedBadges, isAchievementId, maxDisplayedBadges, selectedAchievements } from "../services/achievements.js";
 import { message, normalizeLanguage } from "../messages.js";
 
 export const profileCommand = new SlashCommandSubcommandBuilder().setName("profile")
-  .setDescription("Show a player's profile: level, EXP, points, Sparks, accuracy and streaks.")
+  .setDescription("Show a player's profile: level, EXP, Sparks, accuracy and streaks.")
   .addUserOption(option => option.setName("user").setDescription("Player; defaults to you."));
 
 export const leaderboardCommand = new SlashCommandSubcommandBuilder().setName("leaderboard")
-  .setDescription("Show this server's top ten players.");
+  .setDescription("Show this server's top ten players by total EXP.");
 
 export const achievementsCommand = new SlashCommandSubcommandBuilder().setName("achievements")
   .setDescription("Show unlocked quiz achievements and progress on this server.")
@@ -108,8 +108,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
       return;
     }
     if (!ids.length || !ids.every(isAchievementId)) { await reply(text("badgeUnknown")); return; }
-    const wallet = await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: interaction.user.id } }, select: { bonusExp: true } });
-    const requirements = ids.map(id => achievementRequirement(id, wallet?.bonusExp)!);
+    const requirements = ids.map(id => achievementRequirement(id)!);
     const saved = await db.userScore.updateMany({ where: { guildId, userId: interaction.user.id, AND: requirements },
       data: { selectedBadge: encodeSelectedBadges(ids) } });
     if (!saved.count) { await reply(text("badgeLocked")); return; }
@@ -118,13 +117,12 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
     return;
   }
   if (sub === "leaderboard") {
-    const players = await db.userScore.findMany({ where: { guildId, answered: { gt: 0 } },
-      orderBy: [{ points: "desc" }, { correct: "desc" }, { userId: "asc" }], take: 10 });
+    const players = await db.userScore.findMany({ where: { guildId, ...rankEligibility }, orderBy: rankOrder, take: 10 });
     const description = players.length ? players.map((player, i) => {
       const rank = rankMarkers[i] ?? `**${i + 1}.**`;
-      const progress = experienceProgress(player.points, player.bonusExp);
+      const progress = experienceProgress(player.exp);
       const accuracy = player.answered ? Math.round(player.correct / player.answered * 100) : 0;
-      return `${rank} <@${player.userId}>\n> ${text("scoreLevel", { level: progress.level })} · ${text("scorePoints", { points: player.points })}\n> ${text("scoreAnswers")}: ${player.answered} · ${text("scoreCorrect")}: ${player.correct} (${accuracy}%) · 🔥 ${player.bestStreak}`;
+      return `${rank} <@${player.userId}>\n> ${text("scoreTotalExp", { exp: String(player.exp) })} · ${text("scoreLevel", { level: progress.level })}\n> ${text("scoreAnswers")}: ${player.answered} · ${text("scoreCorrect")}: ${player.correct} (${accuracy}%) · 🔥 ${player.bestStreak}`;
     }).join("\n\n") : text("scoreEmpty");
     const embed = new EmbedBuilder()
       .setColor(0x8b5cf6)
@@ -157,7 +155,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
   const answered = player?.answered ?? 0;
   const correct = player?.correct ?? 0;
   const accuracy = answered ? Math.round(correct / answered * 100) : 0;
-  const progress = experienceProgress(player?.points ?? 0, player?.bonusExp);
+  const progress = experienceProgress(player?.exp ?? 0n);
   const rank = await serverRank(guildId, user.id, player);
   const title = displayName;
   const rankLabel = rank === null ? text("scoreUnranked") : text("scoreRank", { rank });
@@ -166,7 +164,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
     title, level: text("scoreLevel", { level: progress.level }),
     rank,
     badges: badges.map(badge => ({ id: badge.id, name: text(badge.name) })),
-    points: text("scorePoints", { points: player?.points ?? 0 }).replace(/\*\*/g, ""),
+    totalExp: text("scoreLifetimeExp", { exp: progress.totalExp }),
     sparksLabel: text("sparksName"), sparks: String(player?.sparks ?? 0),
     experience: text("scoreExpProgress", { earned: progress.earned, required: progress.required }),
     percent: progress.percent,
@@ -178,7 +176,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
   try { card = await renderScoreCard(cardData, avatar); }
   catch { }
   if (card) {
-    const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.points}\n${cardData.sparksLabel}: ${cardData.sparks}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
+    const alt = `${boundedText(title, 250)}\n${cardData.level} · ${cardData.totalExp}\n${cardData.sparksLabel}: ${cardData.sparks}\n${rankLabel}\n${cardData.experience} (${progress.percent}%)\n${cardData.answersLabel}: ${answered}\n${cardData.correctLabel}: ${cardData.correct}\n${cardData.streakLabel}: ${cardData.streak}${cardData.badges.length ? `\n${text("scoreBadge", { badge: cardData.badges.map(badge => badge.name).join(", ") })}` : ""}`;
     const attachment = new AttachmentBuilder(card, { name: "quiz-profile.png", description: boundedText(alt, 1000) });
     await reply({ content: null, embeds: [new EmbedBuilder().setColor(0xad94f3).setImage("attachment://quiz-profile.png")], files: [attachment] });
     return;
@@ -186,7 +184,7 @@ export async function handleScore(interaction: ChatInputCommandInteraction, acti
   const embed = new EmbedBuilder()
     .setColor(0xad94f3)
     .setTitle(boundedText(title, 250))
-    .setDescription(`**${cardData.level}** · ${rank === null ? rankLabel : `#${rank}`}\n${text("scorePoints", { points: player?.points ?? 0 })}\n${cardData.experience}\n${progressBar(progress.percent)}`)
+    .setDescription(`**${cardData.level}** · ${rank === null ? rankLabel : `#${rank}`}\n${cardData.totalExp}\n${cardData.experience}\n${progressBar(progress.percent)}`)
     .addFields(
       { name: `✦ ${cardData.sparksLabel}`, value: cardData.sparks, inline: true },
       { name: `📚 ${text("scoreAnswers")}`, value: String(answered), inline: true },

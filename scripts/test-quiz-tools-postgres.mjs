@@ -15,9 +15,9 @@ const {MessageFlags}=await import("discord.js");
 const guildId=`tools-test-${randomUUID()}`, otherGuild=`${guildId}-other`;
 const originalTransaction=db.$transaction.bind(db);
 const client={user:{id:"bot"},rest:{get:async()=>{throw new Error("Button quizzes must not use native poll endpoints");}}};
-const createQuiz=async(name,count=4,guild=guildId)=>{
+const createQuiz=async(name,count=4,guild=guildId,difficulty="medium")=>{
   const identity={messageId:`${guildId}-${name}`,guildId:guild,channelId:"test-channel"};
-  const quiz=await db.quizSettlement.create({data:buttonSettlementData(identity,"medium",count,0,new Date(Date.now()+21_600_000))});
+  const quiz=await db.quizSettlement.create({data:buttonSettlementData(identity,difficulty,count,0,new Date(Date.now()+21_600_000))});
   await db.randomPoll.create({data:{...identity,language:"en",category:"Test topic",question:"Test question?",options:JSON.stringify(["Alpha","Beta","Gamma","Delta"].slice(0,count)),correctOption:0,explanation:"Test fact.",optionEmojis:""}});
   return quiz;
 };
@@ -51,30 +51,44 @@ try{
   stage="fifty-fifty";
   await seed("hinter"); await castQuizVote(quiz,"hinter",2);
   const hints=await Promise.all(Array.from({length:4},()=>useQuizTool(quiz,"hinter","fifty")));
-  assert.ok(hints.every(hint=>hint.status==="hint")); assert.equal(await balance("hinter"),15);
+  assert.ok(hints.every(hint=>hint.status==="hint")); assert.equal(await balance("hinter"),20);
   assert.equal(hints[0].answerIds.length,2); assert.ok(hints[0].answerIds.includes(1));
   for(const hint of hints)assert.deepEqual(hint.answerIds,hints[0].answerIds);
   await db.$disconnect(); assert.deepEqual((await useQuizTool(quiz,"hinter","fifty")).answerIds,hints[0].answerIds);
   const eliminated=[1,2,3,4].find(id=>id!==2&&!hints[0].answerIds.includes(id));
-  assert.equal((await castQuizVote(quiz,"hinter",eliminated)).status,"eliminated"); assert.equal(await balance("hinter"),15);
-  await castQuizVote(quiz,"hinter",1); assert.equal(await balance("hinter"),14);
+  assert.equal((await castQuizVote(quiz,"hinter",eliminated)).status,"eliminated"); assert.equal(await balance("hinter"),20);
+  await castQuizVote(quiz,"hinter",1); assert.equal(await balance("hinter"),19);
   const three=await createQuiz("three",3),two=await createQuiz("two",2);
-  assert.equal((await useQuizTool(two,"hinter","fifty")).status,"unavailable"); assert.equal(await balance("hinter"),14);
-  const threeHint=await useQuizTool(three,"hinter","fifty"); assert.equal(threeHint.answerIds.length,2); assert.ok(threeHint.answerIds.includes(1));
+  assert.equal((await useQuizTool(two,"hinter","fifty")).status,"unavailable"); assert.equal(await balance("hinter"),19);
+  assert.equal((await useQuizTool(three,"hinter","fifty")).status,"weekly-limit");
+  assert.equal((await useQuizTool(three,"hinter","reveal")).status,"revealed");
+  assert.equal((await useQuizTool(two,"walletless","fifty")).status,"unavailable");
+  const threeHint=await useQuizTool(three,"walletless","fifty"); assert.equal(threeHint.answerIds.length,2); assert.ok(threeHint.answerIds.includes(1));
+  assert.equal(await player("walletless"),null);
   stage="private-preview";
   const preview=await createQuiz("preview"); await seed("viewer",10);
   await castQuizVote(preview,"a",1); await castQuizVote(preview,"b",2);
   const previews=await Promise.all(Array.from({length:4},()=>useQuizTool(preview,"viewer","reveal")));
-  assert.ok(previews.every(result=>result.status==="revealed")); assert.deepEqual(previews[0].counts,[1,1,0,0]); assert.equal(await balance("viewer"),7);
-  await castQuizVote(preview,"c",1); assert.deepEqual((await useQuizTool(preview,"viewer","reveal")).counts,[2,1,0,0]); assert.equal(await balance("viewer"),7);
+  assert.ok(previews.every(result=>result.status==="revealed")); assert.deepEqual(previews[0].counts,[1,1,0,0]); assert.equal(await balance("viewer"),10);
+  await castQuizVote(preview,"c",1); assert.deepEqual((await useQuizTool(preview,"viewer","reveal")).counts,[2,1,0,0]); assert.equal(await balance("viewer"),10);
   const replies=[];
   await handleQuizVote({guildId,channelId:preview.channelId,message:{id:preview.messageId,author:{id:"bot"}},customId:"quiz:reveal",client,locale:"en",user:{id:"viewer",bot:false},
     deferReply:async payload=>assert.equal(payload.flags,MessageFlags.Ephemeral),editReply:async payload=>{assert.deepEqual(payload.allowedMentions.parse,[]);replies.push(payload.content);}});
-  assert.match(replies[0],/Alpha: \*\*2\*\*/); assert.equal(await balance("viewer"),7);
+  assert.match(replies[0],/Alpha: \*\*2\*\*/); assert.equal(await balance("viewer"),10);
+  stage="weekly-lifelines";
+  const acrossQuizzes=await Promise.all([quiz,preview].map(active=>useQuizTool(active,"weekly-player","reveal")));
+  assert.deepEqual(acrossQuizzes.map(result=>result.status).sort(),["revealed","weekly-limit"]);
+  const foreignLifeline=await createQuiz("foreign-lifeline",4,otherGuild);
+  assert.equal((await useQuizTool(foreignLifeline,"weekly-player","reveal")).status,"revealed");
+  const weeklyKey={guildId_userId_kind:{guildId,userId:"weekly-player",kind:"reveal"}};
+  await db.quizWeeklyToolUse.update({where:weeklyKey,data:{weekStart:"2000-01-03"}});
+  assert.equal((await useQuizTool(three,"weekly-player","reveal")).status,"revealed");
+  assert.notEqual((await db.quizWeeklyToolUse.findUniqueOrThrow({where:weeklyKey})).weekStart,"2000-01-03");
+  assert.equal(await db.quizCharge.count({where:{userId:"weekly-player"}}),0);
   stage="wager-follow-refund";
   const betting=await createQuiz("betting"); await seed("bettor");
   assert.equal((await placeQuizWager(betting,"bettor",10)).status,"missing");
-  for(const amount of [0,11,20,21,1.5,NaN])assert.equal((await placeQuizWager(betting,"bettor",amount)).status,"invalid");
+  for(const amount of [0,9,26,50,1.5,NaN])assert.equal((await placeQuizWager(betting,"bettor",amount)).status,"invalid");
   await castQuizVote(betting,"bettor",2);
   const bets=await Promise.all(Array.from({length:4},()=>placeQuizWager(betting,"bettor",10)));
   assert.equal(bets.filter(result=>result.status==="placed").length,1); assert.equal(await balance("bettor"),10);
@@ -93,7 +107,7 @@ try{
   const claims=await Promise.all(Array.from({length:3},()=>applyFinalVotes(settled,final.votes,final.finishedAt)));
   assert.equal(claims.filter(Boolean).length,1); assert.equal(await balance("winner"),32); assert.equal(await balance("loser"),7);
   assert.equal((await wager(settled,"winner")).payout,20); assert.equal((await wager(settled,"loser")).payout,0);
-  assert.equal((await player("winner")).points,2); assert.equal((await player("loser")).points,0);
+  assert.equal((await player("winner")).exp,20n); assert.equal((await player("loser")).exp,0n);
   const results=[]; await publishQuizResults(client,settled,"en",async payload=>results.push(payload));
   assert.match(results[0].content,/Alpha: \*\*1\*\*/); assert.match(results[0].content,/Delta: \*\*0\*\*/);
   assert.equal(await publishQuizResults(client,settled,"en",async payload=>results.push(payload)),false);
@@ -106,6 +120,8 @@ try{
   assert.equal(await balance("rollback"),20); assert.equal(await wager(rollback,"rollback"),null);
   inject("quizSupport"); await assert.rejects(useQuizTool(rollback,"rollback","reveal"),/Injected/); db.$transaction=originalTransaction;
   assert.equal(await balance("rollback"),20);
+  assert.equal(await db.quizWeeklyToolUse.count({where:{guildId,userId:"rollback"}}),0);
+  assert.equal((await useQuizTool(rollback,"rollback","reveal")).status,"revealed");
   await placeQuizWager(rollback,"rollback",10);
   inject("quizVote"); await assert.rejects(castQuizVote(rollback,"rollback",null),/Injected/); db.$transaction=originalTransaction;
   assert.equal(await balance("rollback"),10); assert.equal((await wager(rollback,"rollback")).amount,10); assert.ok(await vote(rollback,"rollback"));
@@ -127,9 +143,21 @@ try{
   const purchases=await Promise.all([placeQuizWager(one,"spender",10),placeQuizWager(second,"spender",10)]);
   assert.equal(purchases.filter(result=>result.status==="placed").length,1); assert.equal(await balance("spender"),5);
   const foreign=await createQuiz("foreign",4,otherGuild); await castQuizVote(foreign,"spender",1);
-  assert.equal((await placeQuizWager(foreign,"spender",1)).status,"insufficient");
+  assert.equal((await placeQuizWager(foreign,"spender",10)).status,"insufficient");
   const max=await createQuiz("max"); await seed("max",10); await castQuizVote(max,"max",1);
   assert.equal((await placeQuizWager(max,"max",10)).status,"placed"); assert.equal(await balance("max"),0);
+  stage="difficulty-wager-bounds";
+  for(const [difficulty,min,max] of [["easy",1,10],["medium",10,25],["hard",25,50]]){
+    const rangeQuiz=await createQuiz(`range-${difficulty}`,4,guildId,difficulty);
+    for(const [side,stake] of [["min",min],["max",max]]){
+      const userId=`${difficulty}-${side}`; await seed(userId,stake); await castQuizVote(rangeQuiz,userId,1);
+      for(const amount of [min-1,max+1])assert.deepEqual(await placeQuizWager(rangeQuiz,userId,amount),{status:"invalid",min,max});
+      assert.equal((await placeQuizWager(rangeQuiz,userId,stake)).status,"placed");
+      assert.equal(await balance(userId),0);
+    }
+    await close(rangeQuiz); await applyFinalVotes(rangeQuiz,[],new Date());
+    assert.equal((await wager(rangeQuiz,`${difficulty}-max`)).payout,2*max);
+  }
   stage="modal";
   const modal=await createQuiz("modal"); await seed("modal",20); await castQuizVote(modal,"modal",1);
   const modalReplies=[];
@@ -138,7 +166,7 @@ try{
   await handleWagerModal(submit); await handleWagerModal(submit); assert.equal(await balance("modal"),10); assert.equal(modalReplies.length,2);
   stage="retired-command";
   const retiredQuiz=await createQuiz("retired-command"); await seed("retired-player",10); await castQuizVote(retiredQuiz,"retired-player",1);
-  await placeQuizWager(retiredQuiz,"retired-player",5); await useQuizTool(retiredQuiz,"retired-player","reveal"); await close(retiredQuiz);
+  await placeQuizWager(retiredQuiz,"retired-player",10); await useQuizTool(retiredQuiz,"retired-player","reveal"); await close(retiredQuiz);
   const stale=await collectFinalVotes(client,retiredQuiz), profileBeforeRetired=await player("retired-player");
   await handleScore({guildId,locale:"en",user:{id:"retired-player"},options:{getSubcommand:()=>"forget",getBoolean:()=>true},deferReply:async()=>{},editReply:async payload=>assert.ok(payload.content.includes("/dilemma help"))});
   assert.deepEqual(await player("retired-player"),profileBeforeRetired);
@@ -175,6 +203,7 @@ try{
   db.$transaction=originalTransaction;
   await db.quizSettlement.deleteMany({where:{guildId:{in:[guildId,otherGuild]}}}).catch(()=>{});
   await db.randomPoll.deleteMany({where:{guildId:{in:[guildId,otherGuild]}}}).catch(()=>{});
+  await db.quizWeeklyToolUse.deleteMany({where:{guildId:{in:[guildId,otherGuild]}}}).catch(()=>{});
   await db.userScore.deleteMany({where:{guildId:{in:[guildId,otherGuild]}}}).catch(()=>{});
   await db.guildSettings.deleteMany({where:{guildId:{in:[guildId,otherGuild]}}}).catch(()=>{});
   await db.$disconnect();

@@ -89,7 +89,7 @@ try {
       + voteBreakdown(language,["Alpha||Beta","Gamma"],[1,0]) + "\n\n"
       + quizClosureSummary(language, { closedAt: new Date(0), closedByUserId: null, closeSource: "automatic" }));
     assert.equal(poll.closeSource, "automatic"); assert.equal(poll.closedByUserId, null);
-    assert.equal(score.points, 3, "Changing the topic difficulty does not change an active quiz");
+    assert.equal(score.exp, 30n, "Changing the topic difficulty does not change an active quiz");
     assert.equal(quiz.resultsPending, false); assert.ok(quiz.scoredAt); assert.ok(poll.endedAt);
     await runDueSettlements(client); assert.equal(results.length, 1); assert.equal(answers.length, 1);
   }
@@ -110,7 +110,7 @@ try {
   assert.equal(poll.closedByUserId, null);
   assert.ok(results[0].includes(message(language, "quizClosureUnknown")));
   reset(); failPost = true; await runDueSettlements(client);
-  assert.ok(quiz.scoredAt, "A result send failure must not lose points"); assert.equal(score.points, 3);
+  assert.ok(quiz.scoredAt, "A result send failure must not lose EXP"); assert.equal(score.exp, 30n);
   assert.equal(quiz.resultsPending, true); assert.equal(poll.endedAt, null);
   const readsBeforeRetry = voterReads;
   failPost = false; quiz.nextCheckAt = new Date(0);

@@ -5,13 +5,21 @@ export const runningVersion: string = JSON.parse(readFileSync(new URL("../packag
 export type PlayerReleaseHighlights = { version: string; changes: { en: readonly string[]; pl: readonly string[] } };
 
 export const playerRelease: PlayerReleaseHighlights = {
-  version: "3.12.0",
+  version: "3.13.0",
   changes: {
     en: [
-      "When a factual correction is approved, Dilemma posts it in the quiz channel and refunds affected players' recorded penalties, lost stakes and fees. Check your refund in **My result**."
+      "Your total **EXP** now determines your place on the leaderboard. Your existing progress carries over.",
+      "Server managers and Dilemma managers can start a one-off quiz with `/dilemma custom` from a topic or an exact question. Custom and random quizzes have separate limits.",
+      "The private vote preview and 50/50 are free, with one use of each per week. New bets range from 1-10 Sparks on easy, 10-25 on medium and 25-50 on hard.",
+      "Approved quiz corrections and refunds now appear in **My result**. Dilemma also restores streaks broken by the corrected quiz.",
+      "The player guide now updates in its original message when its text changes."
     ],
     pl: [
-      "Po zatwierdzeniu sprostowania Dilemma opublikuje je na kanale quizu i zwróci poszkodowanym zapisane kary, utracone stawki oraz opłaty. Swój zwrot sprawdzisz w panelu **Mój wynik**."
+      "O miejscu w rankingu decyduje teraz suma **EXP**. Dotychczasowy postęp przechodzi na nowy system.",
+      "Osoby zarządzające serwerem i opiekunowie Dilemmy mogą uruchomić quiz z tematu lub konkretnego pytania przez `/dilemma custom`. Custom i random mają osobne limity.",
+      "Podgląd i 50/50 są darmowe. Każdego koła użyjesz raz w tygodniu. Nowe stawki to 1-10 Iskier w łatwym quizie, 10-25 w średnim i 25-50 w trudnym.",
+      "Zatwierdzone poprawki i zwroty zobaczysz w panelu **Mój wynik**. Dilemma przywraca też serie przerwane przez poprawiony quiz.",
+      "Gdy zmienia się treść poradnika, Dilemma aktualizuje jego dotychczasową wiadomość."
     ]
   }
 };

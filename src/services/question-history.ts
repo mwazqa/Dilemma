@@ -1,6 +1,6 @@
 import type { Topic } from "@prisma/client";
 import { db } from "../db.js";
-import { RANDOM_DAILY_LIMIT } from "./quiz-limits.js";
+import { RANDOM_DAILY_LIMIT, type OnDemandQuizKind } from "./quiz-limits.js";
 import { storedQuizOptions } from "./quiz-options.js";
 import { recentRandomCategories } from "./random-categories.js";
 import type { PastQuestion } from "./question-novelty.js";
@@ -11,10 +11,10 @@ export const randomQuestionHistoryLimit = 365 * RANDOM_DAILY_LIMIT;
 const fields = { id: true, question: true, options: true, correctOption: true, createdAt: true } as const;
 const answer = (row: { options: string; correctOption: number }) => storedQuizOptions(row.options)[row.correctOption] ?? "";
 
-export async function loadQuestionHistory(guildId: string, topic?: Pick<Topic, "id" | "questionsGenerated">) {
+export async function loadQuestionHistory(guildId: string, topic?: Pick<Topic, "id" | "questionsGenerated">, kind: OnDemandQuizKind = "random") {
   const [scheduled, random] = await Promise.all([
     db.generatedPoll.findMany({ where: { guildId }, select: { ...fields, topicId: true }, orderBy: { createdAt: "desc" }, take: savedQuestionHistoryLimit }),
-    db.randomPoll.findMany({ where: { guildId }, select: { ...fields, category: true }, orderBy: { createdAt: "desc" }, take: randomQuestionHistoryLimit })
+    db.randomPoll.findMany({ where: { guildId, kind }, select: { ...fields, category: true }, orderBy: { createdAt: "desc" }, take: randomQuestionHistoryLimit })
   ]);
   const missingOwnHistory = topic && scheduled.filter(row => row.topicId === topic.id).length < Math.min(topic.questionsGenerated, savedQuestionHistoryLimit);
   const own = missingOwnHistory ? await db.generatedPoll.findMany({

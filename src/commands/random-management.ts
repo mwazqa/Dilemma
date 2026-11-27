@@ -56,7 +56,7 @@ export async function handleRandomNotifications(interaction: ChatInputCommandInt
     update: { randomPingRoleId: roleId }
   }));
   if (roleId && roleId !== settings?.randomPingRoleId) {
-    const latest = await db.randomPoll.findFirst({ where: { guildId: interaction.guildId }, orderBy: { createdAt: "desc" }, select: { id: true } });
+    const latest = await db.randomPoll.findFirst({ where: { guildId: interaction.guildId, kind: "random" }, orderBy: { createdAt: "desc" }, select: { id: true } });
     if (latest) await db.randomPoll.updateMany({ where: { id: latest.id }, data: { readyPingSentAt: null } });
   }
   scheduleEvents.emit("randomNotificationsChanged", updated.guildId);

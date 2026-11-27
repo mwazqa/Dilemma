@@ -8,14 +8,15 @@ This policy explains what data Dilemma processes when used on a Discord server.
 
 Dilemma stores Discord server IDs, channel IDs, topic configuration, generated
 questions, poll options, results, and timestamps. For quiz scoring, it stores
-Discord user IDs, final answer selections, points, accuracy and correct-answer
+Discord user IDs, final answer selections, EXP, accuracy and correct-answer
 streaks. Dilemma records bonus EXP from correct-answer streaks and includes it
-alongside EXP from points and Spark exchanges when calculating levels.
+alongside EXP from correct answers and Spark exchanges when calculating levels and rankings.
 Dilemma also stores the player's server-specific Sparks balance and which quizzes
-have a purchased count preview or 50/50 hint, including its two remaining choices.
+have an unlocked count preview or 50/50 hint, including its two remaining choices.
+For each weekly lifeline, Dilemma stores the last week of use per player and server.
 Dilemma records quiz fees and any refunds by player and quiz so the bot can
-refund recorded costs once after a factual correction is approved. The public
-correction includes the approved text and the overall refund.
+refund recorded costs once after a factual correction is approved. Players can
+check the approved correction and their own refund in the private result panel.
 For Spark transfers, Dilemma stores the server, sender, recipient and Discord
 interaction IDs, the amount and timestamp so each transfer is processed once.
 For bets, it stores the player's answer, stake and final payout on the current server.
@@ -71,8 +72,11 @@ options, or commands.
 
 ## AI provider
 
-To generate content, Dilemma sends the configured topic, language, custom answer
-options when supplied, and a bounded selection of previous questions to OpenAI.
+To generate content, Dilemma sends the chosen topic or the question supplied
+through `/dilemma custom` to OpenAI. Generation also uses the server language, custom
+answer options where configured, and relevant question history where applicable.
+Quiz generation also uses approved rules for preventing repeated quiz errors.
+Each rule is saved separately from the report and excludes the reporter's details.
 Quiz requests disable response storage with `store: false`; this does not remove
 any retention required by OpenAI's own policies. OpenAI's privacy policy and
 terms govern provider-side processing. Discord user IDs and votes are not part

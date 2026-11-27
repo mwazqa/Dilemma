@@ -42,6 +42,7 @@ db.dailyQuizRun.update = async ({ data }) => data;
 db.dailyQuizRun.deleteMany = async () => { released++; return { count: 1 }; };
 db.generatedPoll.count = db.randomPoll.count = async () => 0;
 db.generatedPoll.findMany = db.randomPoll.findMany = async () => [];
+db.quizGenerationRule.findMany = async () => [];
 db.randomPoll.findFirst = async () => null;
 db.randomPoll.create = async ({ data }) => data;
 db.generatedPoll.create = async ({ data }) => { generated = data; return data; };

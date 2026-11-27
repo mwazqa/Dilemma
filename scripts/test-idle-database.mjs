@@ -208,6 +208,7 @@ try {
   db.dailyQuizRun.updateMany = async () => ({ count: 1 });
   db.generatedPoll.count = async () => 0;
   db.generatedPoll.findMany = async () => [];
+  db.quizGenerationRule.findMany = async () => [];
   db.generatedPoll.findUnique = async ({ where }) => { const poll = polls.get(where.messageId); return poll?.kind === "random" ? null : poll ?? null; };
   db.generatedPoll.updateMany = async ({ where, data }) => { const poll = polls.get(where.messageId); if (poll.endedAt) return { count: 0 }; Object.assign(poll, data); return { count: 1 }; };
   db.generatedPoll.create = async ({ data }) => { polls.set(data.messageId, { ...data, endedAt: null }); return data; };

@@ -6,8 +6,7 @@ requireTestDatabase(process.env);
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test" });
 const { db } = await import("../dist/db.js");
 const { applyFinalVotes, scoreHistory } = await import("../dist/services/scoring.js");
-const { experienceProgress } = await import("../dist/services/experience.js");
-const { maxWalletValue } = await import("../dist/services/sparks.js");
+const { experienceProgress, maxExperience } = await import("../dist/services/experience.js");
 const { exchangeSparks } = await import("../dist/services/spark-exchange.js");
 const { achievementProgress } = await import("../dist/services/achievements.js");
 const { quizPersonalPayload } = await import("../dist/services/quiz-personal.js");
@@ -29,15 +28,16 @@ async function settle(quiz, userId, at, correct = true) {
   assert.equal(await applyFinalVotes(quiz, votes, new Date(at)), true);
   return storedAnswer(quiz, userId);
 }
-async function seedHistory(userId, points, bonusExp = 0, sparks = 20) {
-  for (let index = 0; index < points.length; index++) {
+async function seedHistory(userId, awards, extraExp = 0n, sparks = 20) {
+  for (let index = 0; index < awards.length; index++) {
     const quiz = await makeQuiz(`${userId}-legacy-${index}`);
     await db.quizSettlement.update({ where: { messageId: quiz.messageId }, data: { scoredAt: new Date() } });
-    await db.quizAnswer.create({ data: { guildId, messageId: quiz.messageId, userId, answerId: points[index] ? 1 : 2,
-      correct: points[index] > 0, points: points[index], finishedAt: new Date((index + 1) * 1000) } });
+    await db.quizAnswer.create({ data: { guildId, messageId: quiz.messageId, userId, answerId: awards[index] ? 1 : 2,
+      correct: awards[index] > 0, baseExp: awards[index], finishedAt: new Date((index + 1) * 1000) } });
   }
-  const score = scoreHistory(points.map(value => ({ correct: value > 0, points: value })));
-  await db.userScore.create({ data: { guildId, userId, ...score, bonusExp, sparks } });
+  const score = scoreHistory(awards.map(value => ({ correct: value > 0 })));
+  const exp = awards.reduce((total, value) => total + BigInt(value), extraExp);
+  await db.userScore.create({ data: { guildId, userId, ...score, exp, sparks } });
 }
 try {
   const migration = readFileSync("prisma/postgresql/migrations/20261118140000_streak_experience/migration.sql", "utf8");
@@ -60,8 +60,8 @@ try {
     const expected = Math.min(Math.max(0, index - 1) * 5, 40); bonus += expected;
     assert.equal(receipt.streakExp, expected);
     const player = await wallet("serial");
-    assert.equal(player.points, index + 1); assert.equal(player.bonusExp, bonus);
-    assert.equal(experienceProgress(player.points, player.bonusExp).totalExp, (index + 1) * 10 + bonus);
+    assert.equal(receipt.baseExp, 10);
+    assert.equal(player.exp, BigInt((index + 1) * 10 + bonus));
     assert.equal(player.sparks, index + 1 + (index >= 5 ? 5 : 0) + (index >= 10 ? 5 : 0));
     const snapshot = await wallet("serial");
     assert.equal(await applyFinalVotes(last, [{ userId: "serial", answerId: 1 }], new Date((index + 1) * 1000)), false);
@@ -80,7 +80,7 @@ try {
   stage = "wrong-and-skipped";
   const missed = await makeQuiz("missed");
   assert.equal((await settle(missed, "serial", 13000, false)).streakExp, 0);
-  assert.equal((await wallet("serial")).bonusExp, 260); assert.equal((await wallet("serial")).currentStreak, 0);
+  assert.equal((await wallet("serial")).exp, 380n); assert.equal((await wallet("serial")).currentStreak, 0);
   const restart = await makeQuiz("restart"); assert.equal((await settle(restart, "serial", 14000)).streakExp, 0);
   const skipped = await makeQuiz("skipped"); await applyFinalVotes(skipped, [], new Date(15000));
   const continued = await makeQuiz("continued", guildId, "buttons");
@@ -88,21 +88,21 @@ try {
   assert.equal((await wallet("serial")).currentStreak, 2);
   const third = await makeQuiz("third-after-reset", guildId, "buttons");
   assert.equal((await settle(third, "serial", 17000)).streakExp, 5);
-  assert.equal((await wallet("serial")).bonusExp, 265);
+  assert.equal((await wallet("serial")).exp, 415n);
   const other = await makeQuiz("isolated", otherGuild);
   assert.equal((await settle(other, "serial", 18000)).streakExp, 0);
-  assert.equal((await wallet("serial", otherGuild)).bonusExp, 0);
+  assert.equal((await wallet("serial", otherGuild)).exp, 10n);
   stage = "bonus-level-and-exchange";
-  await seedHistory("boundary", [3, 3, 0, 1, 1], 9);
+  await seedHistory("boundary", [30, 30, 0, 10, 10], 9n);
   const boundary = await makeQuiz("boundary"); assert.equal((await settle(boundary, "boundary", 6000)).streakExp, 5);
   let player = await wallet("boundary");
-  assert.equal(player.points, 9); assert.equal(player.bonusExp, 14); assert.equal(player.sparks, 26);
-  assert.equal(experienceProgress(player.points, player.bonusExp).level, 2);
+  assert.equal(player.exp, 104n); assert.equal(player.sparks, 26);
+  assert.equal(experienceProgress(player.exp).level, 2);
   assert.ok(achievementProgress(player).find(item => item.id === "level_2").unlocked);
   await exchangeSparks(randomUUID(), guildId, "boundary", 3);
-  player = await wallet("boundary"); assert.equal(player.points, 9); assert.equal(player.bonusExp, 23); assert.equal(player.sparks, 23);
+  player = await wallet("boundary"); assert.equal(player.exp, 113n); assert.equal(player.sparks, 23);
   stage = "finish-order-and-legacy";
-  await seedHistory("delayed", [1, 1]);
+  await seedHistory("delayed", [10, 10]);
   const later = await makeQuiz("later"); assert.equal((await settle(later, "delayed", 5000)).streakExp, 5);
   const earlyWrong = await makeQuiz("early-wrong"); await settle(earlyWrong, "delayed", 3000, false);
   const earlyCorrect = await makeQuiz("early-correct");
@@ -111,23 +111,23 @@ try {
   assert.equal((await wallet("delayed")).currentStreak, 2);
   assert.equal(await db.quizAnswer.count({ where: { guildId, userId: "delayed", messageId: { contains: "legacy" }, streakExp: { not: 0 } } }), 0);
   stage = "concurrent-once-only";
-  await seedHistory("parallel", [1]); const parallel = await makeQuiz("parallel");
+  await seedHistory("parallel", [10]); const parallel = await makeQuiz("parallel");
   const results = await Promise.all(Array.from({ length: 3 }, () => applyFinalVotes(parallel, [{ userId: "parallel", answerId: 1 }], new Date(2000))));
   assert.equal(results.filter(Boolean).length, 1);
-  assert.equal((await wallet("parallel")).bonusExp, 0);
+  assert.equal((await wallet("parallel")).exp, 20n);
   const first = await makeQuiz("competing-a", guildId, "buttons"), second = await makeQuiz("competing-b", guildId, "buttons");
   await db.quizSettlement.update({ where: { messageId: first.messageId }, data: { expiresAt: new Date(3000) } });
   await db.quizSettlement.update({ where: { messageId: second.messageId }, data: { expiresAt: new Date(4000) } });
   await db.quizVote.createMany({ data: [first, second].map(quiz => ({ guildId, messageId: quiz.messageId, userId: "parallel", answerId: 1 })) });
   assert.ok((await Promise.all([applyFinalVotes(first, [{ userId: "parallel", answerId: 1 }], new Date(3000)),
     applyFinalVotes(second, [{ userId: "parallel", answerId: 1 }], new Date(4000))])).every(Boolean));
-  const awarded = await db.quizAnswer.aggregate({ where: { guildId, userId: "parallel" }, _sum: { streakExp: true } });
-  assert.equal((await wallet("parallel")).bonusExp, awarded._sum.streakExp);
+  const awarded = await db.quizAnswer.aggregate({ where: { guildId, userId: "parallel" }, _sum: { baseExp: true, streakExp: true } });
+  assert.equal((await wallet("parallel")).exp, BigInt(awarded._sum.baseExp + awarded._sum.streakExp));
   assert.equal((await storedAnswer(first, "parallel")).streakExp, 5);
   assert.equal((await storedAnswer(second, "parallel")).streakExp, 10);
-  assert.equal((await wallet("parallel")).bonusExp, 15, "Worker order cannot reduce a closed button quiz's bonus");
+  assert.equal((await wallet("parallel")).exp, 55n, "Worker order cannot reduce a closed button quiz's bonus");
   stage = "pending-closed-votes";
-  await seedHistory("waiting", [1, 1]);
+  await seedHistory("waiting", [10, 10]);
   const unscoredWrong = await makeQuiz("unscored-wrong", guildId, "buttons");
   await db.quizSettlement.update({ where: { messageId: unscoredWrong.messageId },
     data: { expiresAt: new Date(Date.now() + 3_600_000), closedAt: new Date(3000) } });
@@ -144,30 +144,30 @@ try {
   const thirdAfterActive = await makeQuiz("third-after-active", guildId, "buttons");
   assert.equal((await settle(thirdAfterActive, "waiting", 6000)).streakExp, 5, "An active wrong choice has not broken the streak yet");
   stage = "equal-finish-order";
-  await seedHistory("tied", [1]);
+  await seedHistory("tied", [10]);
   const tied = [await makeQuiz("tied-a", guildId, "buttons"), await makeQuiz("tied-b", guildId, "buttons")];
   for (const quiz of tied) await db.quizSettlement.update({ where: { messageId: quiz.messageId }, data: { expiresAt: new Date(2000) } });
   await db.quizVote.createMany({ data: tied.map(quiz => ({ guildId, messageId: quiz.messageId, userId: "tied", answerId: 1 })) });
   await applyFinalVotes(tied[1], [], new Date(2000)); await applyFinalVotes(tied[0], [], new Date(2000));
   assert.equal((await storedAnswer(tied[0], "tied")).streakExp, 0);
   assert.equal((await storedAnswer(tied[1], "tied")).streakExp, 5);
-  assert.equal((await wallet("tied")).bonusExp, 5);
+  assert.equal((await wallet("tied")).exp, 35n);
   stage = "storage-limit";
-  await seedHistory("capped", [1, 1], maxWalletValue - 1);
+  await seedHistory("capped", [10, 10], maxExperience - 31n);
   const capped = await makeQuiz("capped"); assert.equal((await settle(capped, "capped", 3000)).streakExp, 1);
-  assert.equal((await wallet("capped")).bonusExp, maxWalletValue);
+  assert.equal((await wallet("capped")).exp, maxExperience);
   const full = await makeQuiz("full"); assert.equal((await settle(full, "capped", 4000)).streakExp, 0);
   stage = "rollback";
-  await seedHistory("rollback", [1, 1]); const failed = await makeQuiz("rollback");
+  await seedHistory("rollback", [10, 10]); const failed = await makeQuiz("rollback");
   db.$transaction = (callback, options) => originalTransaction(tx => callback(new Proxy(tx, { get(target, property) {
     return property === "userScore" ? { findUnique: args => target.userScore.findUnique(args),
       upsert: async args => { await target.userScore.upsert(args); throw new Error("Injected post-bonus failure"); } } : target[property];
   } })), options);
   await assert.rejects(applyFinalVotes(failed, [{ userId: "rollback", answerId: 1 }], new Date(3000)), /Injected/);
   db.$transaction = originalTransaction;
-  assert.equal((await wallet("rollback")).bonusExp, 0); assert.equal(await storedAnswer(failed, "rollback"), null);
+  assert.equal((await wallet("rollback")).exp, 20n); assert.equal(await storedAnswer(failed, "rollback"), null);
   assert.equal((await db.quizSettlement.findUnique({ where: { messageId: failed.messageId } })).scoredAt, null);
-  await settle(failed, "rollback", 3000); assert.equal((await wallet("rollback")).bonusExp, 5);
+  await settle(failed, "rollback", 3000); assert.equal((await wallet("rollback")).exp, 35n);
   console.log(JSON.stringify({ check: "streak-experience-postgres", passed: true, cappedBonus: true, onceOnly: true,
     levelsAndBadges: true, guildIsolation: true, privateResultLocales: messageLanguages.length, rollback: true, finishPosition: true }));
 } catch (error) {

@@ -7,8 +7,10 @@ import { END_QUIZ_BUTTON_ID, myQuizButton, reportQuizButton } from "./poll-contr
 import { renderQuizCard } from "./quiz-card.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { walletTransaction } from "./wallet-transaction.js";
-import { defaultDifficulty, type Difficulty } from "../difficulty.js";
+import { defaultDifficulty, parseDifficulty, type Difficulty } from "../difficulty.js";
 import { wrongAnswerPenalties } from "./sparks.js";
+import { quizWeekStart } from "./quiz-limits.js";
+import { guildTimezone } from "./timezone.js";
 
 export const VOTE_PREFIX = "quiz:vote:";
 export const WITHDRAW_VOTE_ID = "quiz:withdraw";
@@ -16,10 +18,12 @@ export const REVEAL_VOTES_ID = "quiz:reveal";
 export const FIFTY_FIFTY_ID = "quiz:fifty";
 export const WAGER_BUTTON_ID = "quiz:wager";
 export const WAGER_MODAL_PREFIX = "quiz:wager:";
-export const MAX_WAGER = 10;
+export const wagerRanges = {
+  easy: { min: 1, max: 10 },
+  medium: { min: 10, max: 25 },
+  hard: { min: 25, max: 50 }
+} as const satisfies Record<Difficulty, { min: number; max: number }>;
 export const WITHDRAW_COST = 1;
-export const REVEAL_COST = 3;
-export const FIFTY_FIFTY_COST = 5;
 type Identity = Pick<QuizSettlement, "messageId" | "guildId" | "channelId">;
 
 export async function quizVotingPayload(question: { question: string; options: string[]; optionEmojis: string[] }, expiresAt: Date,
@@ -33,8 +37,8 @@ export async function quizVotingPayload(question: { question: string; options: s
   const controls = new ActionRowBuilder<ButtonBuilder>().addComponents(
     myQuizButton(language),
     new ButtonBuilder().setCustomId(WITHDRAW_VOTE_ID).setLabel(message(language, "withdrawVoteButton", { cost: WITHDRAW_COST })).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(REVEAL_VOTES_ID).setLabel(message(language, "revealVotesButton", { cost: REVEAL_COST })).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(FIFTY_FIFTY_ID).setLabel(message(language, "fiftyFiftyButton", { cost: FIFTY_FIFTY_COST }))
+    new ButtonBuilder().setCustomId(REVEAL_VOTES_ID).setLabel(message(language, "revealVotesButton")).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(FIFTY_FIFTY_ID).setLabel(message(language, "fiftyFiftyButton"))
       .setStyle(ButtonStyle.Secondary).setDisabled(question.options.length < 3)
   );
   const finish = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -118,14 +122,16 @@ export async function castQuizVote(identity: Identity, userId: string, answerId:
 }
 
 export async function placeQuizWager(identity: Identity, userId: string, amount: number) {
-  if (!Number.isInteger(amount) || amount < 1 || amount > MAX_WAGER) return { status: "invalid" as const };
   return walletTransaction(async tx => {
     const quiz = await lockActiveQuiz(tx, identity);
     if (!quiz) return { status: "closed" as const };
+    const range = wagerRanges[parseDifficulty(quiz.difficulty)];
     const key = { messageId: quiz.messageId, userId };
+    const existing = await tx.quizWager.findUnique({ where: { messageId_userId: key } });
+    if (existing && existing.amount === amount) return { status: "existing" as const, amount: existing.amount, answerId: existing.answerId };
+    if (!Number.isInteger(amount) || amount < range.min || amount > range.max) return { status: "invalid" as const, ...range };
     const vote = await tx.quizVote.findUnique({ where: { messageId_userId: key } });
     if (!vote) return { status: "missing" as const };
-    const existing = await tx.quizWager.findUnique({ where: { messageId_userId: key } });
     if (existing) return { status: "existing" as const, amount: existing.amount, answerId: existing.answerId };
     if (!await spendSparks(tx, quiz.guildId, userId, amount)) return { status: "insufficient" as const };
     await tx.quizWager.create({ data: { ...key, guildId: quiz.guildId, answerId: vote.answerId, amount } });
@@ -142,11 +148,14 @@ export async function useQuizTool(identity: Identity, userId: string, kind: "rev
     const key = { messageId: quiz.messageId, userId };
     const support = await tx.quizSupport.findUnique({ where: { messageId_userId: key } });
     const unlocked = kind === "reveal" ? support?.revealed : Boolean(support?.hintAnswerIds);
-    const cost = kind === "reveal" ? REVEAL_COST : FIFTY_FIFTY_COST;
     let hintAnswerIds = support?.hintAnswerIds ?? null;
     if (!unlocked) {
-      if (!await spendSparks(tx, quiz.guildId, userId, cost)) return { status: "insufficient" as const };
-      await recordQuizFee(tx, key, cost);
+      const settings = await tx.guildSettings.findUnique({ where: { guildId: quiz.guildId }, select: { timezone: true } });
+      const weekStart = quizWeekStart(new Date(), guildTimezone(settings));
+      const usageKey = { guildId: quiz.guildId, userId, kind };
+      const usage = await tx.quizWeeklyToolUse.findUnique({ where: { guildId_userId_kind: usageKey } });
+      if (usage && usage.weekStart >= weekStart) return { status: "weekly-limit" as const };
+      await tx.quizWeeklyToolUse.upsert({ where: { guildId_userId_kind: usageKey }, create: { ...usageKey, weekStart }, update: { weekStart } });
       if (kind === "fifty") {
         const wrong = answerIds.filter(id => id !== quiz.correctAnswerId);
         hintAnswerIds = [quiz.correctAnswerId, wrong[randomInt(wrong.length)]].sort((a, b) => a - b).join(",");

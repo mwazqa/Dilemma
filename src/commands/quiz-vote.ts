@@ -3,7 +3,8 @@ import { interactionLanguage, openFeedback } from "../feedback.js";
 import { message, normalizeLanguage } from "../messages.js";
 import { db } from "../db.js";
 import { castQuizVote, useQuizTool, VOTE_PREFIX, WITHDRAW_VOTE_ID, REVEAL_VOTES_ID, FIFTY_FIFTY_ID,
-  WITHDRAW_COST, REVEAL_COST, FIFTY_FIFTY_COST, MAX_WAGER, WAGER_BUTTON_ID, WAGER_MODAL_PREFIX, placeQuizWager, voteBreakdown } from "../services/quiz-voting.js";
+  WITHDRAW_COST, wagerRanges, WAGER_BUTTON_ID, WAGER_MODAL_PREFIX, placeQuizWager, voteBreakdown } from "../services/quiz-voting.js";
+import { parseDifficulty } from "../difficulty.js";
 import { storedQuizOptions } from "../services/quiz-options.js";
 import { MY_QUIZ_BUTTON_ID } from "../services/poll-controls.js";
 import { personalQuizAction, quizPersonalPayload } from "../services/quiz-personal.js";
@@ -25,7 +26,10 @@ export async function handleQuizVote(interaction: ButtonInteraction) {
     const result = await useQuizTool(identity, interaction.user.id, kind);
     if (result.status === "closed") { await panel(); return; }
     if (result.status === "unavailable") { await reply(text("fiftyUnavailable")); return; }
-    if (result.status === "insufficient") { await reply(text("sparksInsufficient", { cost: kind === "fifty" ? FIFTY_FIFTY_COST : REVEAL_COST })); return; }
+    if (result.status === "weekly-limit") {
+      await reply(text("quizWeeklyToolLimit", { tool: text(kind === "fifty" ? "fiftyFiftyButton" : "revealVotesButton") }));
+      return;
+    }
     const options = storedQuizOptions(quiz.options);
     if (result.status === "hint") {
       await panel();
@@ -54,9 +58,20 @@ export async function handleWagerButton(interaction: ButtonInteraction) {
       (!fromPanel && interaction.customId !== WAGER_BUTTON_ID) || (fromPanel && !interaction.message.flags.has(MessageFlags.Ephemeral))) {
     await interaction.reply({ content: message(fallbackLanguage, "notPoll"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }); return;
   }
-  const language = normalizeLanguage((await getGuildSettings(interaction.guildId))?.language ?? fallbackLanguage);
-  const amount = new TextInputBuilder().setCustomId("amount").setLabel(message(language, "wagerAmount", { max: MAX_WAGER }))
-    .setPlaceholder(message(language, "wagerPlaceholder")).setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(String(MAX_WAGER).length).setRequired(true);
+  const messageId = fromPanel ? personal.messageId : interaction.message.id;
+  const [settings, quiz] = await Promise.all([
+    getGuildSettings(interaction.guildId),
+    db.quizSettlement.findUnique({ where: { messageId, guildId: interaction.guildId, channelId: interaction.channelId, votingMode: "buttons" },
+      select: { difficulty: true, expiresAt: true, scoredAt: true, closedAt: true } })
+  ]);
+  const language = normalizeLanguage(settings?.language ?? fallbackLanguage);
+  if (!quiz || quiz.scoredAt || quiz.closedAt || +quiz.expiresAt <= Date.now()) {
+    await interaction.reply({ content: message(language, quiz ? "votingClosed" : "notPoll"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+    return;
+  }
+  const range = wagerRanges[parseDifficulty(quiz.difficulty)];
+  const amount = new TextInputBuilder().setCustomId("amount").setLabel(message(language, "wagerAmount", range))
+    .setPlaceholder(message(language, "wagerPlaceholder")).setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(String(range.max).length).setRequired(true);
   const target = fromPanel ? `${personal.messageId}:${interaction.message.id}` : interaction.message.id;
   await interaction.showModal(new ModalBuilder().setCustomId(`${WAGER_MODAL_PREFIX}${target}`)
     .setTitle(message(language, "wagerTitle")).addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(amount)));
@@ -77,10 +92,9 @@ export async function handleWagerModal(interaction: ModalSubmitInteraction) {
   const respond = async (content: string) => reply(fromPanel
     ? await quizPersonalPayload(identity, interaction.user.id, language, content) ?? text("notPoll") : content);
   const input = interaction.fields.getTextInputValue("amount").trim();
-  if (!/^\d{1,2}$/.test(input)) { await respond(text("wagerInvalid", { max: MAX_WAGER })); return; }
-  const amount = Number(input);
+  const amount = /^\d{1,2}$/.test(input) ? Number(input) : NaN;
   const result = await placeQuizWager(identity, interaction.user.id, amount);
-  if (result.status === "invalid") { await respond(text("wagerInvalid", { max: MAX_WAGER })); return; }
+  if (result.status === "invalid") { await respond(text("wagerInvalid", { min: result.min, max: result.max })); return; }
   if (result.status === "closed") { await respond(text("votingClosed")); return; }
   if (result.status === "missing") { await respond(text("wagerVoteFirst")); return; }
   if (result.status === "insufficient") { await respond(text("sparksInsufficient", { cost: amount })); return; }

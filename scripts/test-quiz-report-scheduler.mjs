@@ -5,7 +5,8 @@ const originalFetch = globalThis.fetch;
 let mode = "grounded", requests = 0;
 const source = "https://example.test/facts";
 const analysis = { kind: "factual", verdict: "confirmed", finding: "The synthetic source supports checking this answer.",
-  suggestion: "Verify the proposed change before editing the quiz.", sources: [{ title: "Synthetic source", url: source }] };
+  suggestion: "Verify the proposed change before editing the quiz.", generationRule: "Specify the type when properties vary by construction.",
+  sources: [{ title: "Synthetic source", url: source }] };
 globalThis.fetch = async (url, options) => {
   requests++;
   assert.equal(String(url), "https://api.openai.com/v1/responses");
@@ -22,14 +23,16 @@ globalThis.fetch = async (url, options) => {
   assert.deepEqual(Object.keys(input), ["reportedIssue", "quizContext"]);
   assert.equal(typeof input.reportedIssue, "string"); assert.equal(typeof input.quizContext.question, "string");
   assert.ok(body.text.format.schema.required.includes("kind"));
+  assert.ok(body.text.format.schema.required.includes("generationRule"));
   assert.doesNotMatch(body.input, /111111111111111111|private-reporter|synthetic-secret|discord\.com\/(?:channels|users)/);
   const result = mode === "invalid" ? { verdict: "broken" }
     : mode === "wording" ? { kind: "wording", verdict: "confirmed", finding: "The reported word Whcih is misspelled.",
       suggestion: "Replace Whcih with Which.", sources: [] }
-    : mode === "technical" || mode === "unclear" ? { ...analysis, kind: mode, sources: [] } : analysis;
+    : mode === "technical" || mode === "unclear" ? { ...analysis, kind: mode, sources: [] }
+    : mode === "private-rule" ? { ...analysis, generationRule: "Send to private@example.test." } : analysis;
   const text = JSON.stringify(result);
   return new Response(JSON.stringify({ object: "response", status: "completed", output: [
-    ...(mode === "grounded" ? [{ type: "web_search_call", status: "completed", action: { type: "search", sources: [{ type: "url", url: source }] } }] : []),
+    ...(["grounded", "private-rule"].includes(mode) ? [{ type: "web_search_call", status: "completed", action: { type: "search", sources: [{ type: "url", url: source }] } }] : []),
     { type: "message", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] }
   ] }), { status: 200, headers: { "content-type": "application/json" } });
 };
@@ -45,22 +48,24 @@ try {
   const fact = { question: "Which number is even?", options: '["2","3"]', correctOption: 0, explanation: "Two is even.",
     reason: "Check this fact; password=" + "synthetic-secret" + " <@111111111111111111> https://discord.com/channels/111111111111111111/111111111111111111/111111111111111111 https://discord.com/users/111111111111111111",
     reporterUserId: "private-reporter" };
-  assert.equal((await analyzeQuizReports([fact])).verdict, "confirmed");
+  const grounded = await analyzeQuizReports([fact]);
+  assert.equal(grounded.verdict, "confirmed"); assert.equal(grounded.generationRule, analysis.generationRule);
   mode = "uncited";
   const unsupported = await analyzeQuizReports([fact]);
-  assert.equal(unsupported.verdict, "uncertain"); assert.deepEqual(unsupported.sources, []);
+  assert.equal(unsupported.verdict, "uncertain"); assert.deepEqual(unsupported.sources, []); assert.equal(unsupported.generationRule, null);
+  mode = "private-rule"; assert.equal((await analyzeQuizReports([fact])).generationRule, null);
   mode = "wording";
   const wording = await analyzeQuizReports([{ ...fact, question: "Whcih number is even?", reason: "The word Whcih is misspelled." }]);
   assert.equal(wording.verdict, "confirmed"); assert.equal(wording.kind, "wording"); assert.deepEqual(wording.sources, []);
   mode = "technical"; assert.equal((await analyzeQuizReports([{ ...fact, reason: "The answer button did not react." }])).verdict, "uncertain");
   mode = "unclear"; assert.equal((await analyzeQuizReports([{ ...fact, reason: "Something here seems wrong." }])).verdict, "uncertain");
   mode = "invalid"; await assert.rejects(analyzeQuizReports([fact]));
-  assert.equal(requests, 6);
+  assert.equal(requests, 7);
   assert.equal(reportAnalysisScopeKey(fact), reportAnalysisScopeKey({ ...fact, reporterUserId: "another-reporter" }));
   assert.notEqual(reportAnalysisScopeKey(fact), reportAnalysisScopeKey({ ...fact, reason: "A different issue." }));
   assert.notEqual(reportAnalysisScopeKey(fact), reportAnalysisScopeKey({ ...fact, explanation: "A changed explanation." }));
   await assert.rejects(analyzeQuizReports([fact, { ...fact, reason: "A different issue." }]), /scope mismatch/);
-  assert.equal(requests, 6, "Different reported issues cannot become a shared AI audit");
+  assert.equal(requests, 7, "Different reported issues cannot become a shared AI audit");
   stage = "server-delivery";
   const fixture = index => ({ id: "c" + String(index).padStart(24, "0"), guildId: "222222222222222222", channelId: "333333333333333333",
     messageId: String(444444444444444440n + BigInt(index)), ...fact, reporterUserId: String(555555555555555550n + BigInt(index)),
@@ -108,6 +113,8 @@ try {
   assert.ok(sentBodies.join("\n").includes("cached\\_reporter"));
   assert.ok(sentBodies.join("\n").includes(`https://discord.com/users/${fixture(1).reporterUserId}`));
   assert.ok(sentBodies.join("\n").includes(fixture(1).reporterUserId)); assert.equal(lookups.length, 0);
+  assert.ok(sentBodies.join("\n").includes(message("pl", "quizGenerationRuleLabel")));
+  assert.ok(sentBodies.join("\n").includes(analysis.generationRule));
   const delivered = sends;
   await processQuizReportBatch(client, cutoff, () => true, analyze); assert.equal(sends, delivered);
   reports = Array.from({ length: 5 }, (_, index) => fixture(index + 2));

@@ -48,13 +48,13 @@ try {
   assert.deepEqual(correct.votes, [{ userId: "101", answerId: 17 }]);
   assert.equal(await applyFinalVotes(metadata, correct.votes, correct.finishedAt), true);
   assert.equal(await applyFinalVotes(metadata, correct.votes, correct.finishedAt), false);
-  assert.equal(scores.get("101").points, 2);
+  assert.equal(scores.get("101").exp, 20n);
   assert.equal(answers.length, 1);
   selected = 93;
   const wrong = await collectFinalVotes(client, metadata);
   assert.deepEqual(wrong.votes, [{ userId: "101", answerId: 93 }]);
   assert.equal(await applyFinalVotes({ ...metadata, messageId: "second-quiz" }, wrong.votes, wrong.finishedAt), true);
-  assert.equal(answers.at(-1).points, 0);
+  assert.equal(answers.at(-1).baseExp, 0);
   assert.equal(answers.at(-1).sparksPenalty, 2, "A medium-answer penalty is capped at the available 2 Sparks");
   assert.equal(scores.get("101").sparks.increment, -2);
   selected = null;

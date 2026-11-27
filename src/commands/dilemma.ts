@@ -28,7 +28,7 @@ export const dilemmaCommand = topicCommand
   .addSubcommand(randomResetCommand)
   .addSubcommandGroup(guideCommand);
 
-const commandOrder = ["random", "profile", "leaderboard", "achievements", "badges", "sparks", "end", "create", "edit", "list", "publish", "enable", "disable", "random-cooldown-reset", "random-channels", "random-notifications", "permissions", "guide", "help", "language", "timezone", "ping", "delete"];
+const commandOrder = ["random", "custom", "profile", "leaderboard", "achievements", "badges", "sparks", "end", "create", "edit", "list", "publish", "enable", "disable", "random-cooldown-reset", "random-channels", "random-notifications", "permissions", "guide", "help", "language", "timezone", "ping", "delete"];
 dilemmaCommand.options.sort((first, second) => commandOrder.indexOf(first.toJSON().name) - commandOrder.indexOf(second.toJSON().name));
 
 async function unavailableCommand(interaction: ChatInputCommandInteraction) {

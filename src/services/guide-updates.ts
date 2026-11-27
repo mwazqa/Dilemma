@@ -1,9 +1,10 @@
 import { ChannelType, MessageFlags, PermissionFlagsBits, Routes, type Client } from "discord.js";
 import { db } from "../db.js";
 import { normalizeLanguage } from "../messages.js";
+import { isCurrentReleasePublished } from "../player-release.js";
 import { privateErrorSummary } from "../private-errors.js";
 import { getGuildSettings } from "./guild-settings.js";
-import { getPlayerGuidePayload, getPlayerGuideText, LEGACY_GUIDE_REFRESH_BUTTON_ID } from "./player-guide.js";
+import { getPlayerGuideContentHash, getPlayerGuidePayload, getPlayerGuideText, LEGACY_GUIDE_REFRESH_BUTTON_ID } from "./player-guide.js";
 import { registerGuidePublication, publishGuideReleaseNotice } from "./guide-publications.js";
 import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { scheduleEvents } from "./schedule-events.js";
@@ -16,6 +17,19 @@ function ownedPublicMessage(message: HistoryMessage, botId: string, channelId: s
 }
 function hasLegacyGuideButton(message: HistoryMessage) {
   return message.components?.some(row => row.type === 1 && row.components?.some(button => button.type === 2 && button.custom_id === LEGACY_GUIDE_REFRESH_BUTTON_ID)) ?? false;
+}
+function hasGuideText(source: HistoryMessage, language: string) {
+  return !source.components?.length && source.embeds?.length === 1 && source.embeds[0].description === getPlayerGuideText(language);
+}
+function missingGuide(error: unknown) {
+  return error && typeof error === "object" && "code" in error && (error.code === 10003 || error.code === 10008);
+}
+async function editGuide(client: Client, channelId: string, messageId: string, language: string) {
+  const { embeds, components, allowedMentions } = getPlayerGuidePayload(language);
+  await client.rest.patch(Routes.channelMessage(channelId, messageId), {
+    body: { content: null, embeds: embeds.map(embed => embed.toJSON()), components, allowed_mentions: allowedMentions },
+    signal: AbortSignal.timeout(10000)
+  });
 }
 
 export async function discoverGuidePage(client: Client, channelId: string) {
@@ -74,24 +88,44 @@ export async function migrateLegacyGuide(client: Client, messageId: string) {
   try {
     source = await client.rest.get(Routes.channelMessage(publication.channelId, messageId), { signal: AbortSignal.timeout(10000) }) as HistoryMessage;
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === 10008) {
+    if (missingGuide(error)) {
       await db.guidePublication.update({ where: { messageId }, data: { active: false } }); return;
     }
     throw error;
   }
-  const alreadyGeneric = ["en", "pl"].some(language => source.embeds?.some(embed => embed.description === getPlayerGuideText(language)));
-  if (!ownedPublicMessage(source, client.user!.id, publication.channelId) || (!hasLegacyGuideButton(source) && !alreadyGeneric)) {
+  const storedLanguage = ["en", "pl"].find(language => hasGuideText(source, language));
+  if (source.id !== messageId || !ownedPublicMessage(source, client.user!.id, publication.channelId) ||
+    (!hasLegacyGuideButton(source) && !storedLanguage)) {
     await db.guidePublication.update({ where: { messageId }, data: { active: false } }); return;
   }
-  if (!alreadyGeneric) {
-    const language = normalizeLanguage((await getGuildSettings(publication.guildId))?.language ?? "en");
-    const payload = getPlayerGuidePayload(language);
-    await client.rest.patch(Routes.channelMessage(publication.channelId, messageId), {
-      body: { content: null, embeds: payload.embeds.map(embed => embed.toJSON()), components: [], allowed_mentions: { parse: [] } },
-      signal: AbortSignal.timeout(10000)
-    });
+  const language = normalizeLanguage((await getGuildSettings(publication.guildId))?.language ?? "en");
+  if (storedLanguage !== language) await editGuide(client, publication.channelId, messageId, language);
+  await registerGuidePublication(publication, true, true, getPlayerGuideContentHash(language));
+}
+
+export async function updatePublishedGuide(client: Client, messageId: string, isPublished = isCurrentReleasePublished, current = () => true) {
+  const publication = await db.guidePublication.findUnique({ where: { messageId } });
+  if (!publication?.active || !publication.genericAt) return "unavailable";
+  const { guildId, channelId } = publication;
+  const language = normalizeLanguage((await getGuildSettings(guildId))?.language ?? "en");
+  const contentHash = getPlayerGuideContentHash(language);
+  if (publication.contentHash === contentHash) return "done";
+  if (!current()) return "stopped";
+  if (!await isPublished()) return "unpublished";
+  if (!current()) return "stopped";
+  try {
+    const source = await client.rest.get(Routes.channelMessage(channelId, messageId), { signal: AbortSignal.timeout(10000) }) as HistoryMessage;
+    if (!current()) return "stopped";
+    if (source.id === messageId && ownedPublicMessage(source, client.user!.id, channelId)) {
+      if (!hasGuideText(source, language)) await editGuide(client, channelId, messageId, language);
+      await db.guidePublication.update({ where: { messageId }, data: { contentHash } });
+      return "done";
+    }
+  } catch (error) {
+    if (!missingGuide(error)) throw error;
   }
-  await registerGuidePublication(publication, true);
+  await db.guidePublication.update({ where: { messageId }, data: { active: false } });
+  return "unavailable";
 }
 
 export function startGuideUpdatesScheduler(client: Client) {
@@ -109,7 +143,10 @@ export function startGuideUpdatesScheduler(client: Client) {
         for (const publication of known) {
           if (!current()) return;
           if (!publication.genericAt) queue.schedule(`migrate:${publication.messageId}`, Date.now());
-          else notice(publication.guildId, publication.channelId);
+          else {
+            queue.schedule(`update:${publication.messageId}`, Date.now());
+            notice(publication.guildId, publication.channelId);
+          }
         }
         for (const guild of client.guilds.cache.values()) {
           if (!current()) return;
@@ -146,6 +183,9 @@ export function startGuideUpdatesScheduler(client: Client) {
         if (page.more) queue.schedule(key, Date.now() + 1000);
       } else if (key.startsWith("migrate:")) {
         await migrateLegacyGuide(client, key.slice(8));
+      } else if (key.startsWith("update:")) {
+        const result = await updatePublishedGuide(client, key.slice(7), undefined, current);
+        if (result === "unpublished" && current()) queue.schedule(key, Date.now() + 120000);
       } else {
         const target = noticeChannels.get(key);
         if (!target) return;

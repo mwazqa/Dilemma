@@ -70,6 +70,7 @@ db.topic.update = async ({ where, data }) => {
 };
 db.guildSettings.findUnique = async () => ({ language: "pl" });
 db.generatedPoll.findMany = db.randomPoll.findMany = async () => [];
+db.quizGenerationRule.findMany = async () => [];
 db.generatedPoll.create = async ({ data }) => { generatedPolls.push({ ...data, createdAt: new Date() }); return data; };
 db.randomPoll.create = async ({ data }) => { randomPolls.push({ ...data, createdAt: new Date() }); return data; };
 db.quizSettlement.create = async ({ data }) => data;

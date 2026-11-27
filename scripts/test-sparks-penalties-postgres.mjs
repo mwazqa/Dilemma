@@ -41,12 +41,13 @@ try {
   for (const [difficulty, penalty, reward] of [["easy", 2, 1], ["medium", 3, 2], ["hard", 4, 3]]) {
     stage = difficulty;
     const current = await quiz(difficulty, difficulty);
+    const stake = difficulty === "hard" ? 25 : 10;
     const wrong = `${difficulty}-wrong`, poor = `${difficulty}-poor`, zero = `${difficulty}-zero`, newcomer = `${difficulty}-new`, correct = `${difficulty}-correct`, bettor = `${difficulty}-bet`, skip = `${difficulty}-skip`, withdrawn = `${difficulty}-withdrawn`;
-    for (const [userId, sparks] of [[wrong, 10], [poor, 1], [zero, 0], [correct, 10], [bettor, 20], [skip, 10], [withdrawn, 10]]) await seed(userId, sparks);
+    for (const [userId, sparks] of [[wrong, 10], [poor, 1], [zero, 0], [correct, 10], [bettor, stake + 10], [skip, 10], [withdrawn, 10]]) await seed(userId, sparks);
     await seed(wrong, 50, otherGuild);
     for (const userId of [wrong, poor, zero, newcomer, bettor, withdrawn]) assert.equal((await castQuizVote(current, userId, 2)).status, "voted");
     await castQuizVote(current, correct, 1);
-    await placeQuizWager(current, bettor, 10);
+    assert.equal((await placeQuizWager(current, bettor, stake)).status, "placed");
     await castQuizVote(current, withdrawn, null);
     assert.equal(await wallet(wrong), 10, "A vote alone does not charge an answer penalty");
     await close(current);
@@ -54,7 +55,7 @@ try {
     assert.equal(claims.filter(Boolean).length, 1, "Concurrent settlement charges once");
     assert.equal(await wallet(wrong), 10 - penalty);
     assert.equal((await answer(current, wrong)).sparksPenalty, penalty);
-    assert.equal((await answer(current, wrong)).points, 0);
+    assert.equal((await answer(current, wrong)).baseExp, 0);
     assert.equal((await db.userScore.findUnique({ where: key(wrong) })).currentStreak, 0);
     assert.equal(await wallet(poor), 0); assert.equal((await answer(current, poor)).sparksPenalty, 1);
     for (const userId of [zero, newcomer]) {
@@ -62,7 +63,7 @@ try {
     }
     assert.equal(await wallet(correct), 10 + reward);
     assert.equal((await answer(current, correct)).sparksPenalty, 0);
-    assert.equal((await answer(current, correct)).points, reward);
+    assert.equal((await answer(current, correct)).baseExp, reward * 10);
     assert.equal(await wallet(bettor), 10 - penalty, "Lost stake and wrong-answer penalty are separate");
     assert.equal((await db.quizWager.findUnique({ where: { messageId_userId: { messageId: current.messageId, userId: bettor } } })).payout, 0);
     assert.equal(await wallet(skip), 10); assert.equal(await answer(current, skip), null);
@@ -70,7 +71,7 @@ try {
     assert.equal((await db.userScore.findUnique({ where: key(wrong, otherGuild) })).sparks, 50);
     for (const language of messageLanguages) for (const [userId, deducted] of [[wrong, penalty], [poor, 1], [zero, 0]]) {
       const panel = await quizPersonalPayload(current, userId, language);
-      assert.ok(panel.content.includes(message(language, "quizAnswerLost", { points: 0, penalty: deducted })));
+      assert.ok(panel.content.includes(message(language, "quizAnswerLost", { penalty: deducted })));
       assert.doesNotMatch(panel.content, /\{\w+\}/);
     }
     assert.equal(await applyFinalVotes(current, [], new Date()), false);
@@ -106,7 +107,7 @@ try {
   const historical = await quiz("historical", "hard");
   await seed("historical", 10);
   await db.quizSettlement.update({ where: { messageId: historical.messageId }, data: { scoredAt: new Date(), closedAt: new Date() } });
-  await db.quizAnswer.create({ data: { guildId, messageId: historical.messageId, userId: "historical", answerId: 2, correct: false, points: 0, finishedAt: new Date() } });
+  await db.quizAnswer.create({ data: { guildId, messageId: historical.messageId, userId: "historical", answerId: 2, correct: false, baseExp: 0, finishedAt: new Date() } });
   assert.equal(await applyFinalVotes(historical, [], new Date()), false);
   assert.equal(await wallet("historical"), 10); assert.equal((await answer(historical, "historical")).sparksPenalty, 0);
   const native = await db.quizSettlement.create({ data: { guildId, messageId: `${guildId}-native`, channelId: "test-channel", difficulty: "medium", answerIds: "17,93", correctAnswerId: 17, expiresAt: new Date(0) } });

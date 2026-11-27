@@ -8,12 +8,14 @@ import { normalizeLanguage } from "../messages.js";
 import { scheduleEvents } from "./schedule-events.js";
 
 type GuideIdentity = { messageId: string; guildId: string; channelId: string };
-export async function registerGuidePublication(identity: GuideIdentity, legacy = false, generic = true) {
+export async function registerGuidePublication({ messageId, guildId, channelId }: GuideIdentity, legacy = false, generic = true, contentHash?: string) {
+  const identity = { messageId, guildId, channelId };
+  const guide = generic ? { genericAt: new Date(), ...(contentHash ? { contentHash } : {}) } : {};
   await db.$transaction(async tx => {
     const existing = await tx.guidePublication.findUnique({ where: { messageId: identity.messageId } });
     if (existing && (existing.guildId !== identity.guildId || existing.channelId !== identity.channelId)) throw Error("Guide identity mismatch");
-    const record = await tx.guidePublication.upsert({ where: { messageId: identity.messageId }, create: { ...identity, genericAt: generic ? new Date() : null },
-      update: { active: true, ...(generic ? { genericAt: new Date() } : {}) } });
+    const record = await tx.guidePublication.upsert({ where: { messageId }, create: { ...identity, ...guide },
+      update: { active: true, ...guide } });
     if (record.guildId !== identity.guildId || record.channelId !== identity.channelId) throw Error("Guide identity mismatch");
     if (!legacy) await tx.guideReleaseNotice.upsert({
       where: { guildId_channelId_version: { guildId: identity.guildId, channelId: identity.channelId, version: runningVersion } },

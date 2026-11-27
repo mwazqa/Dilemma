@@ -40,9 +40,10 @@ model QuizAnswer {
   guildId    String
   answerId   Int
   correct    Boolean
-  points     Int
+  baseExp    Int @default(0)
   sparksPenalty Int @default(0)
   streakExp  Int @default(0)
+  streakProtected Boolean @default(false)
   finishedAt DateTime
   settlement QuizSettlement @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
 
@@ -53,19 +54,18 @@ model QuizAnswer {
 model UserScore {
   guildId       String
   userId        String
-  points        Int      @default(0)
+  exp           BigInt   @default(0)
   answered      Int      @default(0)
   correct       Int      @default(0)
   currentStreak Int      @default(0)
   bestStreak    Int      @default(0)
   selectedBadge String?
   sparks        Int      @default(0)
-  bonusExp      Int      @default(0)
   updatedAt     DateTime @updatedAt
   exchanges     SparkExchange[]
 
   @@id([guildId, userId])
-  @@index([guildId, points])
+  @@index([guildId, exp(sort: Desc), correct(sort: Desc), userId])
 }
 
 model SparkExchange {
@@ -177,6 +177,7 @@ model GeneratedPoll {
 }
 
 model RandomPoll {
+  kind          String    @default("random")
   difficulty    String    @default("medium")
   id            String    @id @default(cuid())
   guildId       String
@@ -198,6 +199,7 @@ model RandomPoll {
   closeSource   String?
 
   @@index([guildId, createdAt])
+  @@index([guildId, kind, createdAt])
 }
 
 model QuizVote {
@@ -221,6 +223,15 @@ model QuizSupport {
 
   @@id([messageId, userId])
   @@index([guildId, userId])
+}
+
+model QuizWeeklyToolUse {
+  guildId   String
+  userId    String
+  kind      String
+  weekStart String
+
+  @@id([guildId, userId, kind])
 }
 
 model QuizWager {
@@ -270,6 +281,12 @@ model QuizRefund {
   @@id([messageId, userId])
 }
 
+model QuizGenerationRule {
+  key       String   @id
+  text      String
+  createdAt DateTime @default(now())
+}
+
 model QuizReport {
   id             String   @id @default(cuid())
   guildId        String
@@ -300,6 +317,7 @@ model GuidePublication {
   channelId String
   active    Boolean  @default(true)
   genericAt DateTime?
+  contentHash String?
   createdAt DateTime @default(now())
 
   @@index([active, guildId, channelId])

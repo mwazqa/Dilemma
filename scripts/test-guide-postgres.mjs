@@ -7,8 +7,8 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw Error("Unexpected network request"); };
 const { db } = await import("../dist/db.js");
 const { registerGuidePublication, publishGuideReleaseNotice } = await import("../dist/services/guide-publications.js");
-const { discoverGuidePage, migrateLegacyGuide } = await import("../dist/services/guide-updates.js");
-const { LEGACY_GUIDE_REFRESH_BUTTON_ID, getPlayerGuideText } = await import("../dist/services/player-guide.js");
+const { discoverGuidePage, migrateLegacyGuide, updatePublishedGuide } = await import("../dist/services/guide-updates.js");
+const { LEGACY_GUIDE_REFRESH_BUTTON_ID, getPlayerGuideContentHash, getPlayerGuideText } = await import("../dist/services/player-guide.js");
 const { runningVersion, getReleaseNoticePayload } = await import("../dist/player-release.js");
 const testRelease = { version: runningVersion, changes: { en: ["You can now transfer Sparks to other players."], pl: ["Możesz przesyłać Iskry innym graczom."] } };
 const testReleasePayload = language => getReleaseNoticePayload(language, testRelease);
@@ -69,6 +69,23 @@ try {
   assert.equal(await publishGuideReleaseNotice(client, guildId, quiet.channelId, async () => true, () => true, noHighlights), "done");
   assert.equal(attempts, attemptsBeforeQuiet, "A processed quiet release never sends a Discord message");
   assert.equal(await db.guideReleaseNotice.count({ where: { guildId } }), receiptsBeforeQuiet + 1);
+  stage = "guide-content-update";
+  const guideRoute = `/channels/${quiet.channelId}/messages/${quiet.messageId}`;
+  let guideReads = 0, guideEdits = 0;
+  const guideClient = { user: client.user, rest: {
+    get: async route => {
+      assert.equal(route, guideRoute); guideReads++;
+      return { id: quiet.messageId, channel_id: quiet.channelId, author: client.user, embeds: [{ description: "Old guide text" }] };
+    },
+    patch: async (route, { body }) => {
+      assert.equal(route, guideRoute); guideEdits++;
+      assert.equal(body.embeds[0].description, getPlayerGuideText("pl"));
+    }
+  } };
+  assert.equal(await updatePublishedGuide(guideClient, quiet.messageId, async () => true), "done");
+  assert.equal((await db.guidePublication.findUniqueOrThrow({ where: { messageId: quiet.messageId } })).contentHash, getPlayerGuideContentHash("pl"));
+  assert.equal(await updatePublishedGuide(guideClient, quiet.messageId), "done");
+  assert.equal(guideReads, 1); assert.equal(guideEdits, 1); assert.equal(attempts, attemptsBeforeQuiet);
   stage = "saved-history-cursor";
   const historyChannel = id(8), messageId = id(9);
   await db.guideDiscovery.create({ data: { channelId: historyChannel, guildId } });
@@ -89,7 +106,7 @@ try {
   assert.equal(await publishTestReleaseNotice(client, guildId, historyChannel, async () => true), "sent");
   assert.equal(published.size, 3);
   console.log(JSON.stringify({ check: "guide-postgres", passed: true, subscriptionBaseline: true, concurrentAnnouncements: true,
-    failedSendRetained: true, quietReleases: true, historyCursorPersisted: true, legacyConversionOnce: true }));
+    failedSendRetained: true, quietReleases: true, inPlaceUpdates: true, historyCursorPersisted: true, legacyConversionOnce: true }));
 } catch (error) {
   console.log(JSON.stringify({ check: "guide-postgres", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "operation",
     line: Number(error.stack?.match(/test-guide-postgres\.mjs:(\d+)/)?.[1] || 0) })); process.exitCode = 1;

@@ -7,9 +7,9 @@ const { routeCommand } = await import("../dist/commands/dilemma.js");
 const { questionSchema } = await import("../dist/types/question.js");
 const { message } = await import("../dist/messages.js");
 
-assert.deepEqual(scoreHistory([{ correct: true, points: 1 }, { correct: true, points: 3 }, { correct: false, points: 0 }, { correct: true, points: 2 }]),
-  { points: 6, answered: 4, correct: 3, currentStreak: 1, bestStreak: 2 });
-assert.deepEqual(scoreHistory([]), { points: 0, answered: 0, correct: 0, currentStreak: 0, bestStreak: 0 });
+assert.deepEqual(scoreHistory([{ correct: true }, { correct: true }, { correct: false }, { correct: true }]),
+  { answered: 4, correct: 3, currentStreak: 1, bestStreak: 2 });
+assert.deepEqual(scoreHistory([]), { answered: 0, correct: 0, currentStreak: 0, bestStreak: 0 });
 assert.equal(questionSchema.safeParse({ language: "pl", topic: "Test", question: "Q?", options: ["A", "B"], topicEmoji: "", optionEmojis: ["", ""], correctOption: 3, explanation: "Fact" }).success, false);
 
 const metadata = settlementData({ id: "poll", channelId: "channel", poll: { allowMultiselect: false, expiresAt: new Date(0),
@@ -52,7 +52,7 @@ db.$transaction = async cb => cb({ quizSettlement: { updateMany: async () => ({ 
   quizAnswer: { create: async ({ data }) => { answerRows.push(data); return data; }, findMany: async () => answerRows },
   userScore: { findUnique: async () => player ?? null, upsert: async ({ create }) => player = create } });
 assert.equal(await applyFinalVotes(quiz, [{ userId: "1", answerId: 17 }], new Date(0)), true);
-assert.equal(player.points, 3);
+assert.equal(player.exp, 30n);
 assert.equal(player.currentStreak, 1);
 assert.equal(await applyFinalVotes(quiz, [{ userId: "1", answerId: 17 }], new Date(0)), false);
 assert.equal(answerRows.length, 1, "Duplicate settlement does not award twice");
@@ -61,7 +61,7 @@ await assert.rejects(applyFinalVotes(quiz, [{ userId: "1", answerId: 999 }], new
 db.guildSettings.findUnique = async () => ({ language: "pl" });
 db.userScore.findUnique = async ({ where }) => { assert.equal(where.guildId_userId.guildId, "guild"); return player; };
 db.userScore.count = async ({ where }) => { assert.equal(where.guildId, "guild"); return 2; };
-db.userScore.findMany = async ({ where, orderBy, take }) => { assert.equal(where.guildId, "guild"); assert.equal(take, 10); assert.equal(orderBy[0].points, "desc"); return [player]; };
+db.userScore.findMany = async ({ where, orderBy, take }) => { assert.equal(where.guildId, "guild"); assert.equal(take, 10); assert.equal(orderBy[0].exp, "desc"); return [player]; };
 function interaction(sub, confirm = false, guildId = "guild") {
   const replies = [];
   const payloads = [];

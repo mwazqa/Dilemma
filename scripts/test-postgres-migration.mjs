@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 
 import { requireTestDatabase } from './test-database-guard.mjs';
@@ -19,16 +21,36 @@ try {
   for (const table of tables) {
     const addedDefaults = table === "GuildSettings"
       ? { defaultDifficulty: "medium", defaultPollDurationHours: 24, defaultGenerationTime: null, managerRoleId: null, randomPingRoleId: null, randomCooldownResetAt: null, timezone: null }
-      : table === "UserScore" ? { selectedBadge: null, bonusExp: 0 }
+      : table === "UserScore" ? { selectedBadge: null }
       : table === "Topic" ? { difficulty: "medium", pollDurationHours: 24, startDate: null, pingRoleId: null }
       : table === "RandomPoll" ? { difficulty: "medium", creatorUserId: null, readyPingSentAt: null, closedAt: null, closedByUserId: null, closeSource: null }
       : { difficulty: "medium", closedAt: null, closedByUserId: null, closeSource: null };
     for (const [field, value] of Object.entries(addedDefaults)) {
       if (!before[table].some(row => Object.hasOwn(row, field))) assert.ok(after[table].every(row => row[field] === value));
     }
-    const fields = new Set(before[table].flatMap(row => Object.keys(row)));
-    assert.deepEqual(after[table].map(row => Object.fromEntries(Object.entries(row).filter(([key]) => fields.has(key)))), before[table], `Preserve ${table}`);
+    const expected = table === "UserScore" ? before[table].map(({ points, bonusExp, ...row }) => ({
+      ...row, exp: row.exp ?? BigInt(points) * 10n + BigInt(bonusExp ?? 0)
+    })) : before[table];
+    const fields = new Set(expected.flatMap(row => Object.keys(row)));
+    assert.deepEqual(after[table].map(row => Object.fromEntries(Object.entries(row).filter(([key]) => fields.has(key)))), expected, `Preserve ${table}`);
   }
+  const expSchema = `exp_${randomUUID().replaceAll("-", "")}`;
+  const expMigration = readFileSync("prisma/postgresql/migrations/20261126120000_experience_ranking/migration.sql", "utf8");
+  await db.$transaction(async tx => {
+    await tx.$executeRawUnsafe(`CREATE SCHEMA "${expSchema}"`);
+    await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${expSchema}"`);
+    await tx.$executeRawUnsafe('CREATE TABLE "UserScore" ("guildId" TEXT, "userId" TEXT, "points" INTEGER, "bonusExp" INTEGER, "correct" INTEGER, "sparks" INTEGER)');
+    await tx.$executeRawUnsafe('CREATE INDEX "UserScore_guildId_points_idx" ON "UserScore" ("guildId", "points")');
+    await tx.$executeRawUnsafe('CREATE TABLE "QuizAnswer" ("points" INTEGER, "streakExp" INTEGER)');
+    await tx.$executeRawUnsafe(`INSERT INTO "UserScore" VALUES ('fixture', 'player', 2147483647, 2147483647, 3, 24)`);
+    await tx.$executeRawUnsafe('INSERT INTO "QuizAnswer" VALUES (3, 5)');
+    for (const statement of expMigration.trim().replace(/^BEGIN;/, "").replace(/COMMIT;$/, "").split(";").map(sql => sql.trim()).filter(Boolean)) {
+      await tx.$executeRawUnsafe(statement);
+    }
+    assert.deepEqual(await tx.$queryRawUnsafe('SELECT * FROM "UserScore"'), [{ guildId: "fixture", userId: "player", correct: 3, sparks: 24, exp: 23622320117n }]);
+    assert.deepEqual(await tx.$queryRawUnsafe('SELECT * FROM "QuizAnswer"'), [{ streakExp: 5, baseExp: 30 }]);
+    await tx.$executeRawUnsafe(`DROP SCHEMA "${expSchema}" CASCADE`);
+  });
   const guildId = "migration-difficulty-test";
   const channelKey = { guildId, channelId: "migration-channel" };
   await Promise.all(Array.from({ length: 3 }, () => assignQuizChannel(channelKey.guildId, channelKey.channelId)));

@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.13.0 - 2026-11-27
+
+- Rank players by total EXP across correct answers, streak bonuses and Spark exchanges. Convert every existing score and answer award to EXP.
+- Add `/dilemma custom` for server and Dilemma managers. Publish a one-off quiz from a topic or exact question. Custom and random quizzes each have a four-per-day quota and a six-hour cooldown.
+- Give each player one free use of each lifeline per server week. Reset them on Monday in server time. Apply 1-10, 10-25 and 25-50 Spark stake ranges to new bets by difficulty. Preserve existing stakes and payouts.
+- Keep approved corrections, refunds and streak recovery in My result. Let the owner edit proposals with Edit suggested fix / Edytuj poprawkę and approve rules for future quiz generation across servers.
+- Update existing player guide posts when their language's text changes. Keep significant release highlights in a separate message per registered channel.
+- Apply the six new database migrations and re-register Discord commands when upgrading from v3.12.0.
+
 ## v3.10.1 - 2026-11-18
 
 - Shorten the wrong-answer penalty label to Wrong / Błąd and move its value-sized badge beside the duration in the top-right corner of new quiz cards. Keep the translated label in alternative text and text fallbacks.

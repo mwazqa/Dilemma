@@ -43,7 +43,7 @@ for (const language of messageLanguages) {
     assert.ok(message(language, key).includes("~"), `${key} keeps the shared feedback voice in ${language}`);
     assert.ok(message(language, key).length <= 2000);
   }
-  for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scorePoints", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
+  for (const key of ["scoreAnswers", "scoreCorrect", "scoreStreak", "scoreTotalExp", "scoreLifetimeExp", "scoreExpProgress", "endQuizButton", "badgeNone"]) {
     assert.equal(feedbackKaomoji[key], undefined);
     assert.doesNotMatch(message(language, key), /[~♡✧]/, "Short labels remain readable");
   }
@@ -79,6 +79,7 @@ assert.equal(normalizeLanguage("en-GB"), "en");
 assert.equal(normalizeLanguage("unknown"), "en");
 assert.throws(() => difficultySchema.parse("expert"));
 const { db } = await import("../dist/db.js");
+db.quizGenerationRule.findMany = async () => [];
 db.quizChannel.findUnique = async ({ where }) => ({ channelId: where.guildId_channelId.channelId });
 let settings = { guildId: "guild", language: "pl", defaultDifficulty: "hard", defaultIntervalDays: 7, defaultPollDurationHours: 24, defaultGenerationTime: null };
 let topic;
@@ -151,7 +152,7 @@ function checkNativeDescriptions(option) {
 }
 checkNativeDescriptions(dilemmaCommand.toJSON());
 assert.deepEqual(dilemmaCommand.toJSON().options.map(sub => sub.name).sort(),
-  ["create", "edit", "enable", "disable", "delete", "list", "guide", "help", "random", "random-cooldown-reset", "publish", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "profile", "leaderboard", "achievements", "badges", "sparks", "end"].sort());
+  ["create", "edit", "enable", "disable", "delete", "list", "guide", "help", "random", "custom", "random-cooldown-reset", "publish", "language", "timezone", "random-channels", "random-notifications", "permissions", "ping", "profile", "leaderboard", "achievements", "badges", "sparks", "end"].sort());
 assert.ok(dilemmaCommand.toJSON().options.every(sub => !sub.options?.some(option => ["old_name", "new_name"].includes(option.name))));
 for (const language of messageLanguages) {
   const content = getHelpContent(language);
@@ -354,9 +355,9 @@ for (const command of [dilemmaCommand.toJSON()]) {
   for (const sub of command.options) {
     assert.ok(!sub.options?.some(option => option.name === "questions_per_run"));
     const duration = sub.options?.find(option => option.name === "duration_hours");
-    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, sub.name === "random" ? 6 : 24); }
+    if (duration) { assert.equal(duration.min_value, 1); assert.equal(duration.max_value, ["random", "custom"].includes(sub.name) ? 6 : 24); }
   }
-  for (const sub of command.options.filter(sub => ["create", "edit", "random"].includes(sub.name))) {
+  for (const sub of command.options.filter(sub => ["create", "edit", "random", "custom"].includes(sub.name))) {
     const option = sub.options.find(option => option.name === "difficulty");
     assert.deepEqual(option.choices.map(choice => choice.value), ["easy", "medium", "hard"]);
     assert.ok(!option.required);

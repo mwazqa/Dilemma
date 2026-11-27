@@ -10,11 +10,11 @@ const { db } = await import("../dist/db.js");
 const { clearGuildSettingsCache } = await import("../dist/services/guild-settings.js");
 const { routeCommand, routeAutocomplete, dilemmaCommand } = await import("../dist/commands/dilemma.js");
 const { applyFinalVotes } = await import("../dist/services/scoring.js");
-const zero = { points: 0, answered: 0, correct: 0, currentStreak: 0, bestStreak: 0, selectedBadge: null };
+const zero = { exp: 0n, answered: 0, correct: 0, currentStreak: 0, bestStreak: 0, selectedBadge: null };
 assert.equal(achievements.length, 6);
 assert.equal(new Set(achievements.map(item => item.id)).size, achievements.length);
 assert.ok(achievementProgress(null).every(item => !item.unlocked));
-const earned = { ...zero, points: 10, answered: 100, correct: 10, bestStreak: 10, selectedBadge: "streak_10" };
+const earned = { ...zero, exp: 100n, answered: 100, correct: 10, bestStreak: 10, selectedBadge: "streak_10" };
 assert.equal(achievementProgress(earned).filter(item => item.unlocked).length, 5);
 assert.equal(maxDisplayedBadges, 3);
 assert.deepEqual(selectedAchievements(earned).map(item => item.id), ["streak_10"]);
@@ -37,9 +37,10 @@ for (const invalid of [["unknown"], ["first_answer", "first_answer"], achievemen
 assert.equal(new Set(achievements.map(item => achievementIcon(item.id))).size, 6, "Every badge has its own icon");
 assert.equal(achievementIcon("unknown"), "");
 for (const achievement of achievements) {
-  const field = achievement.metric === "level" ? "points" : achievement.metric;
-  const threshold = achievement.metric === "level" ? achievementRequirement(achievement.id).points.gte : achievement.target;
-  assert.equal(achievementProgress({ ...zero, [field]: threshold - 1 }).find(item => item.id === achievement.id).unlocked, false);
+  const field = achievement.metric === "level" ? "exp" : achievement.metric;
+  const threshold = achievement.metric === "level" ? achievementRequirement(achievement.id).exp.gte : achievement.target;
+  const below = typeof threshold === "bigint" ? threshold - 1n : threshold - 1;
+  assert.equal(achievementProgress({ ...zero, [field]: below }).find(item => item.id === achievement.id).unlocked, false);
   const reached = achievementProgress({ ...zero, [field]: threshold }).find(item => item.id === achievement.id);
   assert.equal(reached.unlocked, true);
   assert.equal(reached.current, achievement.target);
@@ -50,7 +51,7 @@ const players = new Map();
 const key = (guild, user) => `${guild}:${user}`;
 const put = (guild, user, score) => players.set(key(guild, user), { guildId: guild, userId: user, ...score });
 put("guild", "player", earned);
-put("other-guild", "player", { ...earned, points: 100, selectedBadge: "level_5" });
+put("other-guild", "player", { ...earned, exp: 1000n, selectedBadge: "level_5" });
 let locale = "pl", updates = 0, queries = 0;
 db.guildSettings.findUnique = async ({ where }) => { assert.ok(where.guildId); return { language: locale }; };
 db.userScore.findUnique = async ({ where }) => { queries++; const { guildId, userId } = where.guildId_userId; return players.get(key(guildId, userId)) ?? null; };
@@ -107,7 +108,7 @@ for (const language of messageLanguages) {
   assert.ok(!choices.replies[0].some(choice => choice.value === "level_5"));
   const card = { title: "Test", level: message(language, "scoreLevel", { level: 2 }), rank: 1,
     sparksLabel: message(language, "sparksName"), sparks: "42",
-    points: message(language, "scorePoints", { points: 10 }).replace(/\*\*/g, ""), experience: "0 / 200 EXP", percent: 0,
+    totalExp: message(language, "scoreLifetimeExp", { exp: 100 }), experience: "0 / 200 EXP", percent: 0,
     answersLabel: message(language, "scoreAnswers"), answers: "100", correctLabel: message(language, "scoreCorrect"), correct: "10 (10%)",
     streakLabel: message(language, "scoreStreak"), streak: "0 / 10",
     badges: threeIds.map(id => ({ id, name: message(language, achievements.find(item => item.id === id).name) })) };
@@ -135,7 +136,7 @@ for (const language of messageLanguages) {
     const directory = new URL("../.tools/score-card-preview/", import.meta.url);
     await mkdir(directory, { recursive: true });
     await writeFile(new URL("three-badges.png", directory), await renderScoreCard(card));
-    await writeFile(new URL("three-badges-long-name.png", directory), await renderScoreCard({ ...card, title: "Bardzo długi nick ".repeat(10), points: "1000000000 pkt", rank: 1000000 }));
+    await writeFile(new URL("three-badges-long-name.png", directory), await renderScoreCard({ ...card, title: "Bardzo długi nick ".repeat(10), totalExp: "1000000000 EXP", rank: 1000000 }));
   }
 }
 locale = "pl";
@@ -216,13 +217,12 @@ assert.equal(achievementProgress(players.get(key("guild", "player"))).filter(ite
 players.get(key("guild", "player")).selectedBadge = encodeSelectedBadges(threeIds);
 db.quizSettlement.updateMany = async () => ({ count: 1 });
 db.quizAnswer.create = async ({ data }) => data;
-db.quizAnswer.findMany = async () => [{ messageId: "quiz", finishedAt: new Date(0), points: 1, correct: true }];
+db.quizAnswer.findMany = async () => [{ messageId: "quiz", finishedAt: new Date(0), correct: true }];
 db.userScore.upsert = async ({ where, create, update }) => {
   const id = key(where.guildId_userId.guildId, where.guildId_userId.userId);
   const previous = players.get(id);
   players.set(id, previous ? { ...previous, ...update,
-    sparks: (previous.sparks ?? 0) + update.sparks.increment,
-    bonusExp: (previous.bonusExp ?? 0) + update.bonusExp.increment } : create);
+    sparks: (previous.sparks ?? 0) + update.sparks.increment } : create);
 };
 await applyFinalVotes({ guildId: "guild", messageId: "quiz", correctAnswerId: 1, answerIds: "1,2", difficulty: "easy" }, [{ userId: "player", answerId: 1 }], new Date(0));
 assert.equal(players.get(key("guild", "player")).selectedBadge, encodeSelectedBadges(threeIds));

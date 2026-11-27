@@ -56,12 +56,12 @@ export async function quizPersonalPayload(identity: { messageId: string; guildId
     const refund = correction?.refunds[0];
     if (correction) {
       lines.push(message(language, "quizCorrectionPersonal", { correction: correction.text }));
-      if (answer) lines.push(message(language, "quizCorrectionOriginalScore", { points: answer.points }));
+      if (answer) lines.push(message(language, "quizCorrectionOriginalExp", { exp: answer.baseExp }));
+      if (answer?.streakProtected) lines.push(message(language, "quizCorrectionStreakProtected"));
     } else {
       lines.push(message(language, "quizCorrectAnswer", { answer: describe(quiz.correctAnswerId) }));
-      if (answer) lines.push(message(language, answer.correct ? "quizAnswerWon" : "quizAnswerLost", {
-        points: answer.points, penalty: answer.sparksPenalty
-      }));
+      if (answer) lines.push(answer.correct ? message(language, "quizAnswerWon", { exp: answer.baseExp })
+        : message(language, "quizAnswerLost", { penalty: answer.sparksPenalty }));
     }
     if (answer?.streakExp) lines.push(message(language, "quizStreakBonus", { exp: answer.streakExp }));
     if (wager?.payout !== null && wager?.payout !== undefined) {

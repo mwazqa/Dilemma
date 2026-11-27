@@ -16,7 +16,7 @@ export function startRandomNotificationScheduler(client: Client) {
     if (guildId === "bootstrap") { await bootstrap(current); return; }
     const settings = await db.guildSettings.findUnique({ where: { guildId } });
     if (!settings?.randomPingRoleId) return;
-    const poll = await db.randomPoll.findFirst({ where: { guildId }, orderBy: { createdAt: "desc" },
+    const poll = await db.randomPoll.findFirst({ where: { guildId, kind: "random" }, orderBy: { createdAt: "desc" },
       select: { id: true, channelId: true, createdAt: true, readyPingSentAt: true } });
     if (!poll || poll.readyPingSentAt) return;
     const readyAt = await randomQuizReadyAt(guildId, new Date(), guildTimezone(settings));
@@ -24,7 +24,7 @@ export function startRandomNotificationScheduler(client: Client) {
     if (!current()) return;
     const latestSettings = await db.guildSettings.findUnique({ where: { guildId } });
     if (!latestSettings?.randomPingRoleId) return;
-    const latestPoll = await db.randomPoll.findFirst({ where: { guildId }, orderBy: { createdAt: "desc" }, select: { id: true } });
+    const latestPoll = await db.randomPoll.findFirst({ where: { guildId, kind: "random" }, orderBy: { createdAt: "desc" }, select: { id: true } });
     if (latestPoll?.id !== poll.id) { await scheduleGuild(guildId); return; }
     const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId).catch(() => null);
     const channel = await client.channels.fetch(poll.channelId).catch(() => null);
@@ -56,7 +56,7 @@ export function startRandomNotificationScheduler(client: Client) {
     if (loading) changedDuringLoad.add(guildId);
     const settings = await db.guildSettings.findUnique({ where: { guildId } });
     if (!settings?.randomPingRoleId) { queue.cancel(guildId); return; }
-    const poll = await db.randomPoll.findFirst({ where: { guildId }, orderBy: { createdAt: "desc" },
+    const poll = await db.randomPoll.findFirst({ where: { guildId, kind: "random" }, orderBy: { createdAt: "desc" },
       select: { id: true, readyPingSentAt: true } });
     if (!poll || poll.readyPingSentAt) { queue.cancel(guildId); return; }
     queue.schedule(guildId, await randomQuizReadyAt(guildId, new Date(), guildTimezone(settings)));

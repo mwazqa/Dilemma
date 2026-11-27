@@ -33,7 +33,28 @@ try {
       database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES ('legacy-streak', 'test', 'channel', 'easy', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
         INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('legacy-streak', 'legacy-player', 'test', 1, true, 1, CURRENT_TIMESTAMP);`);
     }
+    if (migration === "20261126120000_experience_ranking") {
+      database.exec(`UPDATE "UserScore" SET bonusExp = 15 WHERE userId = 'legacy-player';
+        INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt, scoredAt) VALUES ('legacy-exp', 'test', 'channel', 'hard', 1, '1,2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, streakExp, finishedAt) VALUES ('legacy-exp', 'legacy-player', 'test', 1, true, 3, 5, CURRENT_TIMESTAMP);`);
+    }
+    if (migration === "20261126140000_weekly_lifelines_and_wagers") {
+      database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt) VALUES ('legacy-wager', 'test', 'channel', 'easy', 1, '1,2', CURRENT_TIMESTAMP);
+        INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount, payout) VALUES ('legacy-wager', 'legacy-player', 'test', 1, 20, 40);`);
+    }
     database.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
+    if (migration === "20261126140000_weekly_lifelines_and_wagers") {
+      const legacyWager = database.prepare('SELECT amount, payout FROM "QuizWager" WHERE messageId = ?').get("legacy-wager");
+      assert.deepEqual([legacyWager.amount, legacyWager.payout], [20, 40]);
+      database.prepare('DELETE FROM "QuizSettlement" WHERE messageId = ?').run("legacy-wager");
+      assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizWager"').get().count, 0);
+    }
+    if (migration === "20261126120000_experience_ranking") {
+      const migrated = database.prepare('SELECT * FROM "QuizAnswer" WHERE messageId = ?').get("legacy-exp");
+      assert.deepEqual([migrated.baseExp, migrated.streakExp], [30, 5]);
+      assert.ok(!Object.hasOwn(migrated, "points"));
+      database.prepare('DELETE FROM "QuizSettlement" WHERE messageId = ?').run("legacy-exp");
+    }
     if (migration === "20261118140000_streak_experience") {
       assert.equal(database.prepare('SELECT streakExp FROM "QuizAnswer" WHERE messageId = ?').get("legacy-streak").streakExp, 0);
       assert.throws(() => database.exec('UPDATE "QuizAnswer" SET streakExp = -1'));
@@ -58,6 +79,7 @@ try {
     }
   }
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
+  assert.equal(database.prepare('SELECT kind FROM "RandomPoll" WHERE id = ?').get("r").kind, "random");
   assert.equal(database.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type = 'index' AND name = 'GeneratedPoll_guildId_topicId_createdAt_idx'").get().count, 1);
   for (const table of ["Topic", "GuildSettings", "GeneratedPoll", "RandomPoll", "QuizSettlement", "QuizAnswer", "UserScore", "SparkExchange", "SparkTransfer", "DailyQuizRun", "QuizChannel", "QuizReport", "GuidePublication", "GuideReleaseNotice", "GuideDiscovery"]) {
     if (!tables.includes(table)) throw new Error(`Missing table after migration: ${table}`);
@@ -125,8 +147,8 @@ try {
   assert.equal(readFileSync(`prisma/migrations/${badgeMigration}`, "utf8"), readFileSync(`prisma/postgresql/migrations/${badgeMigration}`, "utf8"));
   const legacyPlayer = database.prepare('SELECT * FROM "UserScore" WHERE userId = ?').get("legacy-player");
   assert.equal(legacyPlayer.selectedBadge, null);
-  assert.equal(legacyPlayer.bonusExp, 0);
-  assert.deepEqual([legacyPlayer.points, legacyPlayer.answered, legacyPlayer.correct, legacyPlayer.currentStreak, legacyPlayer.bestStreak], [10, 12, 10, 3, 4]);
+  assert.ok(!Object.hasOwn(legacyPlayer, "points") && !Object.hasOwn(legacyPlayer, "bonusExp"));
+  assert.deepEqual([legacyPlayer.exp, legacyPlayer.answered, legacyPlayer.correct, legacyPlayer.currentStreak, legacyPlayer.bestStreak], [115, 12, 10, 3, 4]);
   database.exec(`UPDATE "UserScore" SET selectedBadge = 'first_answer' WHERE guildId = 'test' AND userId = 'legacy-player'`);
   assert.equal(database.prepare('SELECT selectedBadge FROM "UserScore" WHERE userId = ?').get("legacy-player").selectedBadge, "first_answer");
   assert.equal(database.prepare('SELECT sparks FROM "UserScore" WHERE userId = ?').get("legacy-player").sparks, 0);
@@ -143,14 +165,14 @@ try {
   assert.equal(database.prepare('SELECT difficulty FROM "Topic"').get().difficulty, "hard");
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizSettlement"').get().count, 0);
   database.exec(`INSERT INTO "QuizSettlement" (messageId, guildId, channelId, difficulty, correctAnswerId, answerIds, expiresAt) VALUES ('score-test', 'test', 'channel', 'hard', 17, '17,93', CURRENT_TIMESTAMP);
-    INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP);`);
+    INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, baseExp, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 30, CURRENT_TIMESTAMP);`);
   assert.equal(database.prepare('SELECT resultsPending FROM "QuizSettlement" WHERE messageId = ?').get("score-test").resultsPending, 1);
   assert.equal(database.prepare('SELECT votingMode FROM "QuizSettlement" WHERE messageId = ?').get("score-test").votingMode, "native");
   database.exec(`INSERT INTO "QuizVote" (messageId, userId, guildId, answerId) VALUES ('score-test', 'player', 'test', 17);
     INSERT INTO "QuizSupport" (messageId, userId, guildId, revealed) VALUES ('score-test', 'player', 'test', true);
-    INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'player', 'test', 17, 20);`);
-  assert.throws(() => database.exec(`INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'invalid', 'test', 17, 21)`));
-  assert.throws(() => database.exec(`INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, points, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 3, CURRENT_TIMESTAMP)`));
+    INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'player', 'test', 17, 50);`);
+  assert.throws(() => database.exec(`INSERT INTO "QuizWager" (messageId, userId, guildId, answerId, amount) VALUES ('score-test', 'invalid', 'test', 17, 51)`));
+  assert.throws(() => database.exec(`INSERT INTO "QuizAnswer" (messageId, userId, guildId, answerId, correct, baseExp, finishedAt) VALUES ('score-test', 'player', 'test', 17, true, 30, CURRENT_TIMESTAMP)`));
   database.exec('DELETE FROM "QuizSettlement" WHERE messageId = \'score-test\'');
   assert.equal(database.prepare('SELECT count(*) AS count FROM "QuizAnswer"').get().count, 0);
   for (const table of ["QuizVote", "QuizSupport", "QuizWager"]) assert.equal(database.prepare(`SELECT count(*) AS count FROM "${table}"`).get().count, 0);

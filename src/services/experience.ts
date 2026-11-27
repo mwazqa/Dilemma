@@ -1,4 +1,5 @@
-export const experiencePerPoint = 10;
+export const correctAnswerExp = { easy: 10, medium: 20, hard: 30 } as const;
+export const maxExperience = BigInt(2 ** 52 - 1);
 export const experiencePerStreakStep = 5;
 export const streakBonusStartsAt = 3;
 export const maxStreakBonusExp = 40;
@@ -15,11 +16,9 @@ export function levelThreshold(level: number): number {
   return threshold;
 }
 
-export function experienceProgress(points: number, bonusExp = 0) {
-  if (!Number.isSafeInteger(points) || points < 0) throw new RangeError("Invalid points");
-  if (!Number.isSafeInteger(bonusExp) || bonusExp < 0) throw new RangeError("Invalid bonus experience");
-  const totalExp = points * experiencePerPoint + bonusExp;
-  if (!Number.isSafeInteger(totalExp)) throw new RangeError("Experience is too large");
+export function experienceProgress(experience: number | bigint) {
+  const totalExp = Number(experience);
+  if (!Number.isSafeInteger(totalExp) || totalExp < 0 || totalExp > Number(maxExperience)) throw new RangeError("Invalid experience");
   let level = Math.floor((1 + Math.sqrt(1 + totalExp * 0.08)) / 2);
   while (level > 1 && levelThreshold(level) > totalExp) level--;
   while (levelThreshold(level + 1) <= totalExp) level++;

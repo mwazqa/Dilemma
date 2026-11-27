@@ -29,14 +29,14 @@ try {
   await applyFinalVotes(early, [{ userId: "player", answerId: 93 }], new Date(1000));
   let player = await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: "player" } } });
   assert.equal(player.currentStreak, 1, "Streak uses finish order, not retry order");
-  assert.equal(player.points, 3); assert.equal(player.answered, 2);
+  assert.equal(player.exp, 30n); assert.equal(player.answered, 2);
   const latest = await createQuiz("latest", "medium");
   await applyFinalVotes(latest, [{ userId: "player", answerId: 17 }], new Date(3000));
   player = await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: "player" } } });
-  assert.equal(player.currentStreak, 2); assert.equal(player.bestStreak, 2); assert.equal(player.points, 5);
+  assert.equal(player.currentStreak, 2); assert.equal(player.bestStreak, 2); assert.equal(player.exp, 50n);
   const other = await createQuiz("other", "easy", secondGuild);
   await applyFinalVotes(other, [{ userId: "player", answerId: 17 }], new Date(1000));
-  assert.equal((await db.userScore.findUnique({ where: { guildId_userId: { guildId: secondGuild, userId: "player" } } })).points, 1);
+  assert.equal((await db.userScore.findUnique({ where: { guildId_userId: { guildId: secondGuild, userId: "player" } } })).exp, 10n);
   const empty = await createQuiz("empty", "easy");
   await applyFinalVotes(empty, [], new Date(4000));
   assert.equal((await db.userScore.findUnique({ where: { guildId_userId: { guildId, userId: "player" } } })).currentStreak, 2);

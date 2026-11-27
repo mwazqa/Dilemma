@@ -8,10 +8,9 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { scheduleEvents, settlementDeadline, type SettlementSchedule } from "./schedule-events.js";
 import { getGuildSettings } from "./guild-settings.js";
 import { publishQuizResults } from "./quiz-results.js";
-import { earnedSparks, maxWalletValue, wrongAnswerPenalties } from "./sparks.js";
-import { streakExperience } from "./experience.js";
+import { correctAnswerSparks, levelUpSparks, wrongAnswerPenalties } from "./sparks.js";
+import { correctAnswerExp, maxExperience, streakExperience } from "./experience.js";
 
-const pointsByDifficulty = { easy: 1, medium: 2, hard: 3 } as const;
 export type FinalVote = { userId: string; answerId: number };
 
 export function settlementData(message: Message, guildId: string, difficulty: string, options: string[], correctOption: number) {
@@ -28,17 +27,15 @@ export function settlementData(message: Message, guildId: string, difficulty: st
     correctAnswerId: mapped[correctOption], answerIds: mapped.join(","), expiresAt: poll.expiresAt, resultsPending: true };
 }
 
-export function scoreHistory(history: { correct: boolean; points: number }[]) {
+export function scoreHistory(history: { correct: boolean; streakProtected?: boolean }[]) {
   let currentStreak = 0;
   let bestStreak = 0;
   let correct = 0;
-  let points = 0;
   for (const answer of history) {
-    points += answer.points;
     if (answer.correct) { correct++; currentStreak++; bestStreak = Math.max(bestStreak, currentStreak); }
-    else currentStreak = 0;
+    else if (!answer.streakProtected) currentStreak = 0;
   }
-  return { points, answered: history.length, correct, currentStreak, bestStreak };
+  return { answered: history.length, correct, currentStreak, bestStreak };
 }
 
 export async function collectFinalVotes(client: Client, quiz: QuizSettlement): Promise<{ votes: FinalVote[]; finishedAt: Date } | null> {
@@ -99,13 +96,17 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
           const correct = vote.answerId === quiz.correctAnswerId;
           const difficulty = parseDifficulty(quiz.difficulty);
           const wallet = await tx.userScore.findUnique({
-            where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } }, select: { sparks: true, bonusExp: true }
+            where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } }, select: { sparks: true, exp: true }
           });
+          const previousExp = wallet?.exp ?? 0n;
+          const availableExp = Number(maxExperience - previousExp);
+          const baseExp = correct ? Math.min(correctAnswerExp[difficulty], availableExp) : 0;
           const sparksPenalty = correct ? 0 : Math.min(wallet?.sparks ?? 0, wrongAnswerPenalties[difficulty]);
           await tx.quizAnswer.create({ data: { ...vote, guildId: quiz.guildId, messageId: quiz.messageId, correct,
-            points: correct ? pointsByDifficulty[difficulty] : 0, sparksPenalty, finishedAt } });
+            baseExp, sparksPenalty, finishedAt } });
           const history = await tx.quizAnswer.findMany({ where: { guildId: quiz.guildId, userId: vote.userId },
-            select: { messageId: true, finishedAt: true, correct: true, points: true }, orderBy: [{ finishedAt: "asc" }, { messageId: "asc" }] });
+            select: { messageId: true, finishedAt: true, correct: true, streakProtected: true },
+            orderBy: [{ finishedAt: "asc" }, { messageId: "asc" }] });
           const score = scoreHistory(history);
           if (!history.some(answer => answer.messageId === quiz.messageId)) throw new Error("Scored answer unavailable");
           const pending = correct && quiz.votingMode === "buttons" ? await tx.quizVote.findMany({
@@ -115,17 +116,17 @@ export async function applyFinalVotes(quiz: QuizSettlement, votes: FinalVote[], 
           }) : [];
           const streakHistory = [...history, ...pending.map(answer => ({ messageId: answer.messageId,
             finishedAt: answer.settlement.closedAt ?? answer.settlement.expiresAt,
-            correct: answer.answerId === answer.settlement.correctAnswerId, points: 0 }))]
+            correct: answer.answerId === answer.settlement.correctAnswerId }))]
             .filter(answer => +answer.finishedAt < +finishedAt || +answer.finishedAt === +finishedAt && answer.messageId <= quiz.messageId)
             .sort((a, b) => +a.finishedAt - +b.finishedAt || (a.messageId < b.messageId ? -1 : a.messageId > b.messageId ? 1 : 0));
           const streak = scoreHistory(streakHistory).currentStreak;
-          const streakExp = correct ? Math.min(streakExperience(streak), maxWalletValue - (wallet?.bonusExp ?? 0)) : 0;
+          const streakExp = correct ? Math.min(streakExperience(streak), availableExp - baseExp) : 0;
           if (streakExp) await tx.quizAnswer.update({ where: { messageId_userId: { messageId: quiz.messageId, userId: vote.userId } }, data: { streakExp } });
-          const earned = correct ? pointsByDifficulty[difficulty] : 0;
-          const sparks = correct ? earnedSparks(score.points, earned, wallet?.bonusExp, streakExp) : -sparksPenalty;
+          const exp = previousExp + BigInt(baseExp + streakExp);
+          const sparks = correct ? correctAnswerSparks[difficulty] + levelUpSparks(previousExp, exp) : -sparksPenalty;
           await tx.userScore.upsert({ where: { guildId_userId: { guildId: quiz.guildId, userId: vote.userId } },
-            create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks: Math.max(0, sparks), bonusExp: streakExp },
-            update: { ...score, sparks: { increment: sparks }, bonusExp: { increment: streakExp } } });
+            create: { guildId: quiz.guildId, userId: vote.userId, ...score, sparks: Math.max(0, sparks), exp },
+            update: { ...score, sparks: { increment: sparks }, exp } });
         }
         if (quiz.votingMode === "buttons") {
           const wagers = await tx.quizWager.findMany({ where: { messageId: quiz.messageId, guildId: quiz.guildId, payout: null } });

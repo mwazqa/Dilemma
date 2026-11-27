@@ -35,7 +35,6 @@ import { startQuizReportReviewScheduler } from "./services/quiz-report-scheduler
 import { startGuideUpdatesScheduler } from "./services/guide-updates.js";
 import { handleQuizCorrectionButton, handleQuizCorrectionModal } from "./commands/quiz-correction.js";
 import { CORRECTION_ACCEPT_PREFIX, CORRECTION_BUTTON_PREFIX, CORRECTION_MODAL_PREFIX } from "./services/quiz-corrections.js";
-import { startQuizCorrectionScheduler } from "./services/quiz-correction-notices.js";
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const stopSchedulers: (() => void)[] = [];
@@ -46,7 +45,6 @@ client.on(Events.Error, error => {
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Logged in as Discord bot");
   stopSchedulers.push(startScheduler(client), startScoreScheduler(client), startRandomNotificationScheduler(client), startQuizReportReviewScheduler(client), startGuideUpdatesScheduler(client));
-  stopSchedulers.push(startQuizCorrectionScheduler(client));
 });
 
 client.on(Events.GuildCreate, async (guild) => {

@@ -17,8 +17,10 @@ function zoneFormatters(timezone: string) {
   return value;
 }
 
+export type OnDemandQuizKind = "random" | "custom";
+
 export class DailyQuizLimitError extends Error {
-  constructor(public readonly kind: "topic" | "random") {
+  constructor(public readonly kind: "topic" | OnDemandQuizKind) {
     super("Daily quiz limit reached");
     this.name = "DailyQuizLimitError";
   }
@@ -31,7 +33,6 @@ export class TopicScheduleNotReadyError extends Error {
 export const RANDOM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 export const RANDOM_DAILY_LIMIT = 4;
 export const RANDOM_MAX_DURATION_HOURS = 6;
-const randomDailyScope = "random-daily";
 export type QuizRun = DailyQuizRun & { dailyRun?: DailyQuizRun; cycleRun?: DailyQuizRun; timezone?: string };
 
 export class RandomQuizCooldownError extends Error {
@@ -41,88 +42,91 @@ export class RandomQuizCooldownError extends Error {
   }
 }
 
-async function randomUsage(tx: Prisma.TransactionClient, guildId: string, now: Date, timezone: string, exclude: DailyQuizRun[] = []) {
+async function onDemandUsage(tx: Prisma.TransactionClient, guildId: string, kind: OnDemandQuizKind, now: Date, timezone: string, exclude: DailyQuizRun[] = []) {
   const { day, start, end } = quizDayBounds(now, timezone);
-  const settings = await tx.guildSettings.findUnique({ where: { guildId }, select: { randomCooldownResetAt: true } });
+  const dailyScope = `${kind}-daily`;
+  const settings = kind === "random" ? await tx.guildSettings.findUnique({ where: { guildId }, select: { randomCooldownResetAt: true } }) : null;
   const resetAt = settings?.randomCooldownResetAt?.getTime() ?? 0;
   const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, resetAt));
   const [poll, stored] = await Promise.all([
-    tx.randomPoll.findFirst({ where: { guildId, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
-    tx.dailyQuizRun.findMany({ where: { guildId, scope: { in: ["random", randomDailyScope] },
+    tx.randomPoll.findFirst({ where: { guildId, kind, createdAt: { gt: cutoff } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
+    tx.dailyQuizRun.findMany({ where: { guildId, scope: { in: [kind, dailyScope] },
       createdAt: { gte: new Date(Math.min(+start, +cutoff)) } } })
   ]);
   const rows = stored.filter(row => !exclude.some(item => item.guildId === row.guildId && item.scope === row.scope &&
     item.day === row.day && item.slot === row.slot));
   const today = rows.filter(row => row.createdAt >= start && row.createdAt < end);
-  const daily = today.filter(row => row.scope === randomDailyScope || row.day !== "cooldown");
+  const daily = today.filter(row => row.scope === dailyScope || row.day !== "cooldown");
   const recorded = daily.flatMap(row => row.messageId ? [row.messageId] : []);
-  const legacyCount = await tx.randomPoll.count({ where: { guildId, createdAt: { gte: start, lt: end },
+  const legacyCount = await tx.randomPoll.count({ where: { guildId, kind, createdAt: { gte: start, lt: end },
     ...(recorded.length ? { messageId: { notIn: recorded } } : {}) } });
-  const pending = today.filter(row => row.scope === "random" && row.day === "cooldown" && !row.messageId &&
+  const pending = today.filter(row => row.scope === kind && row.day === "cooldown" && !row.messageId &&
     !daily.some(item => !item.messageId && +item.createdAt === +row.createdAt));
   return { day, daily, pending, used: daily.length + legacyCount + pending.length, resetAt,
     latest: Math.max(poll?.createdAt.getTime() ?? 0, ...rows.filter(row => +row.createdAt >= resetAt).map(row => +row.createdAt)) };
 }
 
 export async function randomQuizReadyAt(guildId: string, now = new Date(), timezone = env.QUIZ_TIMEZONE): Promise<Date> {
-  const usage = await db.$transaction(tx => randomUsage(tx, guildId, now, timezone));
+  const usage = await db.$transaction(tx => onDemandUsage(tx, guildId, "random", now, timezone));
   const { end } = quizDayBounds(now, timezone);
   const cooldownAt = usage.latest ? usage.latest + RANDOM_COOLDOWN_MS : +now;
   return new Date(Math.max(+now, cooldownAt, usage.used >= RANDOM_DAILY_LIMIT ? +end : +now));
 }
 
-async function claimRandomQuiz(guildId: string, now: Date, timezone: string): Promise<QuizRun> {
-  const key = { guildId, scope: "random", day: "cooldown", slot: 1 };
+export async function claimOnDemandQuiz(guildId: string, kind: OnDemandQuizKind, now: Date, timezone: string): Promise<QuizRun> {
+  const key = { guildId, scope: kind, day: "cooldown", slot: 1 };
+  const dailyScope = `${kind}-daily`;
   let run: QuizRun;
   try {
     run = await db.$transaction(async tx => {
-      const usage = await randomUsage(tx, guildId, now, timezone);
-      if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError("random");
+      const usage = await onDemandUsage(tx, guildId, kind, now, timezone);
+      if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError(kind);
       const cutoff = new Date(Math.max(now.getTime() - RANDOM_COOLDOWN_MS, usage.resetAt));
       if (usage.latest > +cutoff) throw new RandomQuizCooldownError(new Date(usage.latest + RANDOM_COOLDOWN_MS));
       const updated = await tx.dailyQuizRun.updateMany({ where: { ...key, createdAt: { lte: cutoff } },
         data: { createdAt: now, messageId: null } });
       const run = updated.count ? { ...key, createdAt: now, messageId: null }
         : await tx.dailyQuizRun.create({ data: { ...key, createdAt: now } });
-      const occupied = new Set(usage.daily.filter(row => row.scope === randomDailyScope && row.day === usage.day).map(row => row.slot));
+      const occupied = new Set(usage.daily.filter(row => row.scope === dailyScope && row.day === usage.day).map(row => row.slot));
       for (const pending of usage.pending) {
         const slot = Array.from({ length: RANDOM_DAILY_LIMIT }, (_, index) => index + 1).find(value => !occupied.has(value));
-        if (!slot) throw new DailyQuizLimitError("random");
-        await tx.dailyQuizRun.create({ data: { guildId, scope: randomDailyScope, day: usage.day, slot, createdAt: pending.createdAt } });
+        if (!slot) throw new DailyQuizLimitError(kind);
+        await tx.dailyQuizRun.create({ data: { guildId, scope: dailyScope, day: usage.day, slot, createdAt: pending.createdAt } });
         occupied.add(slot);
       }
       for (let slot = 1; slot <= RANDOM_DAILY_LIMIT; slot++) {
         if (occupied.has(slot)) continue;
-        const dailyRun = await tx.dailyQuizRun.create({ data: { guildId, scope: randomDailyScope, day: usage.day, slot, createdAt: now } });
+        const dailyRun = await tx.dailyQuizRun.create({ data: { guildId, scope: dailyScope, day: usage.day, slot, createdAt: now } });
         return { ...run, dailyRun, timezone };
       }
-      throw new DailyQuizLimitError("random");
+      throw new DailyQuizLimitError(kind);
     });
   } catch (error) {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
     const current = await db.dailyQuizRun.findUnique({ where: { guildId_scope_day_slot: key } });
     throw new RandomQuizCooldownError(new Date((current?.createdAt ?? now).getTime() + RANDOM_COOLDOWN_MS));
   }
-  scheduleEvents.emit("randomCooldownChanged", guildId);
+  if (kind === "random") scheduleEvents.emit("randomCooldownChanged", guildId);
   return run;
 }
 
 export async function refreshRandomQuizRun(run: QuizRun, timezone = run.timezone ?? env.QUIZ_TIMEZONE): Promise<QuizRun> {
   const dailyRun = run.dailyRun;
-  if (!dailyRun) throw new Error("Missing random daily reservation");
+  const kind = run.scope;
+  if (!dailyRun || (kind !== "random" && kind !== "custom")) throw new Error("Missing on-demand daily reservation");
   const createdAt = new Date();
   const refreshed = await db.$transaction(async tx => {
     const updated = await tx.dailyQuizRun.updateMany({ where: { ...runKey(run).guildId_scope_day_slot,
       createdAt: run.createdAt, messageId: null }, data: { createdAt } });
     if (!updated.count) throw new RandomQuizCooldownError(new Date(createdAt.getTime() + RANDOM_COOLDOWN_MS));
-    const usage = await randomUsage(tx, run.guildId, createdAt, timezone, [run, dailyRun]);
-    if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError("random");
+    const usage = await onDemandUsage(tx, run.guildId, kind, createdAt, timezone, [run, dailyRun]);
+    if (usage.used >= RANDOM_DAILY_LIMIT) throw new DailyQuizLimitError(kind);
     const refreshed = await tx.dailyQuizRun.updateMany({ where: { ...runKey(dailyRun).guildId_scope_day_slot,
       createdAt: dailyRun.createdAt, messageId: null }, data: { createdAt } });
     if (!refreshed.count) throw new Error("Random daily reservation changed");
     return { ...run, createdAt, timezone, dailyRun: { ...dailyRun, createdAt } };
   });
-  scheduleEvents.emit("randomCooldownChanged", run.guildId);
+  if (kind === "random") scheduleEvents.emit("randomCooldownChanged", run.guildId);
   return refreshed;
 }
 
@@ -130,6 +134,12 @@ export function quizDay(now: Date, timezone = env.QUIZ_TIMEZONE): string {
   const parts = zoneFormatters(timezone).day.formatToParts(now);
   const part = (name: string) => parts.find(item => item.type === name)!.value;
   return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function quizWeekStart(now: Date, timezone: string): string {
+  const day = new Date(`${quizDay(now, timezone)}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
+  return day.toISOString().slice(0, 10);
 }
 
 function dayStart(day: string, timezone: string): Date {
@@ -234,7 +244,7 @@ export function validatePollDuration(hours: number, maximum = 24): number {
 }
 
 export async function claimQuizRun(guildId: string, topicId?: string, now = new Date(), early = true, timezone = env.QUIZ_TIMEZONE): Promise<QuizRun> {
-  if (!topicId) return claimRandomQuiz(guildId, now, timezone);
+  if (!topicId) return claimOnDemandQuiz(guildId, "random", now, timezone);
   const { day, start, end } = quizDayBounds(now, timezone);
   const scope = topicId ? `topic:${topicId}` : "random";
   const kind = "topic";

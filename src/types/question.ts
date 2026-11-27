@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+export const maxQuestionLength = 300;
+
 export const questionSchema = z.object({
   language: z.string().min(2),
   topic: z.string().min(1).max(80),
-  question: z.string().min(1).max(300),
+  question: z.string().min(1).max(maxQuestionLength),
   options: z.array(z.string().min(1).max(55)).min(2).max(4).refine(
     (options) => new Set(options.map((option) => option.trim().toLocaleLowerCase())).size === options.length,
     "Answer options must be unique"

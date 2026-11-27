@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { requireTestDatabase } from "./test-database-guard.mjs";
 requireTestDatabase(process.env);
 Object.assign(process.env, { DISCORD_TOKEN: "test", DISCORD_CLIENT_ID: "test", OPENAI_API_KEY: "test", AI_MIN_INTERVAL_MS: "0", AI_MAX_RETRIES: "0" });
-const prefix = `history-${randomUUID()}`, guilds = Array.from({ length: 7 }, (_, index) => `${prefix}-${index}`);
+const prefix = `history-${randomUUID()}`, guilds = Array.from({ length: 8 }, (_, index) => `${prefix}-${index}`);
+const generationRule = "Specify the species when an animal fact only applies to certain species.";
 const originalFetch = globalThis.fetch;
 let stage = "setup", generated = [], requests = [], review = true, sent = [];
 const specimen = (question, answer = "Wombat", explanation = "A synthetic animal fact.") => ({ language: "pl", topic: "Zwierzęta", question, options: [answer, "Koala", "Bóbr", "Kapibara"], correctOption: 0, explanation, topicEmoji: "", optionEmojis: ["", "", "", ""] });
@@ -19,9 +20,10 @@ globalThis.fetch = async (url, options) => {
   return new Response(JSON.stringify({ object: "response", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] }), { headers: { "content-type": "application/json" } });
 };
 const { db } = await import("../dist/db.js");
-const { publishTopicQuestions, publishRandomQuestion } = await import("../dist/services/poll-publisher.js");
+const { publishCustomQuiz, publishTopicQuestions, publishRandomQuestion } = await import("../dist/services/poll-publisher.js");
+const { AiQuestionNotAnswerableError } = await import("../dist/services/question-generator.js");
 const { loadQuestionHistory, loadQuestionFacts } = await import("../dist/services/question-history.js");
-const { quizDay } = await import("../dist/services/quiz-limits.js");
+const { DailyQuizLimitError, RandomQuizCooldownError, RANDOM_DAILY_LIMIT, quizDay } = await import("../dist/services/quiz-limits.js");
 const originalGeneratedRead = db.generatedPoll.findMany.bind(db.generatedPoll), originalRandomRead = db.randomPoll.findMany.bind(db.randomPoll);
 const poll = (guildId, messageId, data = original, createdAt = new Date(1000)) => ({ guildId, messageId, channelId: "test-channel", question: data.question, options: JSON.stringify(data.options), correctOption: data.correctOption, explanation: data.explanation, createdAt });
 const channel = guildId => ({ id: "test-channel", guild: { id: guildId, members: {} }, send: async payload => { sent.push(payload); return { id: `${prefix}-sent-${sent.length}` }; } });
@@ -30,6 +32,7 @@ const setLanguage = guildId => db.guildSettings.create({ data: { guildId, langua
 function scenario(values, duplicate = true) { generated = [...values]; requests = []; review = duplicate; }
 try {
   for (const guildId of guilds) await setLanguage(guildId);
+  await db.quizGenerationRule.create({ data: { key: prefix, text: generationRule } });
   stage = "random-to-topic";
   const first = await topic(guilds[0]);
   await db.randomPoll.create({ data: { ...poll(guilds[0], `${prefix}-random-old`), language: "pl" } });
@@ -38,6 +41,8 @@ try {
   assert.deepEqual(requests.map(row => row.text.format.name), ["quiz_question", "quiz_novelty", "quiz_question"]);
   assert.ok(requests[0].input.includes(original.question));
   assert.ok(requests[2].input.includes(paraphrase.question));
+  for (const request of [requests[0], requests[2]]) assert.ok(request.instructions.includes(generationRule));
+  assert.ok(!requests[1].instructions.includes(generationRule));
   assert.equal((await db.generatedPoll.findFirst({ where: { guildId: guilds[0] } })).question, fresh.question);
   assert.equal(sent.length, 1, "The rejected paraphrase never reaches Discord");
   stage = "topic-to-random";
@@ -45,12 +50,14 @@ try {
   scenario([paraphrase, fresh]);
   await publishRandomQuestion(guilds[1], 4, channel(guilds[1]));
   assert.deepEqual(requests.map(row => row.text.format.name), ["quiz_question", "quiz_novelty", "quiz_question"]);
+  assert.ok(requests[0].instructions.includes(generationRule));
   assert.equal((await db.randomPoll.findFirst({ where: { guildId: guilds[1] } })).question, fresh.question);
   stage = "different-fact";
   const third = await topic(guilds[2]);
   await db.randomPoll.create({ data: { ...poll(guilds[2], `${prefix}-same-animal`), language: "pl" } });
   const different = specimen("Które zwierzę wykopuje rozbudowane podziemne nory?", "Wombat", "A distinct synthetic burrow fact.");
-  scenario([different], false); await publishTopicQuestions(third, channel(guilds[2]));
+  scenario([different], false); await publishTopicQuestions(third, channel(guilds[2]), false);
+  assert.ok(requests[0].instructions.includes(generationRule));
   assert.equal(requests.length, 2); assert.equal((await db.generatedPoll.findFirst({ where: { guildId: guilds[2] } })).question, different.question);
   stage = "guild-isolation";
   const isolated = await topic(guilds[3]);
@@ -106,11 +113,56 @@ try {
   assert.equal(index.length, 1);
   const migration = readFileSync("prisma/postgresql/migrations/20261104090000_shared_question_history_index/migration.sql", "utf8");
   assert.equal(migration, readFileSync("prisma/migrations/20261104090000_shared_question_history_index/migration.sql", "utf8"));
+  stage = "on-demand-question-limits";
+  const requestedQuestion = "Which bird can hover while flying?";
+  const publishProvided = guildId => publishCustomQuiz(guildId, { question: requestedQuestion }, 4, channel(guildId), "medium", 2, "test-manager");
+  const publishCustomTopic = guildId => publishCustomQuiz(guildId, { topic: "Synthetic wildlife" }, 4, channel(guildId), "medium", 2, "test-manager");
+  const questionGuild = guilds[7];
+  scenario([{ ...fresh, question: requestedQuestion, answerable: false }]);
+  const sentBeforeAsk = sent.length;
+  await assert.rejects(publishProvided(questionGuild), AiQuestionNotAnswerableError);
+  assert.equal(sent.length, sentBeforeAsk);
+  assert.equal(await db.dailyQuizRun.count({ where: { guildId: questionGuild } }), 0);
+  scenario([{ ...fresh, answerable: true }]);
+  await assert.rejects(publishProvided(questionGuild), /AI generation could not be completed/);
+  assert.equal(sent.length, sentBeforeAsk, "A rewritten question never reaches Discord");
+  scenario([{ ...fresh, question: requestedQuestion, answerable: true }]);
+  await publishProvided(questionGuild);
+  assert.equal(requests.length, 1);
+  assert.equal(JSON.parse(requests[0].input).suppliedQuestion, requestedQuestion);
+  assert.ok(requests[0].instructions.includes(generationRule));
+  const askedPoll = await db.randomPoll.findFirstOrThrow({ where: { guildId: questionGuild, kind: "custom" } });
+  assert.equal(askedPoll.question, requestedQuestion);
+  assert.equal(askedPoll.creatorUserId, "test-manager");
+  assert.equal(JSON.parse(askedPoll.options)[askedPoll.correctOption], fresh.options[fresh.correctOption]);
+  await assert.rejects(publishProvided(questionGuild), RandomQuizCooldownError);
+  await assert.rejects(publishCustomTopic(questionGuild), RandomQuizCooldownError);
+  const fillPool = async (guildId, scope) => {
+    const firstSlot = await db.dailyQuizRun.findFirstOrThrow({ where: { guildId, scope } });
+    await db.dailyQuizRun.createMany({ data: Array.from({ length: RANDOM_DAILY_LIMIT - 1 }, (_, index) => ({
+      guildId, scope, day: firstSlot.day, slot: index + 2, createdAt: firstSlot.createdAt
+    })) });
+  };
+  await fillPool(questionGuild, "custom-daily");
+  await assert.rejects(publishProvided(questionGuild), error => error instanceof DailyQuizLimitError && error.kind === "custom");
+  assert.equal(requests.length, 1);
+  scenario([original]);
+  await publishRandomQuestion(questionGuild, 4, channel(questionGuild));
+  assert.equal(requests.length, 1, "An exhausted question pool still allows a random quiz");
+  await assert.rejects(publishRandomQuestion(questionGuild, 4, channel(questionGuild)), RandomQuizCooldownError);
+  await fillPool(guilds[1], "random-daily");
+  await assert.rejects(publishRandomQuestion(guilds[1], 4, channel(guilds[1])), error => error instanceof DailyQuizLimitError && error.kind === "random");
+  scenario([fresh]);
+  await publishCustomTopic(guilds[1]);
+  assert.equal(requests.length, 1, "An exhausted random pool still allows a custom quiz");
+  assert.ok(requests[0].input.includes("Synthetic wildlife"));
+  assert.equal(await db.topic.count({ where: { guildId: guilds[1] } }), 0);
   console.log(JSON.stringify({ check: "question-history-postgres", passed: true, crossSource: true, deletedTopicHistory: true, differentFactsAllowed: true, guildIsolation: true, parallelPublication: true, reservationsReleased: true, boundedHistory: true, leanReads: true, indexed: true, liveApiUsed: false }));
 } catch (error) {
   console.error(JSON.stringify({ check: "question-history-postgres", passed: false, stage, category: error instanceof assert.AssertionError ? "assertion" : "test-error", errorType: /^[A-Za-z]+Error$/.test(error.name) ? error.name : "Error", kind: ["unavailable", "limit", "configuration", "invalid-response", "timeout"].includes(error.kind) ? error.kind : undefined, requests: requests.map(request => request.text?.format?.name), remaining: generated.length, line: Number(error.stack?.match(/test-question-history-postgres\.mjs:(\d+)/)?.[1] ?? 0) })); process.exitCode = 1;
 } finally {
   globalThis.fetch = originalFetch; db.generatedPoll.findMany = originalGeneratedRead; db.randomPoll.findMany = originalRandomRead;
+  await db.quizGenerationRule.deleteMany({ where: { key: prefix } });
   await db.quizSettlement.deleteMany({ where: { guildId: { in: guilds } } });
   for (const table of ["generatedPoll", "randomPoll", "dailyQuizRun", "topic", "guildSettings"]) await db[table].deleteMany({ where: { guildId: { in: guilds } } });
   await db.$disconnect();

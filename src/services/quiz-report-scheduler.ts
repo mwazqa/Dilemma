@@ -8,7 +8,7 @@ import { DeadlineQueue, retryDelay } from "./deadline-queue.js";
 import { quizDayBounds } from "./quiz-limits.js";
 import { analyzeQuizReports, reportAnalysisCacheSchema, reportAnalysisSchema, reportAnalysisScopeKey, type ReportAnalysis } from "./quiz-report-analysis.js";
 import { deliverQuizReportReview, safeReportText } from "./quiz-report-review.js";
-import { CORRECTION_ACCEPT_PREFIX, CORRECTION_BUTTON_PREFIX, suggestedCorrection } from "./quiz-corrections.js";
+import { CORRECTION_ACCEPT_PREFIX, CORRECTION_BUTTON_PREFIX, suggestedCorrection, suggestedGenerationRule } from "./quiz-corrections.js";
 
 export const REPORT_REVIEW_TIMEZONE = "Europe/Warsaw";
 type BatchRunner = (client: Client, cutoff: Date, current: () => boolean) => Promise<boolean>;
@@ -67,11 +67,13 @@ export async function processQuizReportBatch(client: Client, cutoff: Date, curre
     const verdict = analysis.verdict === "confirmed" ? "quizReportReviewConfirmed"
       : analysis.verdict === "not-confirmed" ? "quizReportReviewNotConfirmed" : "quizReportReviewUncertain";
     const proposal = suggestedCorrection(analysis);
+    const generationRule = suggestedGenerationRule(analysis);
     const url = [first.guildId, first.channelId, first.messageId].every(id => /^\d{17,20}$/.test(id))
       ? `https://discord.com/channels/${first.guildId}/${first.channelId}/${first.messageId}` : "";
     const findings = [
       `**${message(language, verdict)}**`, `**${message(language, "quizReportReviewFinding")}:** ${safeReportText(analysis.finding)}`,
       `**${message(language, "quizReportReviewSuggestion")}:** ${proposal || safeReportText(analysis.suggestion)}`,
+      ...(generationRule ? [`**${message(language, "quizGenerationRuleLabel")}**\n${inlineText(generationRule)}`] : []),
       analysis.sources.length ? `**${message(language, "quizReportReviewSources")}:**\n` + analysis.sources.map(source =>
         `[${inlineText(source.title)}](${source.url.replace(/[()]/g, character => encodeURIComponent(character))})`).join("\n")
         : message(language, analysis.kind === "wording" ? "quizReportReviewTextEvidence" : "quizReportReviewNoSources")];

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { EmbedBuilder } from "discord.js";
 import { message } from "../messages.js";
 
@@ -8,6 +9,10 @@ export function getPlayerGuideText(language = "en"): string {
     myAnswerButton: message(language, "myQuizVoteButton"), myResultButton: message(language, "myQuizResultButton"),
     reportQuizButton: message(language, "quizReportButton")
   });
+}
+
+export function getPlayerGuideContentHash(language: string): string {
+  return createHash("sha256").update(getPlayerGuideText(language)).digest("hex");
 }
 
 export function getPlayerGuideEmbed(language = "en"): EmbedBuilder {
